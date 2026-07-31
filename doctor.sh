@@ -344,13 +344,17 @@ if [[ -f "$ENV_FILE" ]]; then
       tip "then: edit $ENV_FILE  (or: bash \"$REPO/install.sh\")"
     fi
   done
-  for k in OPENAI_API_KEY CONTEXT7_API_KEY EXA_API_KEY; do
+  for k in LLM_GATEWAY_OPENAI_BASE_URL LLM_GATEWAY_API_KEY CONTEXT7_API_KEY EXA_API_KEY; do
     if [[ -n "$(getkey $k)" ]]; then ok "$k set"
     else
       case "$k" in
-        OPENAI_API_KEY)
-          opt "$k unset (GPT lane falls back to OpenRouter)"
-          tip "https://platform.openai.com/api-keys → add OPENAI_API_KEY=… to $ENV_FILE"
+        LLM_GATEWAY_OPENAI_BASE_URL)
+          bad "$k MISSING — subscription GPT lane unavailable"
+          tip "add the gateway OpenAI-compatible base URL (for example https://proxy.unbeatn.ai/v1) to $ENV_FILE"
+          ;;
+        LLM_GATEWAY_API_KEY)
+          bad "$k MISSING — subscription GPT lane unavailable"
+          tip "add the shared gateway bearer key to $ENV_FILE"
           ;;
         CONTEXT7_API_KEY)
           opt "$k unset (Context7 docs MCP unauthenticated)"
@@ -396,26 +400,28 @@ if [[ -f "$ENV_FILE" ]]; then
       tip "verify key at https://openrouter.ai/keys"
     fi
   fi
-  # Direct OpenAI key ping (cheap)
-  oai="$(getkey OPENAI_API_KEY)"
-  if [[ -n "$oai" ]] && command -v curl >/dev/null; then
-    _oa_out="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' \
+  # Shared subscription gateway probe: /models is non-billable and validates
+  # the same OpenAI-compatible endpoint used by the GPT agent lane.
+  gateway_url="$(getkey LLM_GATEWAY_OPENAI_BASE_URL)"
+  gateway_key="$(getkey LLM_GATEWAY_API_KEY)"
+  if [[ -n "$gateway_url" && -n "$gateway_key" ]] && command -v curl >/dev/null; then
+    _gw_out="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' \
       --connect-timeout 5 --max-time 15 \
-      -H "Authorization: Bearer $oai" https://api.openai.com/v1/models 2>/dev/null || echo "000 0")"
-    oacode="${_oa_out%% *}"
-    oasecs="${_oa_out##* }"
-    oams="$(python3 -c "print(int(round(float('$oasecs')*1000)))" 2>/dev/null || echo "?")"
-    if [[ "$oacode" == "200" ]]; then
-      ok "OpenAI key live (HTTP 200, ${oams}ms)"
-      if [[ "$oams" != "?" && "$oams" -gt 1500 ]]; then
-        soft "OpenAI latency ${oams}ms — network blip, GPT lane still usable"
+      -H "Authorization: Bearer $gateway_key" "${gateway_url%/}/models" 2>/dev/null || echo "000 0")"
+    gwcode="${_gw_out%% *}"
+    gwsecs="${_gw_out##* }"
+    gwms="$(python3 -c "print(int(round(float('$gwsecs')*1000)))" 2>/dev/null || echo "?")"
+    if [[ "$gwcode" == "200" ]]; then
+      ok "Subscription gateway live (HTTP 200, ${gwms}ms)"
+      if [[ "$gwms" != "?" && "$gwms" -gt 1500 ]]; then
+        soft "Subscription gateway latency ${gwms}ms — GPT lane still usable"
       fi
-    elif [[ "$oacode" == "401" || "$oacode" == "403" ]]; then
-      bad "OpenAI key rejected (HTTP $oacode) — GPT lane (Hephaestus/Oracle/Momus) will fail"
-      tip "https://platform.openai.com/api-keys → update OPENAI_API_KEY in $ENV_FILE"
+    elif [[ "$gwcode" == "401" || "$gwcode" == "403" ]]; then
+      bad "Subscription gateway key rejected (HTTP $gwcode) — GPT lane will fail"
+      tip "update LLM_GATEWAY_API_KEY in $ENV_FILE"
     else
-      soft "OpenAI key check returned HTTP $oacode (${oams}ms)"
-      tip "https://platform.openai.com/api-keys — GPT lane needs a valid direct key"
+      soft "Subscription gateway probe returned HTTP $gwcode (${gwms}ms)"
+      tip "verify LLM_GATEWAY_OPENAI_BASE_URL and gateway availability"
     fi
   fi
 else
@@ -986,7 +992,7 @@ elif dc > 4:
 else:
     ok("defaultConcurrency=%s" % dc)
 
-for prov, cap in (("openrouter", 6), ("openai", 4), ("anthropic", 2)):
+for prov, cap in (("openrouter", 6), ("subscription-gateway", 4), ("anthropic", 2)):
     v = pc.get(prov)
     if not isinstance(v, int):
         bad("providerConcurrency.%s missing" % prov)
@@ -996,7 +1002,7 @@ for prov, cap in (("openrouter", 6), ("openai", 4), ("anthropic", 2)):
         ok("providerConcurrency.%s=%s" % (prov, v))
 
 # Referenced models = agents/categories (+fallbacks) + OpenCode whitelist.
-# Aliases: openai/X ↔ openrouter/openai/X (both keys are intentional for dual lane).
+# OpenRouter model IDs can be referenced with or without the provider prefix.
 def aliases(mid):
     out = {mid}
     if mid.startswith("openrouter/"):
@@ -1004,8 +1010,6 @@ def aliases(mid):
         out.add(bare)
         if bare.startswith("openai/"):
             out.add(bare)
-    elif mid.startswith("openai/"):
-        out.add("openrouter/" + mid)
     elif "/" in mid:
         out.add("openrouter/" + mid)
     return out
@@ -1086,12 +1090,12 @@ else:
 
 # MCP env allowlist (Exa / Context7 / provider keys into OmO MCP)
 allow = set(omo.get("mcp_env_allowlist") or [])
-need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"}
+need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"}
 miss_env = sorted(need_env - allow)
 if miss_env:
     opt("mcp_env_allowlist missing: %s — run: oc fix" % ", ".join(miss_env))
 else:
-    ok("mcp_env_allowlist covers Context7/Exa/OpenAI/OpenRouter")
+    ok("mcp_env_allowlist covers Context7/Exa/subscription gateway/OpenRouter")
 
 sw = omo.get("start_work") if isinstance(omo.get("start_work"), dict) else {}
 if "start_work" not in omo:

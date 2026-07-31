@@ -216,7 +216,8 @@ fi
 # Never dump the whole .env (DB URLs, company secrets, etc.) into the process environment.
 OC_ENV_ALLOWLIST=(
   OPENROUTER_API_KEY
-  OPENAI_API_KEY
+  LLM_GATEWAY_API_KEY
+  LLM_GATEWAY_OPENAI_BASE_URL
   EXA_API_KEY
   CONTEXT7_API_KEY
   OPENROUTER_MGMT_KEY

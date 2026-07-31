@@ -105,7 +105,7 @@ ${c_bold}Models & Admin:${c_0}
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]
                                          Package pins vs npm + GitHub (+ other repos)
   ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO plugin doctor / pin cache
-  ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + direct OpenAI admin
+  ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + subscription gateway admin
 
 ${c_bold}Run & Launch:${c_0}
   ${c_g}run${c_0}       "<msg>" [-a agent] [-d dir]    Headless runner (run to completion)
@@ -695,7 +695,7 @@ Options:
 
 Examples:
   oc install --quick
-  OPENROUTER_API_KEY=sk-… OPENAI_API_KEY=sk-… oc install --yes
+  OPENROUTER_API_KEY=sk-… LLM_GATEWAY_API_KEY=… oc install --yes
   oc install --full
 
 After install:

@@ -21,7 +21,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | Runtime | [OpenCode](https://opencode.ai) | Provider-agnostic coding agent TUI/CLI; config-as-code; LSP; MCP |
 | Orchestration | [oh-my-openagent (OmO)](https://omo.vibetip.help/docs) | Multi-model agents, categories, team mode, ultrawork, hyperplan — docs on VibeTip |
 | Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM Exacto, DeepSeek Nitro, Claude, Gemini, MiniMax; Exacto/Nitro variants |
-| GPT lane | Direct [OpenAI](https://platform.openai.com) | Hephaestus/Oracle/Momus/deep/ultrabrain need Sol quality; OpenRouter GPT is fallback only |
+| GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; OpenRouter GPT is fallback only |
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
 | GitHub code | OmO `grep_app` | Real call-site examples across public repos |
@@ -29,15 +29,15 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | Design | Open Design / Claude Design patterns | `artistry` locks direction; `visual-engineering` ships (shadcn-aware) |
 | Identity | `signature.json` + `oc signature` | Markers + content fingerprint — proves this tree is OpenConfig, not a random clone |
 
-**Not used (on purpose):** Cloudflare AI Gateway, OpenAI-compatible env hacks, Claude Code bridge imports, random third-party MCPs, OmO security-* skills, packaging this repo as an npm project.
+**Not used (on purpose):** Cloudflare AI Gateway, unscoped provider env hacks, Claude Code bridge imports, random third-party MCPs, OmO security-* skills, packaging this repo as an npm project.
 
 ### Routing logic (short)
 
 - **Orchestration / tool loops** → GLM `5.2:exacto` (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) — Exacto = tool-call quality on OpenRouter.
 - **Fast parallel recon** → DeepSeek Flash `:nitro` (explore, librarian, sisyphus-junior, quick) — Nitro = throughput.
-- **Deep implement / critique** → OpenAI `gpt-5.6-sol` direct (Hephaestus, Oracle, Momus, deep, ultrabrain, arch-review). `gpt-5.6-sol-pro` = higher-quality reasoning mode fallback.
+- **Deep implement / critique** → subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review). OpenRouter GPT remains a paid fallback.
 - **Visual / writing** → Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.6 Flash Nitro).
-- **Hard ceiling** → Claude Fable 5 max for `ultrawork` / unspecified-high (Opus 4.8 / 4.7 / Sol fallbacks).
+- **Hard ceiling** → Claude Opus 5 max for `ultrawork` / unspecified-high (Fable 5 / Opus 4.8 / 4.7 / Sol fallbacks).
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k3` (1M ctx, ~$3/$15) as a quality fallback — already wired in `opencode.json` / OmO fallbacks; not a daily default (single-provider, expensive). Prefer K2.7 Code / DeepSeek for routine coding.
 - **Content-aware research** → DeepSeek Pro + `content-aware-*` agent/categories when Claude/OpenAI refuse.
 
@@ -86,7 +86,7 @@ Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 - Allow-everything on this trusted local box (no interactive prompts for normal tools).
 - Hard-deny catastrophic bash: `rm -rf /`, `rm -rf ~`, `mkfs`, `sudo`, `git push --force`, `gh repo delete`.
 - External directories, team tools, LSP, MCP allowed: Context7 · Exa websearch · grep_app · codegraph · lsp (OmO builtins + `opencode.json` Context7).
-- Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.
+- Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `LLM_GATEWAY_OPENAI_BASE_URL`, `LLM_GATEWAY_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.
 
 ## Commands
 
@@ -109,7 +109,7 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Lead: **sisyphus**. Eligible: sisyphus, atlas, sisyphus-junior, hephaestus (`teammate: allow`), or `kind: category`.
 - Teams: explorers, ship-feature, debug-team, review-panel, refactor-team, docs-team, content-aware-audit → `~/.omo/teams/`.
 - Hyperplan (`hyperplan` / `hpp` / `/hyperplan`): **sisyphus only**, not prometheus. Needs team mode + demoted `plan` agent for Phase 6. Do not put `plan` in `disabled_agents`.
-- Ultrawork (`ulw`): Claude Fable 5 max (not Opus-primary).
+- Ultrawork (`ulw`): Claude Opus 5 max (Fable remains a fallback, not the primary route).
 
 ## What not to do
 

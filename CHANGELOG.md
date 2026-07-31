@@ -2,6 +2,13 @@
 
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
+## [1.5.39] — 2026-07-31
+
+### Opus 5 deep-routing refresh
+- Make `anthropic/claude-opus-5` the max-effort route for `ultrawork` and `unspecified-high`
+- Retain Claude Fable 5 as a capped fallback, and cap Opus 5 at one concurrent background task
+- Keep the existing GLM, DeepSeek, GPT-subscription and public Buzz-persona primary routes unchanged
+
 ## [1.5.38] — 2026-07-26
 
 ### Prompt contract hardening

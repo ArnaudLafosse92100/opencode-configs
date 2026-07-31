@@ -16,7 +16,7 @@
   },
   "enabled_providers": [
     "openrouter",
-    "openai"
+    "subscription-gateway"
   ],
   "instructions": [
     "AGENTS.md",
@@ -75,6 +75,7 @@
         "anthropic/claude-opus-4.8",
         "anthropic/claude-opus-4.8-fast",
         "anthropic/claude-opus-4.7",
+        "anthropic/claude-opus-5",
         "anthropic/claude-fable-5",
         "moonshotai/kimi-k3"
       ],
@@ -1030,6 +1031,66 @@
             }
           }
         },
+        "anthropic/claude-opus-5": {
+          "id": "anthropic/claude-opus-5",
+          "name": "Claude Opus 5",
+          "family": "claude",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": false,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
+            },
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "preferred_min_throughput": {
+                "p50": 40,
+                "p90": 30
+              },
+              "preferred_max_latency": {
+                "p50": 8,
+                "p90": 14
+              },
+              "order": [
+                "amazon-bedrock",
+                "google-vertex",
+                "anthropic",
+                "azure"
+              ]
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
         "anthropic/claude-fable-5": {
           "id": "anthropic/claude-fable-5",
           "name": "Claude Fable 5",
@@ -1250,6 +1311,146 @@
             },
             "reasoning": {
               "effort": "medium"
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        }
+      }
+    },
+    "subscription-gateway": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Subscription Gateway (Codex)",
+      "env": [
+        "LLM_GATEWAY_API_KEY",
+        "LLM_GATEWAY_OPENAI_BASE_URL"
+      ],
+      "options": {
+        "baseURL": "{env:LLM_GATEWAY_OPENAI_BASE_URL}",
+        "apiKey": "{env:LLM_GATEWAY_API_KEY}",
+        "timeout": 900000,
+        "headerTimeout": 900000,
+        "chunkTimeout": 900000
+      },
+      "models": {
+        "gpt-5.6-sol": {
+          "id": "llm-agent-planning",
+          "name": "GPT-5.6 Sol (subscription planning)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "gpt-5.6-terra": {
+          "id": "llm-agent-implementation",
+          "name": "GPT-5.6 Terra (subscription implementation)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "gpt-5.6-sol-review": {
+          "id": "llm-agent-review",
+          "name": "GPT-5.6 Sol (subscription review)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
             }
           },
           "variants": {

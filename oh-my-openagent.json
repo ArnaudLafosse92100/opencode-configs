@@ -25,10 +25,12 @@
         "openrouter/minimax/minimax-m3",
         "openrouter/deepseek/deepseek-v4-pro",
         "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8"
+        "openrouter/anthropic/claude-opus-4.8",
+        "openrouter/anthropic/claude-opus-5",
+        "openrouter/anthropic/claude-fable-5"
       ],
       "ultrawork": {
-        "model": "openrouter/anthropic/claude-fable-5",
+        "model": "openrouter/anthropic/claude-opus-5",
         "variant": "max"
       },
       "temperature": 0.25,
@@ -39,12 +41,12 @@
       "color": "#00F0FF"
     },
     "hephaestus": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-terra",
       "mode": "primary",
       "variant": "high",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol-review",
+        "subscription-gateway/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra"
       ],
@@ -93,12 +95,12 @@
       "color": "#39FF14"
     },
     "oracle": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-sol",
       "mode": "subagent",
       "variant": "high",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol-review",
+        "subscription-gateway/gpt-5.6-terra",
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
         "openrouter/moonshotai/kimi-k3",
@@ -150,7 +152,7 @@
         "openrouter/google/gemini-3.6-flash",
         "openrouter/google/gemini-3.5-flash",
         "openrouter/moonshotai/kimi-k3",
-        "openai/gpt-5.6-sol"
+        "subscription-gateway/gpt-5.6-sol-review"
       ],
       "maxTokens": 24576,
       "prompt_append": "file://~/.config/opencode/prompts/agents/multimodal-looker.md",
@@ -171,15 +173,16 @@
       "variant": "medium"
     },
     "momus": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-sol-review",
       "mode": "subagent",
       "variant": "max",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-terra",
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
         "openrouter/moonshotai/kimi-k3",
+        "openrouter/anthropic/claude-opus-5",
         "openrouter/anthropic/claude-fable-5",
         "openrouter/anthropic/claude-opus-4.8-fast",
         "openrouter/anthropic/claude-opus-4.8",
@@ -213,7 +216,7 @@
       "variant": "high",
       "fallback_models": [
         "openrouter/moonshotai/kimi-k3",
-        "openai/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-sol-review",
         "openrouter/z-ai/glm-5.2-exacto",
         "openrouter/deepseek/deepseek-v4-flash",
         "openrouter/minimax/minimax-m3"
@@ -249,12 +252,13 @@
       "color": "#FF2D95"
     },
     "ultrabrain": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-sol",
       "variant": "max",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol-review",
+        "subscription-gateway/gpt-5.6-terra",
         "openrouter/openai/gpt-5.6-sol",
+        "openrouter/anthropic/claude-opus-5",
         "openrouter/anthropic/claude-fable-5",
         "openrouter/anthropic/claude-opus-4.8-fast",
         "openrouter/anthropic/claude-opus-4.8",
@@ -266,11 +270,11 @@
       "color": "#B967FF"
     },
     "deep": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-sol",
       "variant": "high",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol-review",
+        "subscription-gateway/gpt-5.6-terra",
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/deepseek/deepseek-v4-pro",
         "openrouter/z-ai/glm-5.2-exacto"
@@ -316,13 +320,14 @@
       "maxTokens": 8192
     },
     "unspecified-high": {
-      "model": "openrouter/anthropic/claude-fable-5",
+      "model": "openrouter/anthropic/claude-opus-5",
       "variant": "max",
       "fallback_models": [
+        "openrouter/anthropic/claude-fable-5",
         "openrouter/anthropic/claude-opus-4.8-fast",
         "openrouter/anthropic/claude-opus-4.8",
         "openrouter/anthropic/claude-opus-4.7",
-        "openai/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-sol",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
@@ -345,7 +350,7 @@
       "model": "openrouter/z-ai/glm-5.2-exacto",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro",
-        "openai/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-sol",
         "openrouter/minimax/minimax-m3"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
@@ -369,11 +374,11 @@
     },
     "arch-review": {
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
-      "model": "openai/gpt-5.6-sol",
+      "model": "subscription-gateway/gpt-5.6-sol-review",
       "variant": "high",
       "fallback_models": [
-        "openai/gpt-5.6-terra",
-        "openai/gpt-5.6-sol-pro",
+        "subscription-gateway/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-terra",
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/anthropic/claude-opus-4.8-fast",
         "openrouter/anthropic/claude-opus-4.8",
@@ -401,7 +406,7 @@
       "description": "Deep vuln research. Each finding: CVSS, evidence, repro, fix.",
       "model": "openrouter/deepseek/deepseek-v4-pro",
       "fallback_models": [
-        "openai/gpt-5.6-sol",
+        "subscription-gateway/gpt-5.6-sol-review",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoningEffort": "high",
@@ -413,14 +418,14 @@
     "defaultConcurrency": 4,
     "providerConcurrency": {
       "openrouter": 6,
-      "openai": 4,
+      "subscription-gateway": 4,
       "anthropic": 2
     },
     "modelConcurrency": {
-      "openai/gpt-5.6-sol": 3,
-      "openai/gpt-5.6-sol-pro": 3,
-      "openai/gpt-5.6-luna": 4,
-      "openai/gpt-5.6-terra": 3,
+      "subscription-gateway/gpt-5.6-sol": 3,
+      "subscription-gateway/gpt-5.6-terra": 3,
+      "subscription-gateway/gpt-5.6-sol-review": 3,
+      "openrouter/anthropic/claude-opus-5": 1,
       "openrouter/anthropic/claude-fable-5": 1,
       "openrouter/anthropic/claude-opus-4.8": 1,
       "openrouter/anthropic/claude-opus-4.8-fast": 1,
@@ -630,7 +635,8 @@
   "mcp_env_allowlist": [
     "CONTEXT7_API_KEY",
     "EXA_API_KEY",
-    "OPENAI_API_KEY",
+    "LLM_GATEWAY_API_KEY",
+    "LLM_GATEWAY_OPENAI_BASE_URL",
     "OPENROUTER_API_KEY"
   ]
 }

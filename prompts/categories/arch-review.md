@@ -1,4 +1,4 @@
-# Category: arch-review (GPT-5.6 Sol direct)
+# Category: arch-review (GPT-5.6 Sol via subscription gateway)
 
 Coupling, cohesion, blast radius, security posture. Findings-first unless the lead asks for edits. Team security reviews prefer `content-aware-deep` (DeepSeek Pro).
 

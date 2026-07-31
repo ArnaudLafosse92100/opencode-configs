@@ -356,7 +356,7 @@ if omo:
         err(f"background_task.defaultConcurrency must be 1–4 (got {dc!r})")
     else:
         ok(f"background_task.defaultConcurrency={dc}")
-    for prov, cap in (("openrouter", 6), ("openai", 4), ("anthropic", 2)):
+    for prov, cap in (("openrouter", 6), ("subscription-gateway", 4), ("anthropic", 2)):
         v = pc.get(prov)
         if not isinstance(v, int) or v < 1 or v > cap:
             err(f"providerConcurrency.{prov} must be 1–{cap} (got {v!r})")
@@ -421,12 +421,12 @@ if omo:
     else:
         ok("goal footgun documented (prompts/goal.md in instructions)")
     allow = set(omo.get("mcp_env_allowlist") or [])
-    need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"}
+    need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"}
     miss_env = sorted(need_env - allow)
     if miss_env:
         warn(f"mcp_env_allowlist missing: {', '.join(miss_env)} — run: oc fix")
     else:
-        ok("mcp_env_allowlist covers Context7/Exa/OpenAI/OpenRouter")
+        ok("mcp_env_allowlist covers Context7/Exa/subscription gateway/OpenRouter")
     if not isinstance(omo.get("start_work"), dict):
         warn("start_work block missing — run: oc fix")
     else:
@@ -926,7 +926,7 @@ for rel, label in (
         ok(f"{label} present")
 
 env_ex = open(os.path.join(repo, ".env.example"), encoding="utf-8").read()
-for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "EXA_API_KEY", "CONTEXT7_API_KEY", "OC_PROJECTS_DIR", "OC_DEFAULT_WORKSPACE"):
+for key in ("OPENROUTER_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "EXA_API_KEY", "CONTEXT7_API_KEY", "OC_PROJECTS_DIR", "OC_DEFAULT_WORKSPACE"):
     if key not in env_ex:
         err(f".env.example missing {key}")
 if "OPENROUTER_API_KEY" in env_ex and "OC_PROJECTS_DIR" in env_ex and "OC_DEFAULT_WORKSPACE" in env_ex:
@@ -1062,8 +1062,8 @@ else:
     except Exception as e:
         err(f"signature.json: {e}")
 
-# ---- 4d. stale Opus-primary ultrawork wording (config uses Fable max) ----
-stale_opus = []
+# ---- 4d. stale Fable-primary ultrawork wording (config uses Opus 5 max) ----
+stale_fable = []
 for root, _, files in os.walk(os.path.join(repo, "prompts")):
     for fn in files:
         if not fn.endswith(".md"):
@@ -1074,15 +1074,15 @@ for root, _, files in os.walk(os.path.join(repo, "prompts")):
         except OSError:
             continue
         low = txt.lower()
-        if "opus max" in low or "ultrawork/opus" in low or "ultrawork → claude opus" in low:
-            stale_opus.append(os.path.relpath(path, repo))
+        if "fable max" in low or "ultrawork/fable" in low or "ultrawork → claude fable" in low:
+            stale_fable.append(os.path.relpath(path, repo))
 agents_txt = open(os.path.join(repo, "AGENTS.md"), encoding="utf-8").read().lower()
-if "ultrawork" in agents_txt and "opus max path" in agents_txt:
-    stale_opus.append("AGENTS.md")
-if stale_opus:
-    warn(f"stale Opus-primary ultrawork wording (config uses Fable max): {stale_opus}")
+if "ultrawork" in agents_txt and "fable max path" in agents_txt:
+    stale_fable.append("AGENTS.md")
+if stale_fable:
+    warn(f"stale Fable-primary ultrawork wording (config uses Opus 5 max): {stale_fable}")
 else:
-    ok("no stale Opus-primary ultrawork wording in prompts")
+    ok("no stale Fable-primary ultrawork wording in prompts")
 
 # ---- 5. agent markdown frontmatter sanity ----
 for md in sorted(glob.glob(os.path.join(repo, "agents", "*.md"))):

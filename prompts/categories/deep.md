@@ -1,4 +1,4 @@
-# Category: deep (GPT-5.6 Sol direct)
+# Category: deep (GPT-5.6 Sol via subscription gateway)
 
 One goal + one deliverable per call. Autonomous problem-solving on Sol (not Flash explore).
 

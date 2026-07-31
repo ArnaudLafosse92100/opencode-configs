@@ -70,6 +70,14 @@ esac
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
 
+# `bunx oh-my-openagent run` launches the OpenCode binary by name. Desktop
+# shells normally add this directory through zshrc, but a headless run (or the
+# Buzz harness) may not inherit an interactive PATH.
+opencode_bin="${OPENCODE_BIN:-$HOME/.opencode/bin/opencode}"
+if [[ -x "$opencode_bin" ]]; then
+  export PATH="$(dirname "$opencode_bin"):$PATH"
+fi
+
 # bunx writes package.json/node_modules into cwd — never run it from the
 # config repo (or a user project). Use a dedicated cache dir instead.
 OMO_BUNX_CWD="${XDG_CACHE_HOME:-${HOME}/.cache}/opencode/omo-cli-runner"

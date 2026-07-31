@@ -33,7 +33,8 @@ Decision log: [`AGENTS.md`](./AGENTS.md) · Stance: [`prompts/core.md`](./prompt
 
 ```bash
 export OPENROUTER_API_KEY=…     # required
-export OPENAI_API_KEY=…         # GPT lane (Hephaestus / Oracle / Momus / …)
+export LLM_GATEWAY_OPENAI_BASE_URL=https://proxy.unbeatn.ai/v1
+export LLM_GATEWAY_API_KEY=…    # GPT subscription lane (Hephaestus / Oracle / Momus / …)
 export EXA_API_KEY=…            # OmO websearch
 export CONTEXT7_API_KEY=…       # library docs
 
@@ -137,7 +138,7 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | Agent | Model | Role |
 | --- | --- | --- |
 | **sisyphus** | GLM 5.2 Exacto | Default orchestrator / lead |
-| **hephaestus** | GPT-5.6 Sol (direct OpenAI) | Implementation |
+| **hephaestus** | GPT-5.6 Terra (subscription gateway) | Implementation |
 | **prometheus** | GLM 5.2 Exacto | Planner |
 | **atlas** | GLM 5.2 Exacto | Plan executor after `/start-work` |
 | **content-aware-research** | DeepSeek V4 Pro | Full-depth research (edit denied) |
@@ -146,12 +147,12 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 
 | Agent | Model | Role |
 | --- | --- | --- |
-| oracle | GPT-5.6 Sol | Critique / adjudication |
+| oracle | GPT-5.6 Sol (subscription gateway) | Critique / adjudication |
 | librarian | DeepSeek Flash Nitro | Docs (Context7-first) |
 | explore | DeepSeek Flash Nitro | Codebase map |
 | multimodal-looker | Claude Sonnet 5 | Vision (`look_at`) |
 | metis | Claude Sonnet 5 | Pre-planning critic |
-| momus | GPT-5.6 Sol max | Plan / review gate |
+| momus | GPT-5.6 Sol (subscription gateway) | Plan / review gate |
 | sisyphus-junior | DeepSeek Flash Nitro | Cheap delegated work |
 
 Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff — do **not** put it in `disabled_agents`.
@@ -164,15 +165,15 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 | --- | --- | --- |
 | `bug-hunt` | GLM Exacto | Reproduce → root cause → fix |
 | `refactor-safe` | GLM Exacto | Behavior-preserving refactors |
-| `arch-review` | GPT-5.6 Sol | Coupling / blast radius |
+| `arch-review` | GPT-5.6 Sol (subscription gateway) | Coupling / blast radius |
 | `content-aware-fast` | DeepSeek Flash Nitro | Attack-surface recon |
 | `content-aware-deep` | DeepSeek Pro Exacto | Deep vuln research |
 | `writing` | Gemini 3.6 Flash Nitro | Docs / prose |
 | `visual-engineering` | Gemini 3.1 Pro | Ship UI |
 | `artistry` | Gemini 3.1 Pro | Design direction |
 | `quick` | DeepSeek Flash Nitro | Cheap fast tasks |
-| `deep` / `ultrabrain` | GPT-5.6 Sol | Heavy / max reasoning |
-| `unspecified-low` / `unspecified-high` | Flash / Claude Fable | Hyperplan critics |
+| `deep` / `ultrabrain` | GPT-5.6 Sol (subscription gateway) | Heavy / max reasoning |
+| `unspecified-low` / `unspecified-high` | Flash / Claude Opus 5 | Hyperplan critics |
 
 ---
 
@@ -180,7 +181,7 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 
 | Say | Effect |
 | --- | --- |
-| `ultrawork` / `ulw` | Claude Fable max ceiling |
+| `ultrawork` / `ulw` | Claude Opus 5 max ceiling |
 | `team` | Team-mode expansion |
 | `hyperplan` / `hpp` / `/hyperplan` | Adversarial planning (from **sisyphus**) |
 | `/goal` | **Disabled** — OmO 4.19 goal hook breaks `/start-work`. Use `/start-work` → Atlas (`prompts/goal.md`) |
@@ -214,13 +215,13 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | Lane | Models | Used for |
 | --- | --- | --- |
 | Orchestration | `z-ai/glm-5.2:exacto` | Sisyphus / Atlas / Prometheus / bug-hunt |
-| GPT (direct) | `openai/gpt-5.6-sol` (+ terra / 5.5 fallbacks) | Hephaestus / Oracle / Momus / deep |
+| GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
 | Recon | `deepseek/deepseek-v4-flash:nitro` | explore / librarian / sisyphus-junior / quick |
 | Depth | `deepseek/deepseek-v4-pro:exacto` | content-aware / hard fallback |
 | Visual / writing | Gemini 3.1 Pro · 3.6 Flash Nitro | artistry / visual / writing |
-| Ceiling | `anthropic/claude-fable-5` | ultrawork · unspecified-high |
+| Ceiling | `anthropic/claude-opus-5` | ultrawork · unspecified-high |
 
-OpenRouter is primary. GPT agents prefer **direct OpenAI**. Fallbacks + `runtime_fallback` on API errors. Stream timeouts: **900s**.
+OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
 
 ### Concurrency
 
@@ -229,8 +230,8 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | Knob | Value |
 | --- | --- |
 | `background_task.defaultConcurrency` | **4** |
-| OpenRouter / OpenAI / Anthropic | **6 / 4 / 2** |
-| Flash / Exacto / Sol / Fable | **4 / 3 / 3 / 1** |
+| OpenRouter / subscription gateway / Anthropic | **6 / 4 / 2** |
+| Flash / Exacto / Sol / Opus 5 / Fable | **4 / 3 / 3 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |
 
@@ -241,7 +242,7 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | Key | Required | Enables |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | **yes** | OpenRouter models |
-| `OPENAI_API_KEY` | **yes** for GPT lane | Hephaestus / Oracle / Momus / deep / … |
+| `LLM_GATEWAY_OPENAI_BASE_URL` + `LLM_GATEWAY_API_KEY` | **yes** for GPT subscription lane | Hephaestus / Oracle / Momus / deep / … |
 | `EXA_API_KEY` | for websearch | OmO Exa |
 | `CONTEXT7_API_KEY` | recommended | Context7 |
 | `OPENROUTER_MGMT_KEY` | optional | `oc admin` |

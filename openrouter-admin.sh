@@ -186,35 +186,38 @@ for mid in sorted(models.keys()):
           echo "  $line" | tr -d '\r'
         done || true
 
-    # Direct OpenAI GPT lane (when key is present)
+    # Shared subscription GPT lane. /models is non-billable and verifies the
+    # exact OpenAI-compatible transport used by the configured agent aliases.
     echo ""
-    echo -e "${c_b}── Direct OpenAI Probes ──${c_0}"
-    OPENAI_KEY="${OPENAI_API_KEY:-}"
-    if [[ -z "$OPENAI_KEY" ]]; then
-      opt "OPENAI_API_KEY not set — GPT lane falls back to OpenRouter"
+    echo -e "${c_b}── Subscription Gateway ──${c_0}"
+    GATEWAY_KEY="${LLM_GATEWAY_API_KEY:-}"
+    GATEWAY_URL="${LLM_GATEWAY_OPENAI_BASE_URL:-}"
+    if [[ -z "$GATEWAY_KEY" || -z "$GATEWAY_URL" ]]; then
+      opt "LLM gateway credentials not set — GPT subscription lane unavailable"
     else
-      python3 -c "
+      gateway_models="$(curl -sS --connect-timeout 5 --max-time 15 \
+        -H "Authorization: Bearer $GATEWAY_KEY" \
+        "${GATEWAY_URL%/}/models" 2>/dev/null || true)"
+      if ! printf '%s' "$gateway_models" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+        bad "Subscription gateway /models probe failed"
+      else
+        printf '%s' "$gateway_models" | python3 -c "
 import json
-oc = json.load(open('$REPO/opencode.json'))
-models = (oc.get('provider') or {}).get('openai', {}).get('models') or {}
-for mid in sorted(models.keys()):
-    print(mid)
-" | while read -r mid; do
-        [[ -z "$mid" ]] && continue
-        echo -n "  "
-        http_code=$(curl -s -o /tmp/oc-openai-health.json -w "%{http_code}" \
-          -H "Authorization: Bearer $OPENAI_KEY" \
-          -H "Content-Type: application/json" \
-          -d "{\"model\":\"$mid\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_completion_tokens\":16}" \
-          "https://api.openai.com/v1/chat/completions" 2>/dev/null || echo "000")
-        if [ "$http_code" = "200" ]; then
-          printf "${c_g}✓${c_0} %-35s routes (HTTP 200)\n" "openai/$mid"
-        elif [ "$http_code" = "429" ]; then
-          printf "${c_y}⚠${c_0} %-35s RATE LIMITED (HTTP 429)\n" "openai/$mid"
-        else
-          printf "${c_r}✗${c_0} %-35s FAILED (HTTP %s)\n" "openai/$mid" "$http_code"
-        fi
-      done
+cfg = json.load(open('$REPO/opencode.json'))
+available = {m.get('id') for m in json.load(open('/dev/stdin')).get('data', []) if isinstance(m, dict)}
+expected = (cfg.get('provider') or {}).get('subscription-gateway', {}).get('models') or {}
+for name, spec in sorted(expected.items()):
+    remote_id = spec.get('id') or name
+    state = 'available' if remote_id in available else 'MISSING'
+    print(f'{name}|{remote_id}|{state}')
+" | while IFS='|' read -r name remote_id state; do
+          if [[ "$state" == "available" ]]; then
+            printf "${c_g}✓${c_0} %-35s advertised as %s\n" "subscription-gateway/$name" "$remote_id"
+          else
+            printf "${c_r}✗${c_0} %-35s (%s) MISSING from /v1/models\n" "subscription-gateway/$name" "$remote_id"
+          fi
+        done
+      fi
     fi
     ;;
 

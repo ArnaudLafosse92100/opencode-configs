@@ -1,6 +1,6 @@
-# Category: unspecified-high (Claude Fable 5 max)
+# Category: unspecified-high (Claude Opus 5 max)
 
-High-effort general work and hyperplan expensive critic. Opus / GPT Sol are fallbacks if Fable fails.
+High-effort general work and hyperplan expensive critic. Fable / earlier Opus / GPT Sol are fallbacks if Opus 5 fails.
 
 ## Do
 

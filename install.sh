@@ -74,7 +74,7 @@ Lazy defaults: install CLI=yes · zshrc=yes · tmux/ghostty=yes when present · 
 optional keys=skip · OpenRouter required (prompt; Enter skips with warning).
 
 Env (pre-seed keys, no paste needed):
-  OPENROUTER_API_KEY  OPENAI_API_KEY  EXA_API_KEY  CONTEXT7_API_KEY
+  OPENROUTER_API_KEY  LLM_GATEWAY_API_KEY  LLM_GATEWAY_OPENAI_BASE_URL  EXA_API_KEY  CONTEXT7_API_KEY
 
 Safety: refuses root; never deletes sessions; backs up replaced configs.
 Logs:   ~/.opencode-backups/logs/install-latest.log (no secrets)
@@ -666,7 +666,8 @@ echo "  File: $ENV_FILE (chmod 600, gitignored)"
 
 # Prefer env pre-seed so lazy users can: OPENROUTER_API_KEY=… ./install.sh
 seed_key_from_env OPENROUTER_API_KEY
-seed_key_from_env OPENAI_API_KEY
+seed_key_from_env LLM_GATEWAY_API_KEY
+seed_key_from_env LLM_GATEWAY_OPENAI_BASE_URL
 seed_key_from_env EXA_API_KEY
 seed_key_from_env CONTEXT7_API_KEY
 seed_key_from_env OPENROUTER_MGMT_KEY
@@ -675,9 +676,9 @@ if $DO_KEYS; then
   prompt_api_key OPENROUTER_API_KEY \
     "OpenRouter (required — GLM/Flash/Claude/Gemini/…)" \
     "https://openrouter.ai/keys" true
-  prompt_api_key OPENAI_API_KEY \
-    "OpenAI (recommended — direct GPT lane / Hephaestus)" \
-    "https://platform.openai.com/api-keys" false
+  prompt_api_key LLM_GATEWAY_API_KEY \
+    "Shared subscription gateway (recommended — GPT agent lane / Hephaestus)" \
+    "your gateway bearer key" false
   prompt_api_key EXA_API_KEY \
     "Exa (recommended — web search)" \
     "https://exa.ai" false
@@ -847,8 +848,8 @@ if $missing_or; then
   echo "  $step. Edit $LINK/.env — add OPENROUTER_API_KEY (required)"
   step=$((step + 1))
 fi
-if [[ -z "$(oc_get_env_key "$ENV_FILE" OPENAI_API_KEY 2>/dev/null || true)" ]]; then
-  echo "  $step. Optional: add OPENAI_API_KEY for the direct GPT lane (Hephaestus/Oracle/…)"
+if [[ -z "$(oc_get_env_key "$ENV_FILE" LLM_GATEWAY_API_KEY 2>/dev/null || true)" || -z "$(oc_get_env_key "$ENV_FILE" LLM_GATEWAY_OPENAI_BASE_URL 2>/dev/null || true)" ]]; then
+  echo "  $step. Add LLM_GATEWAY_OPENAI_BASE_URL + LLM_GATEWAY_API_KEY for the subscription GPT lane (Hephaestus/Oracle/…)"
   step=$((step + 1))
 fi
 echo "  $step. Restart shell (or: source ~/.zshrc)"

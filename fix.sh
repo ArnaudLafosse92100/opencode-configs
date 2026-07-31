@@ -321,8 +321,8 @@ if isinstance(bt, dict):
     if isinstance(pc, dict):
         if not isinstance(pc.get("openrouter"), int) or pc.get("openrouter") > 6:
             pc["openrouter"] = 6; changes.append("providerConcurrency.openrouter capped -> 6")
-        if not isinstance(pc.get("openai"), int) or pc.get("openai") > 4:
-            pc["openai"] = 4; changes.append("providerConcurrency.openai capped -> 4")
+        if not isinstance(pc.get("subscription-gateway"), int) or pc.get("subscription-gateway") > 4:
+            pc["subscription-gateway"] = 4; changes.append("providerConcurrency.subscription-gateway capped -> 4")
     if not isinstance(bt.get("maxToolCalls"), int) or bt.get("maxToolCalls") > 400:
         bt["maxToolCalls"] = 400; changes.append("background_task.maxToolCalls capped -> 400")
     if not isinstance(bt.get("syncPollTimeoutMs"), int) or bt.get("syncPollTimeoutMs") < 60000:
@@ -353,7 +353,7 @@ if isinstance(dm, dict) and dm.get("goal") is not False:
 allow = omo.setdefault("mcp_env_allowlist", [])
 if not isinstance(allow, list):
     allow = []; omo["mcp_env_allowlist"] = allow
-for must in ("CONTEXT7_API_KEY", "EXA_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"):
+for must in ("CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"):
     if must not in allow:
         allow.append(must); changes.append(f"mcp_env_allowlist += {must}")
 

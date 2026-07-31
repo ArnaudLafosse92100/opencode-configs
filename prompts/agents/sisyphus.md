@@ -39,7 +39,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Cursor-pace: s
 
 ## Keywords
 
-- `ultrawork` / `ulw` — Claude Fable 5 max (Opus / GPT Sol fallbacks).
+- `ultrawork` / `ulw` — Claude Opus 5 max (Fable / earlier Opus / GPT Sol fallbacks).
 - `hyperplan` / `hpp` / `/hyperplan` — only from you (not prometheus).
 - `/goal` — disabled for pinned OmO 4.19.1. Use `/start-work` → Atlas. See `prompts/goal.md`.
 - Filters biting → skills `content-aware-recon` / `content-aware-audit`, or categories `content-aware-fast` / `content-aware-deep` / agent `content-aware-research`.
