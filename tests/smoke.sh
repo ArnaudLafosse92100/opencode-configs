@@ -39,10 +39,38 @@ run_step() {
 }
 
 run_step "bash -n oc" bash -n "$REPO/oc"
+
+# CLI aliases must dispatch without running their full commands.
+if "$REPO/oc" health --help 2>&1 | grep -q 'oc check'; then
+  ok "oc health → check"
+else
+  bad "oc health alias broken"
+fi
+if "$REPO/oc" repair --help 2>&1 | grep -q 'oc heal'; then
+  ok "oc repair → heal"
+else
+  bad "oc repair alias broken"
+fi
+if "$REPO/oc" verify --help 2>&1 | grep -q 'validate'; then
+  ok "oc verify → validate"
+else
+  bad "oc verify alias broken"
+fi
+if "$REPO/oc" help 2>&1 | grep -q 'health, ready'; then
+  ok "oc help lists aliases"
+else
+  bad "oc help missing aliases"
+fi
+
 run_step "bash -n doctor.sh" bash -n "$REPO/doctor.sh"
 run_step "bash -n locate.sh" bash -n "$REPO/locate.sh"
 run_step "bash -n versions.sh" bash -n "$REPO/versions.sh"
+run_step "bash -n eval-models.sh" bash -n "$REPO/eval-models.sh"
 run_step "bash -n lib/common.sh" bash -n "$REPO/lib/common.sh"
+run_step "compile model-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/model-routing/run.py"
+run_step "model-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_model_routing_eval.py"
+run_step "model-routing eval plan" "$REPO/eval-models.sh"
+run_step "model-routing targeted plan" "$REPO/eval-models.sh" --models deepseek --cases bounded-architecture-plan
 run_step "validate --quiet" "$REPO/validate.sh" --quiet
 run_step "locate --json" "$REPO/locate.sh" --json
 run_step "signature" "$REPO/signature.sh"
@@ -51,6 +79,41 @@ run_step "cleanup --dry-run" "$REPO/cleanup.sh" --dry-run
 run_step "setup --check" "$REPO/setup.sh" --check
 run_step "doctor --quick" "$REPO/doctor.sh" --quick
 run_step "versions --local" "$REPO/versions.sh" --local
+
+# A broken migrated OmO config must be detected without touching the real HOME.
+test_home="$(mktemp -d)"
+mkdir -p "$test_home/.omo"
+printf '%s\n' '{"[opencode]":{},"agents":{"sisyphus":{"models":["bad"]}}}' > "$test_home/.omo/omo.jsonc"
+quarantine_out="$(HOME="$test_home" "$REPO/fix.sh" --dry-run 2>&1)"
+if grep -q 'quarantined ~/.omo/omo.jsonc' <<< "$quarantine_out"; then
+  ok "broken migrated omo.jsonc is quarantined"
+else
+  bad "broken migrated omo.jsonc quarantine missing"
+fi
+rm "$test_home/.omo/omo.jsonc"
+rmdir "$test_home/.omo" "$test_home"
+
+# Fast OpenRouter lanes, bounded subscription gateway, expensive models capped.
+if python3 -c '
+import json, sys
+omo=json.load(open(sys.argv[1]))
+bt=omo.get("background_task") or {}
+pc=bt.get("providerConcurrency") or {}
+mc=bt.get("modelConcurrency") or {}
+ok=(bt.get("defaultConcurrency")==6
+    and pc.get("openrouter")==8
+    and pc.get("subscription-gateway")==4
+    and pc.get("anthropic")==2
+    and mc.get("openrouter/deepseek/deepseek-v4-flash")==6
+    and mc.get("openrouter/z-ai/glm-5.2-exacto")==5
+    and mc.get("openrouter/moonshotai/kimi-k3")==2
+    and mc.get("openrouter/anthropic/claude-opus-5")==1)
+sys.exit(0 if ok else 1)
+' "$REPO/oh-my-openagent.json"; then
+  ok "mixed-provider concurrency pins"
+else
+  bad "concurrency drift — run: oc fix"
+fi
 
 # doctor --json schema (machine summary for heal/check tooling)
 if "$REPO/doctor.sh" --quick --json 2>/dev/null | python3 -c '

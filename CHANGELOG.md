@@ -2,6 +2,27 @@
 
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
+## Unreleased — 2026-08-03
+
+### Selective upstream hardening for mixed routing
+- Keep Sisyphus canonical and quarantine the invalid migrated `~/.omo/omo.jsonc` shape fixed upstream in 1.5.47, without importing its OpenRouter-only routing rule
+- Adopt 1.5.48's faster OpenRouter parallelism while keeping the subscription gateway capped at 4 and Kimi/Opus lanes cost-bounded
+- Add the compatible 1.5.50 CLI aliases (`health`, `ready`, `repair`, `verify`) while preserving mixed OpenRouter + subscription-gateway administration
+- Add smoke coverage for aliases, quarantine detection, and the mixed-provider concurrency contract
+
+## [1.5.40] — 2026-08-02
+
+### DeepSeek V4 Flash 0731 + Kimi K3 fallback policy
+- Retire DeepSeek V4 Pro from every primary route, fallback chain, concurrency map, whitelist, and model definition
+- Route `content-aware-research` and `content-aware-deep` through the current `deepseek-v4-flash` slug, which now resolves to DeepSeek V4 Flash 0731
+- Use Kimi K3 as the expensive deep-agentic fallback for review, debugging, refactoring, and content-aware depth lanes
+- Keep multimodal-looker on Claude Sonnet 5, with Gemini Flash and Kimi K3 fallbacks; all three accept image input
+- Add a validation guard that fails if a future update reintroduces `deepseek-v4-pro`
+- Add an explicit `agentic-deep-kimi` category rather than making Kimi a daily default
+- Add `oc eval`, a plan-first DeepSeek/Kimi/Sonnet canary with per-run, cumulative campaign, and account-reserve spending guards
+- Persist response-reported eval costs so delayed OpenRouter credit totals cannot weaken the campaign or reserve guards
+- Raise the canary output allowance to 2,400 tokens after proving that 1,200 could be consumed entirely by DeepSeek reasoning, and cover the grader/ledger with offline regression tests
+
 ## [1.5.39] — 2026-07-31
 
 ### Opus 5 deep-routing refresh

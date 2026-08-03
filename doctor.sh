@@ -987,17 +987,17 @@ def tip(m): print("TIP|" + m)
 dc = bt.get("defaultConcurrency")
 if not isinstance(dc, int) or dc < 1:
     bad("background_task.defaultConcurrency missing/invalid")
-elif dc > 4:
-    bad("defaultConcurrency=%s (>4) — runaway risk; run: oc fix" % dc)
+elif dc != 6:
+    bad("defaultConcurrency=%s (want 6) — run: oc fix" % dc)
 else:
     ok("defaultConcurrency=%s" % dc)
 
-for prov, cap in (("openrouter", 6), ("subscription-gateway", 4), ("anthropic", 2)):
+for prov, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
     v = pc.get(prov)
     if not isinstance(v, int):
         bad("providerConcurrency.%s missing" % prov)
-    elif v > cap:
-        bad("providerConcurrency.%s=%s (cap %s) — run: oc fix" % (prov, v, cap))
+    elif v != cap:
+        bad("providerConcurrency.%s=%s (want %s) — run: oc fix" % (prov, v, cap))
     else:
         ok("providerConcurrency.%s=%s" % (prov, v))
 

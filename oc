@@ -12,7 +12,7 @@
 # Commands:
 #   setup [--check|--force|--sync-env]    Idempotent installer
 #   doctor [--quick|--fix|--harden|--ai-fix]
-#   validate [--quiet]                    Config validator + footgun detector
+#   validate|verify [--quiet]             Config validator + footgun detector
 #   signature [--refresh|--json]          Project identity verify / refresh
 #   locate [--json|--search]              Discover paths (read-only)
 #   test [smoke|idempotency]              Self-test suite
@@ -20,6 +20,7 @@
 #   cleanup [--dry-run|--yes]             Reconcile to known-good state
 #   maintain [--check|--clean|--plans]    Clean sessions, caches, logs
 #   models [--catalog|--providers|--json|--upgrade]  OpenRouter catalog / providers
+#   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
 #   plugin [doctor|cache]                 OmO plugin doctor / cache status
 #   run "<msg>" [-a agent] [-d dir]       Headless runner (run to completion)
@@ -28,6 +29,7 @@
 #   new <name> [--profile] [--dir|--here] Scaffold under projects dir
 #   projects [--list|--ensure]            Show / ensure projects directory
 #   install                               1-step installer (curl | bash)
+#   health|ready / repair                 Aliases for check / heal
 #   diagnose [--no-ai|--fix|--agent-fix]  AI-assisted diagnostics
 #   help                                  Show this help
 #   version                               Print version
@@ -102,6 +104,7 @@ ${c_bold}Repair & Clean:${c_0}
 ${c_bold}Models & Admin:${c_0}
   ${c_g}models${c_0}    [--catalog|--providers|--json|--upgrade]
                                          OpenRouter catalog / live provider health
+  ${c_g}eval${c_0}      [--execute|--run-budget N]    Bounded model-routing canary (plan-only by default)
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]
                                          Package pins vs npm + GitHub (+ other repos)
   ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO plugin doctor / pin cache
@@ -117,6 +120,12 @@ ${c_bold}Scaffold:${c_0}
   ${c_g}new${c_0}       <name> [--profile|--dir|--here|--launch]
                                          Scaffold under projects home (~/Projects)
   ${c_g}projects${c_0}  [--list|--ensure]               Show / ensure projects directory
+
+${c_bold}Aliases:${c_0}
+  ${c_dim}health, ready${c_0}  → check          ${c_dim}repair${c_0} → heal
+  ${c_dim}verify${c_0}          → validate       ${c_dim}where, discover${c_0} → locate
+  ${c_dim}sig${c_0}             → signature      ${c_dim}pins${c_0} → versions
+  ${c_dim}omo${c_0}             → plugin         ${c_dim}opencode${c_0} → launch
 
 ${c_bold}Admin subcommands:${c_0}
   status       Account overview (credits, keys, spend)
@@ -145,11 +154,13 @@ ${c_bold}Examples:${c_0}
   oc doctor --fix                 Repair configs + re-check
   oc versions                    Pins vs npm/GitHub + other opencode.json
   oc versions --fix               Align ~/.opencode @opencode-ai/plugin to CLI
+  oc eval                         Show zero-cost DeepSeek/Kimi/Sonnet canary plan
+  oc eval --execute               Run the first bounded comparison (default cap: \$1)
   oc plugin doctor               Upstream OmO plugin doctor (pin cache)
   oc fix                         Restore agent colors + footguns
   oc validate                    Structural / footgun checks
   oc run "Fix the failing tests" Headless: run to completion
-  oc admin health                Live OpenRouter + OpenAI probes
+  oc admin health                Live OpenRouter + subscription gateway probes
   oc launch                      Launch OpenCode (cwd, or ~/Projects if config repo)
   oc new myapp                   Scaffold → ~/Projects/myapp
   oc projects --list             List projects home
@@ -1113,19 +1124,20 @@ case "$cmd" in
 
   setup)      dispatch setup.sh "$@" ;;
   doctor)     dispatch doctor.sh "$@" ;;
-  validate)   dispatch validate.sh "$@" ;;
+  validate|verify) dispatch validate.sh "$@" ;;
   fix)        dispatch fix.sh "$@" ;;
   cleanup)    dispatch cleanup.sh "$@" ;;
   maintain)   dispatch maintain.sh "$@" ;;
   models)     dispatch models.sh "$@" ;;
+  eval|evaluate|benchmark) dispatch eval-models.sh "$@" ;;
   versions|pins) dispatch versions.sh "$@" ;;
   plugin|omo) do_plugin "$@" ;;
   run)        dispatch run.sh "$@" ;;
   diagnose)   dispatch diagnose.sh "$@" ;;
   opencode)   dispatch opencode.sh "$@" ;;
   install)    do_install "$@" ;;
-  check)      do_check "$@" ;;
-  heal)       do_heal "$@" ;;
+  check|health|ready) do_check "$@" ;;
+  heal|repair) do_heal "$@" ;;
   test)       do_test "$@" ;;
   locate|where|discover) dispatch locate.sh "$@" ;;
   signature|sig) dispatch signature.sh "$@" ;;
@@ -1161,7 +1173,8 @@ case "$cmd" in
     case "$cmd" in
       plug|plugins) tip "did you mean: ${c_g}oc plugin doctor${c_0}" ;;
       ver|versioning) tip "did you mean: ${c_g}oc versions${c_0}" ;;
-      health|ready) tip "did you mean: ${c_g}oc doctor${c_0}  or  ${c_g}oc check${c_0}" ;;
+      clean) tip "did you mean: ${c_g}oc cleanup${c_0}  or  ${c_g}oc maintain --clean${c_0}" ;;
+      probe) tip "did you mean: ${c_g}oc models --probe${c_0}" ;;
     esac
     printf '\n'
     show_help

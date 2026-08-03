@@ -50,7 +50,7 @@ drift=0
 sec "Required files"
 REQUIRED=(
   opencode.json oh-my-openagent.json tui.json tmux.conf ghostty.conf zshrc.snippet bunfig.toml README.md AGENTS.md CHANGELOG.md .env.example .gitignore projects.json versions.json signature.json
-  validate.sh doctor.sh cleanup.sh fix.sh models.sh versions.sh diagnose.sh setup.sh install.sh maintain.sh
+  validate.sh doctor.sh cleanup.sh fix.sh models.sh versions.sh diagnose.sh setup.sh install.sh maintain.sh eval-models.sh
 # Add locate.sh to required list
   opencode.sh run.sh openrouter-admin.sh oc locate.sh signature.sh
   lib/common.sh
@@ -62,13 +62,16 @@ REQUIRED=(
   prompts/categories/content-aware-fast.md prompts/categories/content-aware-deep.md prompts/categories/bug-hunt.md
   prompts/categories/refactor-safe.md prompts/categories/arch-review.md
   prompts/categories/visual-engineering.md prompts/categories/ultrabrain.md prompts/categories/deep.md
+  prompts/categories/agentic-deep-kimi.md
   prompts/categories/artistry.md prompts/categories/quick.md prompts/categories/unspecified-low.md
   prompts/categories/unspecified-high.md prompts/categories/writing.md
   prompts/profiles/high.md prompts/profiles/low.md prompts/profiles/fast.md prompts/profiles/research.md
   prompts/profiles/debug.md prompts/profiles/writing.md prompts/profiles/content-aware.md
   profiles/high.json profiles/low.json profiles/research.json profiles/writing.json profiles/content-aware.json profiles/debug.json profiles/fast.json
   teams/explorers/config.json teams/review-panel/config.json teams/content-aware-audit/config.json teams/ship-feature/config.json teams/debug-team/config.json teams/docs-team/config.json teams/refactor-team/config.json
+  tests/test_model_routing_eval.py
   skills/.gitkeep
+  evals/model-routing/run.py evals/model-routing/cases.json evals/model-routing/README.md
 )
 missing=0
 for f in "${REQUIRED[@]}"; do

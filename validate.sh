@@ -58,6 +58,22 @@ omo_path = os.path.join(repo, "oh-my-openagent.json")
 oc = parsed.get(oc_path)
 omo = parsed.get(omo_path)
 
+# DeepSeek V4 Pro is intentionally retired. Keep this as a cross-file policy
+# guard so future upstream merges cannot silently reintroduce it as a primary,
+# fallback, profile default, concurrency entry, whitelist item, or model
+# definition.
+retired_route_files = [oc_path, omo_path]
+retired_route_files += sorted(glob.glob(os.path.join(repo, "profiles", "*.json")))
+retired_route_files += sorted(glob.glob(os.path.join(repo, "agents", "*.md")))
+retired_route_hits = []
+for path in retired_route_files:
+    if os.path.isfile(path) and "deepseek-v4-pro" in open(path).read():
+        retired_route_hits.append(os.path.relpath(path, repo))
+if retired_route_hits:
+    err("retired deepseek-v4-pro route reintroduced in: " + ", ".join(retired_route_hits))
+else:
+    ok("retired deepseek-v4-pro route absent from runtime config and profiles")
+
 # ---- 2. opencode.json runtime footguns ----
 if oc:
     exp = oc.get("experimental", {})
@@ -253,6 +269,45 @@ if omo:
     if agents:
         ok(f"{len(agents)} plugin agents, all colors valid")
 
+    # Sisyphus is the canonical default and team lead. Provider routing stays
+    # intentionally mixed; only identity and loadability are enforced here.
+    disabled_agents = {str(a).lower() for a in (omo.get("disabled_agents") or [])}
+    if (oc or {}).get("default_agent") != "sisyphus":
+        err(f"opencode.json: default_agent must be 'sisyphus' (got {(oc or {}).get('default_agent')!r})")
+    if omo.get("default_run_agent") != "sisyphus":
+        err(f"oh-my-openagent.json: default_run_agent must be 'sisyphus' (got {omo.get('default_run_agent')!r})")
+    order = omo.get("agent_order") or []
+    if not isinstance(order, list) or not order or order[0] != "sisyphus":
+        err("oh-my-openagent.json: agent_order must start with 'sisyphus'")
+    elif len(order) != len(set(order)):
+        err("oh-my-openagent.json: agent_order contains duplicate agents")
+    elif any(name not in agents for name in order):
+        err(f"oh-my-openagent.json: agent_order references undeclared agents: {sorted(set(order) - set(agents))}")
+    else:
+        ok("Sisyphus is first in agent_order and all ordered agents resolve")
+    sis = agents.get("sisyphus")
+    if not isinstance(sis, dict):
+        err("oh-my-openagent.json: agents.sisyphus missing")
+    elif sis.get("mode") != "primary":
+        err("oh-my-openagent.json: agents.sisyphus.mode must be 'primary'")
+    elif "sisyphus" in disabled_agents:
+        err("oh-my-openagent.json: sisyphus must not appear in disabled_agents")
+    else:
+        ok("Sisyphus declared primary and enabled")
+    sa = omo.get("sisyphus_agent") or {}
+    if sa.get("disabled") is True:
+        err("oh-my-openagent.json: sisyphus_agent.disabled must be false")
+    else:
+        ok("sisyphus_agent enabled")
+    omo_jsonc = os.path.expanduser("~/.omo/omo.jsonc")
+    if os.path.isfile(omo_jsonc):
+        with open(omo_jsonc, encoding="utf-8") as f:
+            migrated = f.read()
+        if '"[opencode]"' in migrated and re.search(r'"models"\s*:\s*\[', migrated):
+            err("~/.omo/omo.jsonc has invalid migrated agents.models — run: oc fix")
+    else:
+        ok("~/.omo/omo.jsonc absent (oh-my-openagent.json is canonical)")
+
     # OmO injects security-* via a loopback skills.urls server; OpenCode can
     # deadlock fetching that index during `opencode run` bootstrap. Keep them disabled.
     disabled_skills = {str(s).lower() for s in (omo.get("disabled_skills") or [])}
@@ -322,7 +377,6 @@ if omo:
             err(f"oh-my-openagent.json: keyword_detector.enabled_expansions has invalid value '{v}' — the section drops and ALL expansions fire. Allowed: {sorted(allowed)}.")
 
     # hyperplan prerequisites (OmO skill: team + 4 required categories + demoted plan handoff)
-    disabled_agents = {str(a).lower() for a in (omo.get("disabled_agents") or [])}
     tm = omo.get("team_mode") or {}
     cats = omo.get("categories") or {}
     sa = omo.get("sisyphus_agent") or {}
@@ -352,14 +406,14 @@ if omo:
     bt = omo.get("background_task") or {}
     pc = bt.get("providerConcurrency") or {}
     dc = bt.get("defaultConcurrency")
-    if not isinstance(dc, int) or dc < 1 or dc > 4:
-        err(f"background_task.defaultConcurrency must be 1–4 (got {dc!r})")
+    if dc != 6:
+        err(f"background_task.defaultConcurrency must be 6 (got {dc!r}) — run: oc fix")
     else:
         ok(f"background_task.defaultConcurrency={dc}")
-    for prov, cap in (("openrouter", 6), ("subscription-gateway", 4), ("anthropic", 2)):
+    for prov, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
         v = pc.get(prov)
-        if not isinstance(v, int) or v < 1 or v > cap:
-            err(f"providerConcurrency.{prov} must be 1–{cap} (got {v!r})")
+        if v != cap:
+            err(f"providerConcurrency.{prov} must be {cap} (got {v!r}) — run: oc fix")
         else:
             ok(f"providerConcurrency.{prov}={v}")
     mp = tm.get("max_parallel_members")
@@ -728,6 +782,39 @@ else:
             ok("profiles/content-aware.json → content-aware-research (edit deny)")
     except Exception as e:
         err(f"profiles/content-aware.json: invalid JSON ({e})")
+
+# ---- 4c1b. Kimi must remain an explicit, evaluated escalation lane ----
+cats = omo.get("categories") or {}
+kimi_lane = cats.get("agentic-deep-kimi")
+if not isinstance(kimi_lane, dict):
+    err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
+elif kimi_lane.get("model") != "openrouter/moonshotai/kimi-k3":
+    err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k3")
+else:
+    ok("agentic-deep-kimi is the explicit Kimi primary lane")
+
+kimi_primary = []
+for section, blob in (("agent", omo.get("agents") or {}), ("category", cats)):
+    for name, cfg in blob.items():
+        if isinstance(cfg, dict) and cfg.get("model") == "openrouter/moonshotai/kimi-k3":
+            kimi_primary.append(f"{section}:{name}")
+if kimi_primary != ["category:agentic-deep-kimi"]:
+    err(f"Kimi primary routing must stay explicit-only (got {kimi_primary})")
+else:
+    ok("Kimi is not a global/daily primary")
+
+eval_required = (
+    "eval-models.sh",
+    "evals/model-routing/run.py",
+    "evals/model-routing/cases.json",
+    "evals/model-routing/README.md",
+    "prompts/categories/agentic-deep-kimi.md",
+)
+eval_missing = [path for path in eval_required if not os.path.isfile(os.path.join(repo, path))]
+if eval_missing:
+    err(f"model-routing eval files missing: {eval_missing}")
+else:
+    ok("bounded model-routing eval files present")
 
 # ---- 4c2. projects.json (oc new home) ----
 projects_cfg = os.path.join(repo, "projects.json")

@@ -1,6 +1,6 @@
 # AGENTS.md — Global Agent Instructions (OpenConfig)
 
-**OpenConfig v1.5.38** · CLI `oc` · identity `openconfig/opencode-configs` (`signature.json`)
+**OpenConfig v1.5.40** · CLI `oc` · identity `openconfig/opencode-configs` (`signature.json`)
 
 This file is loaded every OpenCode session. It is the **policy + decision log** for **OpenConfig** (`oc`) — pinned stack for OpenCode + OpenRouter + oh-my-openagent (OmO). Day-to-day coding rules live in `prompts/core.md` (stance + team eligibility + research tool matrix). `/goal` is **disabled** for pinned OmO 4.19.1 (see `prompts/goal.md`). Deep reference: `README.md`.
 
@@ -38,8 +38,9 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 - **Deep implement / critique** → subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review). OpenRouter GPT remains a paid fallback.
 - **Visual / writing** → Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.6 Flash Nitro).
 - **Hard ceiling** → Claude Opus 5 max for `ultrawork` / unspecified-high (Fable 5 / Opus 4.8 / 4.7 / Sol fallbacks).
-- **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k3` (1M ctx, ~$3/$15) as a quality fallback — already wired in `opencode.json` / OmO fallbacks; not a daily default (single-provider, expensive). Prefer K2.7 Code / DeepSeek for routine coding.
-- **Content-aware research** → DeepSeek Pro + `content-aware-*` agent/categories when Claude/OpenAI refuse.
+- **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k3` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
+- **Content-aware research** → DeepSeek V4 Flash 0731 primary, with Kimi K3 and GPT review as bounded escalation.
+- **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/Sonnet canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 
 ### Team eligibility (why)
 
@@ -76,7 +77,7 @@ Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 - On exit: reset mouse tracking + bracketed paste. **Do not** send `\033[?1049l` (clears the visible terminal).
 - Launch with `oc launch` or the `opencode()` shell function.
 - tmux ≥ 3.3 (recommended 3.7+): prefix Ctrl+B, `allow-passthrough`, OmO `prefix+M` main-vertical — see `tmux.conf` / `versions.json`.
-- Version floors: `versions.json` (OpenCode, OmO pin, Ghostty, tmux, node, python, bun). `oc doctor` enforces them; `oc versions` checks npm/GitHub. Product version: **1.5.38**.
+- Version floors: `versions.json` (OpenCode, OmO pin, Ghostty, tmux, node, python, bun). `oc doctor` enforces them; `oc versions` checks npm/GitHub. Product version: **1.5.40**.
 - Local skills (fenced): `skills/content-aware-recon`, `skills/content-aware-audit` — replace OmO `security-*` (keep those disabled).
 - Doctor: `oc doctor --quick --json` for machine readiness (`critical` / `optional` / `soft` / `verdict`).
 - Team inline member prompts (`teams/*/config.json`): `ROLE:` · `METHOD:`/`DELIVERABLE:` · `Mailbox` — keep tight; lead is always sisyphus.
@@ -90,7 +91,7 @@ Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 
 ## Commands
 
-`oc help` · `oc doctor` · `oc plugin doctor` · `oc validate` · `oc versions` · `oc launch` · `oc run` · `oc new` · `oc heal` · `oc signature` · `oc admin health`. Details: `README.md`.
+`oc help` · `oc check` · `oc heal` · `oc doctor` · `oc validate` · `oc fix` · `oc plugin doctor` · `oc versions` · `oc launch` · `oc run` · `oc new` · `oc signature` · `oc admin health`. Details: `README.md`.
 
 ## Projects & scaffolding
 

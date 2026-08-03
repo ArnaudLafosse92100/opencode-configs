@@ -2,7 +2,7 @@
 
 Pinned global config for [OpenCode](https://opencode.ai) + [OpenRouter](https://openrouter.ai) + [oh-my-openagent (OmO)](https://omo.vibetip.help/docs).
 
-**v1.5.38** · CLI **`oc`** · identity `openconfig/opencode-configs`
+**v1.5.40** · CLI **`oc`** · identity `openconfig/opencode-configs`
 
 ```bash
 git clone https://github.com/jesseoue/opencode-configs.git
@@ -16,7 +16,7 @@ source ~/.zshrc && oc doctor && oc launch
 
 | | |
 | --- | --- |
-| **Pins** | OpenConfig `1.5.38` · OpenCode `1.18.5+` · OmO `oh-my-openagent@4.19.1` · `@opencode-ai/plugin` `1.18.5` |
+| **Pins** | OpenConfig `1.5.40` · OpenCode `1.18.5+` · OmO `oh-my-openagent@4.19.1` · `@opencode-ai/plugin` `1.18.5` |
 | **Default lead** | `sisyphus` (GLM Exacto) |
 | **Config path** | `~/.config/opencode` → this repo (symlink) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
@@ -62,7 +62,7 @@ oc heal                # probe-first self-repair
 oc launch [dir]        # TUI (never starts in the config repo)
 oc new myapp           # scaffold under ~/Projects
 oc run "…"             # headless to completion
-oc admin health        # live OpenRouter + OpenAI probes
+oc admin health        # live OpenRouter + subscription-gateway probes
 oc models --providers  # OpenRouter provider health for routed models
 oc versions            # pins vs npm + GitHub (+ other opencode.json)
 oc versions --fix       # align ~/.opencode @opencode-ai/plugin to CLI
@@ -75,6 +75,8 @@ oc doctor --quick --json   # machine summary (heal/check tooling)
 ```
 
 Prefer `oc <cmd>` over raw `./foo.sh`. Full help: `oc help`.
+
+**Aliases:** `oc health`/`ready` → check · `oc repair` → heal · `oc verify` → validate · `oc where` → locate · `oc sig` → signature · `oc pins` → versions · `oc omo` → plugin
 
 ---
 
@@ -91,7 +93,7 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 
 | Package | Source of truth | Current |
 | --- | --- | --- |
-| OpenConfig | `versions.json` → `opencode_configs` | `1.5.38` |
+| OpenConfig | `versions.json` → `opencode_configs` | `1.5.40` |
 | OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.5+` |
 | OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.1` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
@@ -141,7 +143,7 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | **hephaestus** | GPT-5.6 Terra (subscription gateway) | Implementation |
 | **prometheus** | GLM 5.2 Exacto | Planner |
 | **atlas** | GLM 5.2 Exacto | Plan executor after `/start-work` |
-| **content-aware-research** | DeepSeek V4 Pro | Full-depth research (edit denied) |
+| **content-aware-research** | DeepSeek V4 Flash 0731 | Full-depth research (edit denied) |
 
 ### Subagents (`task` / `call_omo_agent` — not team members)
 
@@ -167,7 +169,8 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 | `refactor-safe` | GLM Exacto | Behavior-preserving refactors |
 | `arch-review` | GPT-5.6 Sol (subscription gateway) | Coupling / blast radius |
 | `content-aware-fast` | DeepSeek Flash Nitro | Attack-surface recon |
-| `content-aware-deep` | DeepSeek Pro Exacto | Deep vuln research |
+| `content-aware-deep` | DeepSeek Flash 0731 → Kimi / GPT review | Deep vuln research |
+| `agentic-deep-kimi` | Kimi K3 | Explicit long-horizon escalation after evaluation |
 | `writing` | Gemini 3.6 Flash Nitro | Docs / prose |
 | `visual-engineering` | Gemini 3.1 Pro | Ship UI |
 | `artistry` | Gemini 3.1 Pro | Design direction |
@@ -217,11 +220,17 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | Orchestration | `z-ai/glm-5.2:exacto` | Sisyphus / Atlas / Prometheus / bug-hunt |
 | GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
 | Recon | `deepseek/deepseek-v4-flash:nitro` | explore / librarian / sisyphus-junior / quick |
-| Depth | `deepseek/deepseek-v4-pro:exacto` | content-aware / hard fallback |
+| Depth | `deepseek/deepseek-v4-flash:nitro` → Kimi K3 / GPT review fallback | content-aware |
+| Agentic escalation | `moonshotai/kimi-k3` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
+| Multimodal | Claude Sonnet 5 → Gemini Flash / Kimi K3 fallback | multimodal-looker |
 | Visual / writing | Gemini 3.1 Pro · 3.6 Flash Nitro | artistry / visual / writing |
 | Ceiling | `anthropic/claude-opus-5` | ultrawork · unspecified-high |
 
 OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
+
+### Bounded model-routing eval
+
+`oc eval` prints a zero-cost DeepSeek/Kimi/Sonnet comparison plan. `oc eval --execute` runs three evidence-only cases with a default **$1 per-run cap**, a cumulative **$20 campaign cap**, and a **$2 account reserve**. Results and the conservative campaign ledger live under `~/.cache/openconfig/evals/model-routing/`; see `evals/model-routing/README.md` for the staged promotion gate. Kimi remains an explicit escalation lane until the canary demonstrates a measurable quality gain.
 
 ### Concurrency
 
@@ -229,9 +238,9 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 
 | Knob | Value |
 | --- | --- |
-| `background_task.defaultConcurrency` | **4** |
-| OpenRouter / subscription gateway / Anthropic | **6 / 4 / 2** |
-| Flash / Exacto / Sol / Opus 5 / Fable | **4 / 3 / 3 / 1 / 1** |
+| `background_task.defaultConcurrency` | **6** |
+| OpenRouter / subscription gateway / Anthropic | **8 / 4 / 2** |
+| Flash / Exacto / Sol / Opus 5 / Fable | **6 / 5 / 3 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |
 
@@ -281,7 +290,7 @@ oc projects --list
 | --- | --- | --- |
 | `high` | sisyphus | Default Exacto · balanced tool_output |
 | `low` | sisyphus | Cost-first · smaller tool_output |
-| `fast` | hephaestus | Direct GPT Sol · skip ceremony |
+| `fast` | hephaestus | GPT Sol via subscription gateway · skip ceremony |
 | `research` | sisyphus | Large tool_output · deep / ultrabrain / content-aware |
 | `debug` | sisyphus | Large tool_output · bug-hunt / debug-team |
 | `writing` | sisyphus | Gemini Flash small_model · writing category |
@@ -295,7 +304,7 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 
 - Allow-everything locally for normal tools (trusted box).
 - Hard-deny bash: `rm -rf /|~`, `mkfs`, `sudo`, `git push --force*`, `gh repo delete*`.
-- Providers allowed: OpenRouter + OpenAI only.
+- Providers allowed: OpenRouter + subscription gateway; direct OpenAI remains a compatibility fallback.
 - Server: `127.0.0.1:4097` · share disabled · mdns off.
 
 ---

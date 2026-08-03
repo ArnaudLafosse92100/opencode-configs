@@ -21,7 +21,7 @@
 #   • lock skills.sources to ./skills; disable the Claude Code bridge (no external imports)
 #   • goal.enabled/auto_start + default_mode.goal -> false (OmO 4.19 /start-work footgun)
 #   • drop deprecated ralph_loop (Goals replaced Ralph on OmO 4.19)
-#   • mcp_env_allowlist + start_work.auto_commit=false
+#   • quarantine broken ~/.omo/omo.jsonc when migrated agents.models break Sisyphus
 #
 # Usage:
 #   ./fix.sh                       repair + format + validate
@@ -315,14 +315,32 @@ if isinstance(tx, dict):
 # Background-task runaway guard — keep concurrency / tool budgets bounded
 bt = omo.setdefault("background_task", {})
 if isinstance(bt, dict):
-    if not isinstance(bt.get("defaultConcurrency"), int) or bt.get("defaultConcurrency") > 4:
-        bt["defaultConcurrency"] = 4; changes.append("background_task.defaultConcurrency capped -> 4")
+    if bt.get("defaultConcurrency") != 6:
+        bt["defaultConcurrency"] = 6; changes.append("background_task.defaultConcurrency -> 6")
     pc = bt.setdefault("providerConcurrency", {})
     if isinstance(pc, dict):
-        if not isinstance(pc.get("openrouter"), int) or pc.get("openrouter") > 6:
-            pc["openrouter"] = 6; changes.append("providerConcurrency.openrouter capped -> 6")
-        if not isinstance(pc.get("subscription-gateway"), int) or pc.get("subscription-gateway") > 4:
-            pc["subscription-gateway"] = 4; changes.append("providerConcurrency.subscription-gateway capped -> 4")
+        for provider, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
+            if pc.get(provider) != cap:
+                pc[provider] = cap; changes.append(f"providerConcurrency.{provider} -> {cap}")
+    mc = bt.setdefault("modelConcurrency", {})
+    if isinstance(mc, dict):
+        def _model_concurrency(model):
+            low = str(model).lower()
+            if any(name in low for name in ("opus", "fable")):
+                return 1
+            if "kimi" in low:
+                return 2
+            if any(name in low for name in ("flash", "floor", "luna")):
+                return 6
+            if any(name in low for name in ("exacto", "minimax", "glm")):
+                return 5
+            if any(name in low for name in ("sonnet", "sol", "terra", "gpt-5.5", "gemini-3.1-pro")):
+                return 3
+            return 1
+        for model in list(mc):
+            cap = _model_concurrency(model)
+            if mc.get(model) != cap:
+                mc[model] = cap; changes.append(f"modelConcurrency.{model} -> {cap}")
     if not isinstance(bt.get("maxToolCalls"), int) or bt.get("maxToolCalls") > 400:
         bt["maxToolCalls"] = 400; changes.append("background_task.maxToolCalls capped -> 400")
     if not isinstance(bt.get("syncPollTimeoutMs"), int) or bt.get("syncPollTimeoutMs") < 60000:
@@ -414,6 +432,7 @@ CATEGORY_COLORS = {
     "visual-engineering": "#FF2D95",
     "ultrabrain": "#B967FF",
     "deep": "#00F0FF",
+    "agentic-deep-kimi": "#7C4DFF",
     "artistry": "#FF5C00",
     "quick": "#39FF14",
     "unspecified-low": "#6B7A99",
@@ -512,6 +531,20 @@ if "hyperplan" in (kd.get("enabled_expansions") or []):
     if isinstance(plan_agent, dict) and plan_agent.get("disable") is True:
         del oc["agent"]["plan"]
         changes.append("removed agent.plan.disable (OmO demotes plan for hyperplan)")
+
+# A partial OmO migration can leave an agents.models array that 4.19 rejects,
+# preventing Sisyphus from loading. The repo config remains the canonical source.
+omo_jsonc_path = os.path.expanduser("~/.omo/omo.jsonc")
+if os.path.isfile(omo_jsonc_path):
+    with open(omo_jsonc_path, encoding="utf-8") as f:
+        omo_jsonc_raw = f.read()
+    if '"[opencode]"' in omo_jsonc_raw and re.search(r'"models"\s*:\s*\[', omo_jsonc_raw):
+        if not dry:
+            bdir = os.path.join(backup_root, f"fix-{stamp or 'manual'}")
+            os.makedirs(bdir, exist_ok=True)
+            shutil.copy2(omo_jsonc_path, os.path.join(bdir, "omo.jsonc"))
+            os.remove(omo_jsonc_path)
+        changes.append("quarantined ~/.omo/omo.jsonc (invalid migrated agents.models)")
 
 # ─── config-only: scrub install/runtime strays OpenCode may drop here ─────────
 STRAYS = (

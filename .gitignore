@@ -43,6 +43,8 @@
 !teams/**
 !tests/
 !tests/**
+!evals/
+!evals/**
 
 # ── Never track — even inside allowlisted trees ─────────────────────
 # Secrets
