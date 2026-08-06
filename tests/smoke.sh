@@ -115,6 +115,26 @@ else
   bad "concurrency drift — run: oc fix"
 fi
 
+# OpenRouter lanes fail over to the independent subscription gateway first,
+# and no automatic fallback may buy GPT Sol/Terra through OpenRouter.
+if python3 -c '
+import json, sys
+omo=json.load(open(sys.argv[1]))
+for section in ("agents", "categories"):
+    for cfg in (omo.get(section) or {}).values():
+        if not isinstance(cfg, dict): continue
+        primary=str(cfg.get("model") or "")
+        fbs=[str(x) for x in (cfg.get("fallback_models") or [])]
+        if any(x.startswith(("openrouter/openai/gpt-5.6-sol", "openrouter/openai/gpt-5.6-terra")) for x in fbs):
+            raise SystemExit(1)
+        if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("subscription-gateway/")):
+            raise SystemExit(2)
+' "$REPO/oh-my-openagent.json"; then
+  ok "independent first fallback and no paid OpenRouter GPT fallback"
+else
+  bad "model fallback isolation drift"
+fi
+
 # doctor --json schema (machine summary for heal/check tooling)
 if "$REPO/doctor.sh" --quick --json 2>/dev/null | python3 -c '
 import json,sys

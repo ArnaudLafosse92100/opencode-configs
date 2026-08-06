@@ -368,6 +368,37 @@ if omo:
         _check_fallbacks("categories", n, c.get("model"), c.get("fallback_models"))
     ok("agent/category fallback lists have no primary duplicates")
 
+    # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
+    # subscription gateway only. An OpenRouter-primary lane must try that
+    # independent provider first so a key-level limit does not cascade through
+    # several models backed by the same exhausted key.
+    forbidden_paid_gpt = (
+        "openrouter/openai/gpt-5.6-sol",
+        "openrouter/openai/gpt-5.6-terra",
+    )
+    for section in ("agents", "categories"):
+        for name, cfg in (omo.get(section) or {}).items():
+            if not isinstance(cfg, dict):
+                continue
+            fallbacks = [str(x) for x in (cfg.get("fallback_models") or [])]
+            bad = [x for x in fallbacks if x.startswith(forbidden_paid_gpt)]
+            if bad:
+                err(f"oh-my-openagent.json[{section}.{name}]: paid OpenRouter GPT fallback forbidden: {bad}")
+            primary = str(cfg.get("model") or "")
+            if primary.startswith("openrouter/") and (
+                not fallbacks or not fallbacks[0].startswith("subscription-gateway/")
+            ):
+                err(
+                    f"oh-my-openagent.json[{section}.{name}]: OpenRouter primary must use "
+                    "subscription-gateway as first fallback"
+                )
+    whitelist = (((oc or {}).get("provider") or {}).get("openrouter") or {}).get("whitelist") or []
+    paid_gpt_whitelist = [str(x) for x in whitelist if str(x).startswith("openai/gpt-")]
+    if paid_gpt_whitelist:
+        err(f"opencode.json: OpenRouter GPT models must not be whitelisted: {paid_gpt_whitelist}")
+    else:
+        ok("OpenRouter routing excludes automatic GPT Sol/Terra spend")
+
 
     kd = omo.get("keyword_detector", {})
     allowed = {"ultrawork", "team", "hyperplan", "hyperplan-ultrawork"}
