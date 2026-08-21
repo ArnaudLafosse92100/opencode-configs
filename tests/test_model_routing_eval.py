@@ -67,6 +67,28 @@ class GradeTests(unittest.TestCase):
         self.assertEqual(specs[0]["model"], "deepseek/deepseek-v4-flash-0731:nitro")
 
 
+class ContentAwareFallbackTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
+
+    def test_fast_security_fallback_tries_openrouter_alternatives_before_gateway(self) -> None:
+        fallbacks = self.config["categories"]["content-aware-fast"]["fallback_models"]
+        self.assertEqual(fallbacks, [
+            "openrouter/minimax/minimax-m3",
+            "openrouter/z-ai/glm-5.2-exacto",
+            "subscription-gateway/gpt-5.6-terra",
+        ])
+
+    def test_deep_security_fallback_tries_openrouter_alternatives_before_gateway(self) -> None:
+        fallbacks = self.config["categories"]["content-aware-deep"]["fallback_models"]
+        self.assertEqual(fallbacks, [
+            "openrouter/moonshotai/kimi-k3",
+            "openrouter/z-ai/glm-5.2-exacto",
+            "subscription-gateway/gpt-5.6-sol-review",
+        ])
+
+
 class CampaignLedgerTests(unittest.TestCase):
     def test_reported_cost_is_persisted_atomically(self) -> None:
         original = runner.CAMPAIGN_STATE

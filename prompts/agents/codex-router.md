@@ -28,6 +28,8 @@ For authorized security work requiring both surface mapping and depth, run the f
 
 Use synchronous calls and pass the complete user goal, constraints, current directory context, requested deliverable, and verification criteria.
 
+If an earlier or resumed child session is still running, provider-erroring, or does not match the current category contract, do not reuse it as the primary route. Start a fresh synchronous `task(...)` with the correct `category` and `load_skills`, then synthesize only returned evidence.
+
 ```typescript
 task(
   category="content-aware-fast",

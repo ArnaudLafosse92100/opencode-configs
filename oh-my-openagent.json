@@ -426,9 +426,9 @@
       "description": "Fast attack-surface recon: endpoints, misconfigs, deps.",
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
         "openrouter/minimax/minimax-m3",
-        "openrouter/z-ai/glm-5.2-exacto"
+        "openrouter/z-ai/glm-5.2-exacto",
+        "subscription-gateway/gpt-5.6-terra"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-fast.md",
       "color": "#FF1744",
@@ -440,9 +440,9 @@
       "description": "Deep vuln research. Each finding: CVSS, evidence, repro, fix.",
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
         "openrouter/moonshotai/kimi-k3",
-        "openrouter/z-ai/glm-5.2-exacto"
+        "openrouter/z-ai/glm-5.2-exacto",
+        "subscription-gateway/gpt-5.6-sol-review"
       ],
       "reasoning": "high",
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-deep.md",

@@ -407,13 +407,29 @@ if omo:
     ok("agent/category fallback lists have no primary duplicates")
 
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
-    # subscription gateway only. An OpenRouter-primary lane must try that
+    # subscription gateway only. Most OpenRouter-primary lanes must try that
     # independent provider first so a key-level limit does not cascade through
-    # several models backed by the same exhausted key.
+    # several models backed by the same exhausted key. Content-aware security
+    # lanes are the exception: if DeepSeek refuses authorized cyber content,
+    # try OpenRouter alternatives before falling back to the subscription
+    # gateway, otherwise Codex can surface auth_unavailable instead of a useful
+    # model-level fallback.
     forbidden_paid_gpt = (
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
     )
+    content_aware_fallbacks = {
+        ("categories", "content-aware-fast"): [
+            "openrouter/minimax/minimax-m3",
+            "openrouter/z-ai/glm-5.2-exacto",
+            "subscription-gateway/gpt-5.6-terra",
+        ],
+        ("categories", "content-aware-deep"): [
+            "openrouter/moonshotai/kimi-k3",
+            "openrouter/z-ai/glm-5.2-exacto",
+            "subscription-gateway/gpt-5.6-sol-review",
+        ],
+    }
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
             if not isinstance(cfg, dict):
@@ -423,6 +439,14 @@ if omo:
             if bad:
                 err(f"oh-my-openagent.json[{section}.{name}]: paid OpenRouter GPT fallback forbidden: {bad}")
             primary = str(cfg.get("model") or "")
+            content_aware_expected = content_aware_fallbacks.get((section, name))
+            if content_aware_expected:
+                if fallbacks != content_aware_expected:
+                    err(
+                        f"oh-my-openagent.json[{section}.{name}]: content-aware fallback order must be "
+                        f"{content_aware_expected}"
+                    )
+                continue
             if primary.startswith("openrouter/") and (
                 not fallbacks or not fallbacks[0].startswith("subscription-gateway/")
             ):
