@@ -45,7 +45,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-fast", "load_skills": ["content-aware-recon"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-flash-0731",
+                "terminal_model": "z-ai/glm-5.2-exacto",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -66,7 +66,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-flash-0731",
+                "terminal_model": "z-ai/glm-5.2-exacto",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -86,7 +86,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-deep", "load_skills": ["content-aware-audit"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-flash-0731",
+                "terminal_model": "z-ai/glm-5.2-exacto",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],

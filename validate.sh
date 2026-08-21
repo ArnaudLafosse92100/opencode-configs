@@ -406,30 +406,50 @@ if omo:
         _check_fallbacks("categories", n, c.get("model"), c.get("fallback_models"))
     ok("agent/category fallback lists have no primary duplicates")
 
+    runtime_profile_path = os.path.join(repo, "runtime-profile.json")
+    runtime_profile = "normal"
+    if os.path.isfile(runtime_profile_path):
+        try:
+            runtime_profile = (json.load(open(runtime_profile_path)).get("active") or "normal").strip()
+        except Exception:
+            runtime_profile = "invalid"
+    if runtime_profile not in ("normal", "pentest"):
+        err(f"runtime-profile.json active must be normal or pentest (got {runtime_profile!r})")
+    else:
+        ok(f"runtime profile {runtime_profile!r}")
+
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
     # subscription gateway only. Most OpenRouter-primary lanes must try that
     # independent provider first so a key-level limit does not cascade through
     # several models backed by the same exhausted key. Content-aware security
-    # lanes are the exception: if DeepSeek refuses authorized cyber content,
-    # try OpenRouter alternatives before falling back to the subscription
-    # gateway, otherwise Codex can surface auth_unavailable instead of a useful
-    # model-level fallback.
+    # lanes switch by runtime profile. Normal keeps subscription-gateway as the
+    # last fallback; pentest keeps the lane OpenRouter-only and GLM-first.
     forbidden_paid_gpt = (
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
     )
-    content_aware_fallbacks = {
-        ("categories", "content-aware-fast"): [
-            "openrouter/minimax/minimax-m3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-terra",
-        ],
-        ("categories", "content-aware-deep"): [
-            "openrouter/moonshotai/kimi-k3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-sol-review",
-        ],
-    }
+    if runtime_profile == "pentest":
+        content_aware_fallbacks = {
+            ("categories", "content-aware-fast"): (
+                "openrouter/z-ai/glm-5.2-exacto",
+                ["openrouter/deepseek/deepseek-v4-flash-0731"],
+            ),
+            ("categories", "content-aware-deep"): (
+                "openrouter/z-ai/glm-5.2-exacto",
+                ["openrouter/deepseek/deepseek-v4-flash-0731"],
+            ),
+        }
+    else:
+        content_aware_fallbacks = {
+            ("categories", "content-aware-fast"): (
+                "openrouter/deepseek/deepseek-v4-flash-0731",
+                ["openrouter/minimax/minimax-m3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-terra"],
+            ),
+            ("categories", "content-aware-deep"): (
+                "openrouter/deepseek/deepseek-v4-flash-0731",
+                ["openrouter/moonshotai/kimi-k3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-sol-review"],
+            ),
+        }
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
             if not isinstance(cfg, dict):
@@ -441,10 +461,11 @@ if omo:
             primary = str(cfg.get("model") or "")
             content_aware_expected = content_aware_fallbacks.get((section, name))
             if content_aware_expected:
-                if fallbacks != content_aware_expected:
+                expected_primary, expected_fallbacks = content_aware_expected
+                if primary != expected_primary or fallbacks != expected_fallbacks:
                     err(
-                        f"oh-my-openagent.json[{section}.{name}]: content-aware fallback order must be "
-                        f"{content_aware_expected}"
+                        f"oh-my-openagent.json[{section}.{name}]: content-aware route must be "
+                        f"{expected_primary} with fallbacks {expected_fallbacks}"
                     )
                 continue
             if primary.startswith("openrouter/") and (

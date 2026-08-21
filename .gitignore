@@ -18,6 +18,7 @@
 !projects.json
 !versions.json
 !signature.json
+!runtime-profile.json
 !tui.json
 !tmux.conf
 !zshrc.snippet

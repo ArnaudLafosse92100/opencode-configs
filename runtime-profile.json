@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "active": "pentest",
+  "normal": {
+    "content-aware-fast": {
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "fallback_models": [
+        "openrouter/minimax/minimax-m3",
+        "openrouter/z-ai/glm-5.2-exacto",
+        "subscription-gateway/gpt-5.6-terra"
+      ]
+    },
+    "content-aware-deep": {
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k3",
+        "openrouter/z-ai/glm-5.2-exacto",
+        "subscription-gateway/gpt-5.6-sol-review"
+      ]
+    }
+  },
+  "pentest": {
+    "content-aware-fast": {
+      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-flash-0731"
+      ]
+    },
+    "content-aware-deep": {
+      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-flash-0731"
+      ]
+    }
+  }
+}

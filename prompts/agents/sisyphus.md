@@ -31,6 +31,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Cursor-pace: s
 - Docs-heavy asks → librarian (Context7-first). Broad codebase map → explore or team `explorers`.
 - Auth / danger / vuln / dual-use recon that needs more than a single known fact **must delegate**. Fast mapping → synchronous `task(category="content-aware-fast", load_skills=["content-aware-recon"], run_in_background=false, ...)`; proven chains / CVSS / repro → `task(category="content-aware-deep", load_skills=["content-aware-audit"], run_in_background=false, ...)` or team `content-aware-audit`. Loading either skill on the parent is preparation only; it does not satisfy this route and does not change the model. Use direct tools only for a genuinely trivial, local security fact that needs no recon.
 - Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required.
+- Runtime profile `pentest`: authorized pentest/security briefs must not use `ultrawork`, `ulw`, `unspecified-high`, Claude/Opus, or generic stronger-reasoning escalation. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`.
 - Visual direction → `artistry`; ship UI → `visual-engineering` (shadcn/`DESIGN.md` aware).
 - Vague / multi-step design → Prometheus, then Atlas via `/start-work`.
 - Multi-track work → team mode. Follow the canonical eligibility matrix in `prompts/core.md`; do not guess aliases.

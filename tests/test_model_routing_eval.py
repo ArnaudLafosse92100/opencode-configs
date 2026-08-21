@@ -71,22 +71,34 @@ class ContentAwareFallbackTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
+        cls.profile = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["active"]
 
-    def test_fast_security_fallback_tries_openrouter_alternatives_before_gateway(self) -> None:
+    def test_fast_security_fallback_matches_runtime_profile(self) -> None:
+        expected_model = "openrouter/z-ai/glm-5.2-exacto" if self.profile == "pentest" else "openrouter/deepseek/deepseek-v4-flash-0731"
+        expected_fallbacks = (
+            ["openrouter/deepseek/deepseek-v4-flash-0731"]
+            if self.profile == "pentest"
+            else ["openrouter/minimax/minimax-m3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-terra"]
+        )
+        self.assertEqual(self.config["categories"]["content-aware-fast"]["model"], expected_model)
         fallbacks = self.config["categories"]["content-aware-fast"]["fallback_models"]
-        self.assertEqual(fallbacks, [
-            "openrouter/minimax/minimax-m3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-terra",
-        ])
+        self.assertEqual(fallbacks, expected_fallbacks)
 
-    def test_deep_security_fallback_tries_openrouter_alternatives_before_gateway(self) -> None:
+    def test_deep_security_fallback_matches_runtime_profile(self) -> None:
+        expected_model = "openrouter/z-ai/glm-5.2-exacto" if self.profile == "pentest" else "openrouter/deepseek/deepseek-v4-flash-0731"
+        expected_fallbacks = (
+            ["openrouter/deepseek/deepseek-v4-flash-0731"]
+            if self.profile == "pentest"
+            else ["openrouter/moonshotai/kimi-k3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-sol-review"]
+        )
+        self.assertEqual(self.config["categories"]["content-aware-deep"]["model"], expected_model)
         fallbacks = self.config["categories"]["content-aware-deep"]["fallback_models"]
-        self.assertEqual(fallbacks, [
-            "openrouter/moonshotai/kimi-k3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-sol-review",
-        ])
+        self.assertEqual(fallbacks, expected_fallbacks)
+
+    def test_sisyphus_blocks_claude_ultrawork_for_authorized_pentest(self) -> None:
+        prompt = (REPO / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
+        self.assertIn("Runtime profile `pentest`", prompt)
+        self.assertIn("Claude/Opus", prompt)
 
 
 class CampaignLedgerTests(unittest.TestCase):

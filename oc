@@ -20,6 +20,7 @@
 #   cleanup [--dry-run|--yes]             Reconcile to known-good state
 #   maintain [--check|--clean|--plans]    Clean sessions, caches, logs
 #   models [--catalog|--providers|--json|--upgrade]  OpenRouter catalog / providers
+#   profile [show|normal|pentest]        Switch runtime routing profile
 #   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
 #   plugin [doctor|cache]                 OmO plugin doctor / cache status
@@ -103,6 +104,7 @@ ${c_bold}Repair & Clean:${c_0}
 
 ${c_bold}Models & Admin:${c_0}
   ${c_g}models${c_0}    [--catalog|--providers|--json|--upgrade]
+  ${c_g}profile${c_0}   [show|normal|pentest]         Runtime routing profile
                                          OpenRouter catalog / live provider health
   ${c_g}eval${c_0}      [--execute|--run-budget N]    Bounded model-routing canary (plan-only by default)
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]
@@ -1141,6 +1143,7 @@ case "$cmd" in
   test)       do_test "$@" ;;
   locate|where|discover) dispatch locate.sh "$@" ;;
   signature|sig) dispatch signature.sh "$@" ;;
+  profile) dispatch runtime-profile.sh "$@" ;;
 
   admin)
     # Default to 'status' if no subcommand given

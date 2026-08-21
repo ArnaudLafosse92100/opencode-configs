@@ -139,25 +139,35 @@ else
 fi
 
 # OpenRouter lanes usually fail over to the independent subscription gateway
-# first. Content-aware security lanes intentionally try OpenRouter alternatives
-# first so a cyber-policy refusal can recover before subscription-gateway auth
-# boundaries are hit. No automatic fallback may buy GPT Sol/Terra through
-# OpenRouter.
+# first. Content-aware security lanes switch by runtime profile. In pentest mode
+# they are GLM-first and OpenRouter-only. No automatic fallback may buy GPT
+# Sol/Terra through OpenRouter.
 if python3 -c '
 import json, sys
 omo=json.load(open(sys.argv[1]))
-content_aware={
-    ("categories", "content-aware-fast"): [
-        "openrouter/minimax/minimax-m3",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "subscription-gateway/gpt-5.6-terra",
-    ],
-    ("categories", "content-aware-deep"): [
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "subscription-gateway/gpt-5.6-sol-review",
-    ],
-}
+prof=json.load(open(sys.argv[2])).get("active", "normal")
+if prof == "pentest":
+    content_aware={
+        ("categories", "content-aware-fast"): (
+            "openrouter/z-ai/glm-5.2-exacto",
+            ["openrouter/deepseek/deepseek-v4-flash-0731"],
+        ),
+        ("categories", "content-aware-deep"): (
+            "openrouter/z-ai/glm-5.2-exacto",
+            ["openrouter/deepseek/deepseek-v4-flash-0731"],
+        ),
+    }
+else:
+    content_aware={
+        ("categories", "content-aware-fast"): (
+            "openrouter/deepseek/deepseek-v4-flash-0731",
+            ["openrouter/minimax/minimax-m3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-terra"],
+        ),
+        ("categories", "content-aware-deep"): (
+            "openrouter/deepseek/deepseek-v4-flash-0731",
+            ["openrouter/moonshotai/kimi-k3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-sol-review"],
+        ),
+    }
 for section in ("agents", "categories"):
     for name, cfg in (omo.get(section) or {}).items():
         if not isinstance(cfg, dict): continue
@@ -167,13 +177,14 @@ for section in ("agents", "categories"):
             raise SystemExit(1)
         expected=content_aware.get((section, name))
         if expected:
-            if fbs != expected:
+            expected_primary, expected_fallbacks = expected
+            if primary != expected_primary or fbs != expected_fallbacks:
                 raise SystemExit(3)
             continue
         if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("subscription-gateway/")):
             raise SystemExit(2)
-' "$REPO/oh-my-openagent.json"; then
-  ok "fallback isolation, content-aware OpenRouter recovery, and no paid OpenRouter GPT fallback"
+' "$REPO/oh-my-openagent.json" "$REPO/runtime-profile.json"; then
+  ok "fallback isolation, runtime-profile content-aware routing, and no paid OpenRouter GPT fallback"
 else
   bad "model fallback isolation drift"
 fi
