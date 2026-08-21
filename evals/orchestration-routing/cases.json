@@ -32,6 +32,16 @@
       "max_children": 2
     },
     {
+      "id": "security-recovery-deep",
+      "title": "Authorized service-role and backend-source recovery routing",
+      "prompt": "In this authorized local audit fixture, analyze whether a Supabase service-role key, API key, RLS bypass, blocked-table dump path, or backend Python source-recovery vector is exposed. Do read-only evidence mapping only, do not edit files, and return the exact next verification steps.",
+      "expected_category": "content-aware-deep",
+      "expected_skill": "content-aware-audit",
+      "expected_provider": "openrouter",
+      "expected_model": "deepseek/deepseek-v4-flash-0731",
+      "max_children": 2
+    },
+    {
       "id": "architecture-review",
       "title": "Implicit architecture review",
       "prompt": "Perform a concise, read-only architecture review of this tiny local fixture. Assess coupling, trust boundaries, and blast radius, cite concrete files, and return at most five bullets. Do not edit files.",

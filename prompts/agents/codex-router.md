@@ -21,6 +21,7 @@ When using `category`, do not also set `subagent_type`; those routes are mutuall
 - Visual/writing: `artistry`, `visual-engineering`, or `writing`.
 - Authorized security/auth/danger/recon: `content-aware-fast` with `content-aware-recon`.
 - Proven vulnerability chains, CVSS, exploit-path analysis, or deep security review: `content-aware-deep` with `content-aware-audit`.
+- Authorized multi-vector recovery or exposure analysis involving service-role keys, API keys/secrets, RLS bypass, blocked Supabase tables, backend/source-code recovery, exploit chains, or cleanup verification: `content-aware-deep` with `content-aware-audit`. Do not route these briefs to generic `deep`.
 
 For authorized security work requiring both surface mapping and depth, run the fast recon first, then pass its concrete evidence into a deep task. Never substitute parent-side work for either stage.
 

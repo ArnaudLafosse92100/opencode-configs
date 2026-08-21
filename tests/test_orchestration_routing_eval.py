@@ -76,6 +76,23 @@ class GradeTests(unittest.TestCase):
         self.assertFalse(grade["explicit_skill_loaded"])
         self.assertTrue(grade["checks"]["specialization_contract"])
 
+    def test_service_role_recovery_case_requires_content_aware_deep(self) -> None:
+        case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recovery-deep")
+        self.assertEqual(case["expected_category"], "content-aware-deep")
+        self.assertEqual(case["expected_skill"], "content-aware-audit")
+        self.assertIn("service-role key", case["prompt"])
+        evidence = {
+            "root": {"agent": "codex-router"},
+            "tasks": [{"category": "content-aware-deep", "load_skills": ["content-aware-audit"], "status": "completed"}],
+            "children": [{
+                "terminal_provider": "openrouter",
+                "terminal_model": "deepseek/deepseek-v4-flash-0731",
+                "terminal_finish": "stop",
+                "terminal_error": None,
+            }],
+        }
+        self.assertTrue(runner.grade(case, evidence)["passed"])
+
     def test_trivial_case_rejects_child_session(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "trivial-direct")
         grade = runner.grade(
@@ -116,9 +133,13 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("When using `category`, do not also set `subagent_type`", definition)
         self.assertIn("content-aware-fast", definition)
         self.assertIn("content-aware-deep", definition)
+        self.assertIn("service-role keys", definition)
+        self.assertIn("Do not route these briefs to generic `deep`", definition)
         self.assertIn("Every request that needs tools **must**", prompt)
         self.assertIn("content-aware-fast", prompt)
         self.assertIn("content-aware-deep", prompt)
+        self.assertIn("service-role keys", prompt)
+        self.assertIn("Do not route these briefs to generic `deep`", prompt)
 
     def test_live_canary_targets_codex_router(self) -> None:
         self.assertEqual(runner.DEFAULT_AGENT, "codex-router")
