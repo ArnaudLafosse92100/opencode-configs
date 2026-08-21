@@ -2,7 +2,13 @@
 
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
-## Unreleased — 2026-08-03
+## Unreleased — 2026-08-09
+
+### DeepSeek 0731 route correction + runtime refresh
+- Pin the exact OpenRouter model `deepseek/deepseek-v4-flash-0731`; the unversioned slug still resolves to the April 0423 release on OpenRouter
+- Make the validator reject the legacy Flash slug and require the exact 0731 Nitro model definition
+- Upgrade the validated runtime floor to OpenCode 1.18.11 and OmO 4.19.4, including `reasoningEffort` → `reasoning`
+- Remove redundant provider throughput/latency preferences while preserving the mixed OpenRouter + subscription-gateway lanes
 
 ### Selective upstream hardening for mixed routing
 - Keep Sisyphus canonical and quarantine the invalid migrated `~/.omo/omo.jsonc` shape fixed upstream in 1.5.47, without importing its OpenRouter-only routing rule

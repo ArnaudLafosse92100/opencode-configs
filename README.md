@@ -16,8 +16,9 @@ source ~/.zshrc && oc doctor && oc launch
 
 | | |
 | --- | --- |
-| **Pins** | OpenConfig `1.5.40` · OpenCode `1.18.5+` · OmO `oh-my-openagent@4.19.1` · `@opencode-ai/plugin` `1.18.5` |
+| **Pins** | OpenConfig `1.5.40` · OpenCode `1.18.11+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.11` |
 | **Default lead** | `sisyphus` (GLM Exacto) |
+| **Codex model-picker entry** | `codex-router` (GLM Exacto, task-only workspace access) |
 | **Config path** | `~/.config/opencode` → this repo (symlink) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
 | **Health** | `oc doctor` · `oc versions` · `oc test` |
@@ -94,8 +95,8 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 | Package | Source of truth | Current |
 | --- | --- | --- |
 | OpenConfig | `versions.json` → `opencode_configs` | `1.5.40` |
-| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.5+` |
-| OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.1` |
+| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.11+` |
+| OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.4` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
 
 `oc versions` also lists other `opencode.json` files under `~/Projects` and `/Users/Shared`. Those are project overlays — OmO stays pinned globally here.
@@ -139,6 +140,7 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 
 | Agent | Model | Role |
 | --- | --- | --- |
+| **codex-router** | GLM 5.2 Exacto | Strict Codex bridge entry; delegates workspace actions to OmO categories |
 | **sisyphus** | GLM 5.2 Exacto | Default orchestrator / lead |
 | **hephaestus** | GPT-5.6 Terra (subscription gateway) | Implementation |
 | **prometheus** | GLM 5.2 Exacto | Planner |
@@ -150,14 +152,20 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | Agent | Model | Role |
 | --- | --- | --- |
 | oracle | GPT-5.6 Sol (subscription gateway) | Critique / adjudication |
-| librarian | DeepSeek Flash Nitro | Docs (Context7-first) |
-| explore | DeepSeek Flash Nitro | Codebase map |
+| librarian | DeepSeek Flash 0731 Nitro | Docs (Context7-first) |
+| explore | DeepSeek Flash 0731 Nitro | Codebase map |
 | multimodal-looker | Claude Sonnet 5 | Vision (`look_at`) |
 | metis | Claude Sonnet 5 | Pre-planning critic |
 | momus | GPT-5.6 Sol (subscription gateway) | Plan / review gate |
-| sisyphus-junior | DeepSeek Flash Nitro | Cheap delegated work |
+| sisyphus-junior | DeepSeek Flash 0731 Nitro | Cheap delegated work |
 
 Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff — do **not** put it in `disabled_agents`.
+
+`codex-router` is selected only by `/Volumes/PERSO/OpenCode-Codex-Bridge`.
+Its final permission rules are `* = deny`, then `task = allow`, so it cannot
+silently inspect or modify a workspace on the GLM parent. The OmO category
+still owns the child model, skills/category prompt, and fallbacks. Normal
+OpenCode TUI sessions continue to use `sisyphus`.
 
 ---
 
@@ -168,13 +176,13 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 | `bug-hunt` | GLM Exacto | Reproduce → root cause → fix |
 | `refactor-safe` | GLM Exacto | Behavior-preserving refactors |
 | `arch-review` | GPT-5.6 Sol (subscription gateway) | Coupling / blast radius |
-| `content-aware-fast` | DeepSeek Flash Nitro | Attack-surface recon |
+| `content-aware-fast` | DeepSeek Flash 0731 Nitro | Attack-surface recon |
 | `content-aware-deep` | DeepSeek Flash 0731 → Kimi / GPT review | Deep vuln research |
 | `agentic-deep-kimi` | Kimi K3 | Explicit long-horizon escalation after evaluation |
 | `writing` | Gemini 3.6 Flash Nitro | Docs / prose |
 | `visual-engineering` | Gemini 3.1 Pro | Ship UI |
 | `artistry` | Gemini 3.1 Pro | Design direction |
-| `quick` | DeepSeek Flash Nitro | Cheap fast tasks |
+| `quick` | DeepSeek Flash 0731 Nitro | Cheap fast tasks |
 | `deep` / `ultrabrain` | GPT-5.6 Sol (subscription gateway) | Heavy / max reasoning |
 | `unspecified-low` / `unspecified-high` | Flash / Claude Opus 5 | Hyperplan critics |
 
@@ -219,8 +227,8 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | --- | --- | --- |
 | Orchestration | `z-ai/glm-5.2:exacto` | Sisyphus / Atlas / Prometheus / bug-hunt |
 | GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
-| Recon | `deepseek/deepseek-v4-flash:nitro` | explore / librarian / sisyphus-junior / quick |
-| Depth | `deepseek/deepseek-v4-flash:nitro` → Kimi K3 / GPT review fallback | content-aware |
+| Recon | `deepseek/deepseek-v4-flash-0731:nitro` | explore / librarian / sisyphus-junior / quick |
+| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → Kimi K3 / GPT review fallback | content-aware |
 | Agentic escalation | `moonshotai/kimi-k3` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
 | Multimodal | Claude Sonnet 5 → Gemini Flash / Kimi K3 fallback | multimodal-looker |
 | Visual / writing | Gemini 3.1 Pro · 3.6 Flash Nitro | artistry / visual / writing |
@@ -274,6 +282,7 @@ Every OmO agent/category loads a `prompt_append` from `prompts/`. Profiles under
 | `prompts/categories/*.md` | Category appends |
 | `prompts/profiles/*.md` | Profile briefs |
 | `agents/content-aware-research.md` | OpenCode primary-agent def (synced with prompts) |
+| `agents/codex-router.md` + `prompts/agents/codex-router.md` | Native definition + strict task-only OmO prompt for the Codex bridge |
 
 ---
 
@@ -326,7 +335,7 @@ opencode-configs/
 ├── models.sh · versions.sh · cleanup.sh · signature.sh · locate.sh
 ├── opencode.json · oh-my-openagent.json · tui.json
 ├── versions.json · signature.json · projects.json · AGENTS.md
-├── agents/content-aware-research.md
+├── agents/content-aware-research.md · agents/codex-router.md
 ├── profiles/ · prompts/ · teams/ · skills/
 ├── .env.example
 └── zshrc.snippet · ghostty.conf · tmux.conf
@@ -343,7 +352,7 @@ opencode-configs/
 
 ```bash
 oc signature && oc test && oc validate && oc versions && oc doctor
-bunx oh-my-openagent@4.19.1 doctor   # upstream: System OK
+bunx oh-my-openagent@4.19.4 doctor   # upstream: System OK
 ```
 
 Idempotency: re-running install / setup / heal / fix on a healthy box must not clobber `.env`, rewrite correct symlinks, or bump clean config mtimes.
@@ -360,7 +369,7 @@ Idempotency: re-running install / setup / heal / fix on a healthy box must not c
 | Context7 | [context7.com](https://context7.com) | [upstash/context7](https://github.com/upstash/context7) |
 | Exa | [docs.exa.ai](https://docs.exa.ai) | [exa-labs](https://github.com/exa-labs) |
 
-Installer pulls OpenCode from `https://opencode.ai/install` and OmO from npm `oh-my-openagent@4.19.1` only.
+Installer pulls OpenCode from `https://opencode.ai/install` and OmO from npm `oh-my-openagent@4.19.4` only.
 
 ---
 

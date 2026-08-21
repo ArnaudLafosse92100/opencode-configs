@@ -1643,7 +1643,7 @@ sys.exit(0)
 PY
 }
 
-# OmO plugin cache path for a pin like oh-my-openagent@4.19.1
+# OmO plugin cache path for a pin like oh-my-openagent@4.19.4
 oc_omo_plugin_cache_dir() {
   local pin="${1:-}"
   if [[ -z "$pin" ]]; then

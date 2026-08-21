@@ -4,7 +4,7 @@
   "logLevel": "WARN",
   "username": "user",
   "model": "openrouter/z-ai/glm-5.2-exacto",
-  "small_model": "openrouter/deepseek/deepseek-v4-flash",
+  "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
   "default_agent": "sisyphus",
   "autoupdate": false,
   "share": "disabled",
@@ -24,7 +24,7 @@
     "prompts/goal.md"
   ],
   "plugin": [
-    "oh-my-openagent@4.19.1"
+    "oh-my-openagent@4.19.4"
   ],
   "skills": {
     "paths": [
@@ -34,17 +34,17 @@
   },
   "agent": {
     "title": {
-      "model": "openrouter/deepseek/deepseek-v4-flash",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "temperature": 0.1,
       "steps": 1
     },
     "summary": {
-      "model": "openrouter/deepseek/deepseek-v4-flash",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "temperature": 0.2,
       "steps": 1
     },
     "compaction": {
-      "model": "openrouter/deepseek/deepseek-v4-flash",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "temperature": 0.1,
       "steps": 1
     },
@@ -59,7 +59,7 @@
     "openrouter": {
       "whitelist": [
         "z-ai/glm-5.2-exacto",
-        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-flash-0731",
         "minimax/minimax-m3",
         "google/gemini-3.1-pro-preview",
         "google/gemini-3.6-flash",
@@ -166,9 +166,9 @@
             }
           }
         },
-        "deepseek/deepseek-v4-flash": {
-          "id": "deepseek/deepseek-v4-flash:nitro",
-          "name": "DeepSeek V4 Flash Nitro",
+        "deepseek/deepseek-v4-flash-0731": {
+          "id": "deepseek/deepseek-v4-flash-0731:nitro",
+          "name": "DeepSeek V4 Flash 0731 Nitro",
           "family": "deepseek",
           "reasoning": true,
           "tool_call": true,
@@ -184,14 +184,6 @@
               "require_parameters": true,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 30
-              },
-              "preferred_max_latency": {
-                "p50": 2,
-                "p90": 4
-              },
               "order": [
                 "deepseek",
                 "baidu",
@@ -258,14 +250,6 @@
             "provider": {
               "require_parameters": false,
               "data_collection": "allow",
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 30
-              },
-              "preferred_max_latency": {
-                "p50": 6,
-                "p90": 10
-              },
               "allow_fallbacks": true,
               "order": [
                 "google-vertex",
@@ -318,14 +302,6 @@
             "provider": {
               "require_parameters": false,
               "data_collection": "allow",
-              "preferred_min_throughput": {
-                "p50": 50,
-                "p90": 40
-              },
-              "preferred_max_latency": {
-                "p50": 3,
-                "p90": 6
-              },
               "allow_fallbacks": true,
               "order": [
                 "google-vertex",
@@ -381,15 +357,7 @@
               "allow_fallbacks": true,
               "order": [
                 "anthropic"
-              ],
-              "preferred_min_throughput": {
-                "p50": 70,
-                "p90": 50
-              },
-              "preferred_max_latency": {
-                "p50": 1.5,
-                "p90": 3
-              }
+              ]
             }
           },
           "variants": {
@@ -441,15 +409,7 @@
                 "anthropic",
                 "amazon-bedrock",
                 "azure"
-              ],
-              "preferred_min_throughput": {
-                "p50": 50,
-                "p90": 40
-              },
-              "preferred_max_latency": {
-                "p50": 3,
-                "p90": 6
-              }
+              ]
             }
           },
           "variants": {
@@ -493,14 +453,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 30,
-                "p90": 21
-              },
-              "preferred_max_latency": {
-                "p50": 8,
-                "p90": 12
-              },
               "order": [
                 "google-ai-studio",
                 "google-vertex"
@@ -551,14 +503,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 40
-              },
-              "preferred_max_latency": {
-                "p50": 2,
-                "p90": 4
-              },
               "order": [
                 "google-ai-studio",
                 "google-vertex"
@@ -616,14 +560,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 40
-              },
-              "preferred_max_latency": {
-                "p50": 2,
-                "p90": 4
-              },
               "order": [
                 "google-vertex",
                 "google-ai-studio"
@@ -684,14 +620,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 30
-              },
-              "preferred_max_latency": {
-                "p50": 8,
-                "p90": 14
-              },
               "order": [
                 "amazon-bedrock",
                 "google-vertex",
@@ -744,14 +672,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 30
-              },
-              "preferred_max_latency": {
-                "p50": 8,
-                "p90": 14
-              },
               "order": [
                 "amazon-bedrock",
                 "google-vertex",
@@ -801,14 +721,6 @@
               "require_parameters": true,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 30
-              },
-              "preferred_max_latency": {
-                "p50": 2,
-                "p90": 4
-              },
               "order": [
                 "minimax",
                 "atlas-cloud",
@@ -921,14 +833,6 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true,
-              "preferred_min_throughput": {
-                "p50": 40,
-                "p90": 40
-              },
-              "preferred_max_latency": {
-                "p50": 2,
-                "p90": 4
-              },
               "order": [
                 "google-vertex",
                 "google-ai-studio"

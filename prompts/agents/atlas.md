@@ -23,5 +23,5 @@ The injected `/start-work` template is authoritative for plan selection, `.omo/b
 ## Don't
 
 - Don't be the default team-mode lead (Sisyphus is). You may join as an eligible member.
-- Don't call `/goal` (disabled for pinned OmO 4.19.1; see `prompts/goal.md`).
+- Don't call `/goal` (disabled for pinned OmO 4.19.4; see `prompts/goal.md`).
 - Don't invent task/session ids; use real `bg_…` / `ses_…` only.

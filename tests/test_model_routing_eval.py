@@ -61,6 +61,11 @@ class GradeTests(unittest.TestCase):
         self.assertFalse(grade["passed"])
         self.assertIn("3 retries", grade["forbidden_terms_found"])
 
+    def test_deepseek_alias_pins_0731(self) -> None:
+        specs = runner.model_specs("deepseek")
+        self.assertEqual(specs[0]["config_key"], "deepseek/deepseek-v4-flash-0731")
+        self.assertEqual(specs[0]["model"], "deepseek/deepseek-v4-flash-0731:nitro")
+
 
 class CampaignLedgerTests(unittest.TestCase):
     def test_reported_cost_is_persisted_atomically(self) -> None:

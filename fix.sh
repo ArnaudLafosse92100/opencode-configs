@@ -16,7 +16,8 @@
 #   • normalize the oh-my-* plugin pin
 #   • lock skills.paths to repo-local ./skills (drop external ~/.claude, ~/.agents dirs)
 # Repairs (oh-my-openagent.json):
-#   • agent color -> hex (or removed); strip hidden/steps/thinking/providerOptions
+#   • reasoningEffort -> reasoning; agent color -> hex (or removed)
+#   • strip hidden/steps/thinking/providerOptions
 #   • keyword_detector.enabled_expansions -> only valid enum values
 #   • lock skills.sources to ./skills; disable the Claude Code bridge (no external imports)
 #   • goal.enabled/auto_start + default_mode.goal -> false (OmO 4.19 /start-work footgun)
@@ -27,7 +28,7 @@
 #   ./fix.sh                       repair + format + validate
 #   ./fix.sh --dry-run             show what would change, write nothing
 #   ./fix.sh --set model=openrouter/z-ai/glm-5.2
-#   ./fix.sh --set default_agent=atlas --set small_model=openrouter/deepseek/deepseek-v4-flash
+#   ./fix.sh --set default_agent=atlas --set small_model=openrouter/deepseek/deepseek-v4-flash-0731
 
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -90,6 +91,10 @@ for mid, m in prov.get("models", {}).items():
     for k in ("temperature", "top_p", "thinking"):
         if k in o: del o[k]; changes.append(f"[{mid}] stripped model-level options.{k}")
     pv = o.get("provider", {})
+    for key in ("preferred_min_throughput", "preferred_max_latency"):
+        if key in pv:
+            del pv[key]
+            changes.append(f"[{mid}] removed provider.{key} (native provider routing owns selection)")
     # Only claude/deepseek NEED 'unknown' (their first-party endpoints report it).
     # GLM intentionally excludes it to drop fp4 providers — do not touch that.
     q = pv.get("quantizations")
@@ -177,11 +182,12 @@ for must in ("AGENTS.md", "prompts/core.md", "prompts/goal.md"):
     if must not in instr:
         instr.append(must); changes.append(f"instructions += {must}")
 
-# normalize plugin pin name (accept oh-my-openagent or oh-my-opencode; keep version)
+# Normalize the plugin name and enforce the versions.json pin.
 plug = oc.get("plugin", [])
+want_omo_pin = (load("versions.json").get("oh_my_openagent") or {}).get("pin")
 for i, p in enumerate(plug):
     if "oh-my" in p and "@" in p:
-        ver = p.split("@")[-1]
+        ver = want_omo_pin or p.split("@")[-1]
         canon = f"oh-my-openagent@{ver}"
         if p != canon: plug[i] = canon; changes.append(f"plugin pin -> {canon}")
 
@@ -257,6 +263,19 @@ if isinstance(or_opts, dict):
 
 # ─── oh-my-openagent.json ─────────────────────────────────────────────────────
 omo = load("oh-my-openagent.json"); ombefore = copy.deepcopy(omo)
+
+if want_omo_pin:
+    want_schema = f"https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/v{want_omo_pin}/assets/oh-my-opencode.schema.json"
+    if omo.get("$schema") != want_schema:
+        omo["$schema"] = want_schema
+        changes.append(f"oh-my-openagent schema -> v{want_omo_pin}")
+
+# OmO 4.19.4 uses one canonical reasoning vocabulary for agents/categories.
+for section in ("agents", "categories"):
+    for name, cfg in (omo.get(section) or {}).items():
+        if isinstance(cfg, dict) and "reasoningEffort" in cfg:
+            cfg.setdefault("reasoning", cfg.pop("reasoningEffort"))
+            changes.append(f"{section}.{name}.reasoningEffort -> reasoning")
 
 # OmO / codegraph telemetry + co-author phone-home off
 if omo.get("telemetry") is not False:

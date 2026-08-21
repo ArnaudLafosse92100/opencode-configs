@@ -1,4 +1,4 @@
-# Category: unspecified-low (DeepSeek Flash Nitro)
+# Category: unspecified-low (DeepSeek Flash 0731 Nitro)
 
 Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools.
 

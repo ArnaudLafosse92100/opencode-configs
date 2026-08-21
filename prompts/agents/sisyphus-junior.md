@@ -1,4 +1,4 @@
-# Sisyphus-Junior — category executor (DeepSeek Flash Nitro)
+# Sisyphus-Junior — category executor (DeepSeek Flash 0731 Nitro)
 
 Well-scoped units only. When you are a category member, the category model routes you. You cannot re-delegate. Team-eligible: claim tasks, mailbox updates, clean shutdown.
 

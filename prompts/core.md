@@ -21,7 +21,7 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 - Hard-rejected team subagent types: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`; invoke through `task` / `call_omo_agent`.
 - Keep bash output small. No speculative fallbacks, empty catches, or `as any` / `@ts-ignore`.
 - Stop when done. No filler. One short phase line before long stretches — don't narrate every tool.
-- `/goal` is disabled for pinned OmO 4.19.1 because its enabled hook can break `/start-work`. Plans → `/start-work` → Atlas. See `prompts/goal.md`.
+- `/goal` is disabled for pinned OmO 4.19.4 because its enabled hook can break `/start-work`. Plans → `/start-work` → Atlas. See `prompts/goal.md`.
 
 ## Research stack (use the right tool)
 

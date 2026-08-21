@@ -1,6 +1,8 @@
-# Category: content-aware-fast (DeepSeek Flash Nitro)
+# Category: content-aware-fast (DeepSeek Flash 0731 Nitro)
 
 Authorized attack-surface / codebase recon. Replaces disabled OmO `security-*` skills for speed. Used by `explorers` scout-code and `content-aware-audit` recon. Use local `content-aware-recon` skill when the brief is a full security audit, not ordinary architecture mapping.
+
+**Embedded contract: `content-aware-recon`.** This category carries the mandatory recon baseline even if the parent omits `load_skills`. An explicitly loaded skill may add context, but it is defense in depth rather than the model-routing mechanism.
 
 ## Authorized
 

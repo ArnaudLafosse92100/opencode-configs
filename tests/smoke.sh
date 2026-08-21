@@ -66,11 +66,15 @@ run_step "bash -n doctor.sh" bash -n "$REPO/doctor.sh"
 run_step "bash -n locate.sh" bash -n "$REPO/locate.sh"
 run_step "bash -n versions.sh" bash -n "$REPO/versions.sh"
 run_step "bash -n eval-models.sh" bash -n "$REPO/eval-models.sh"
+run_step "bash -n eval-orchestration.sh" bash -n "$REPO/eval-orchestration.sh"
 run_step "bash -n lib/common.sh" bash -n "$REPO/lib/common.sh"
 run_step "compile model-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/model-routing/run.py"
 run_step "model-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_model_routing_eval.py"
+run_step "compile orchestration-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/orchestration-routing/run.py"
+run_step "orchestration-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_orchestration_routing_eval.py"
 run_step "model-routing eval plan" "$REPO/eval-models.sh"
 run_step "model-routing targeted plan" "$REPO/eval-models.sh" --models deepseek --cases bounded-architecture-plan
+run_step "orchestration-routing eval plan" "$REPO/eval-orchestration.sh"
 run_step "validate --quiet" "$REPO/validate.sh" --quiet
 run_step "locate --json" "$REPO/locate.sh" --json
 run_step "signature" "$REPO/signature.sh"
@@ -93,6 +97,25 @@ fi
 rm "$test_home/.omo/omo.jsonc"
 rmdir "$test_home/.omo" "$test_home"
 
+# Exact model/version and OmO reasoning schema guard.
+if python3 -c '
+import json, pathlib, re, sys
+repo=pathlib.Path(sys.argv[1])
+oc=json.load(open(repo/"opencode.json"))
+omo=json.load(open(repo/"oh-my-openagent.json"))
+models=oc["provider"]["openrouter"]["models"]
+flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
+runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
+ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
+    and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
+    and "reasoningEffort" not in runtime)
+sys.exit(0 if ok else 1)
+' "$REPO"; then
+  ok "exact DeepSeek 0731 route + OmO 4.19.4 reasoning schema"
+else
+  bad "DeepSeek version or OmO reasoning schema drift"
+fi
+
 # Fast OpenRouter lanes, bounded subscription gateway, expensive models capped.
 if python3 -c '
 import json, sys
@@ -104,7 +127,7 @@ ok=(bt.get("defaultConcurrency")==6
     and pc.get("openrouter")==8
     and pc.get("subscription-gateway")==4
     and pc.get("anthropic")==2
-    and mc.get("openrouter/deepseek/deepseek-v4-flash")==6
+    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==6
     and mc.get("openrouter/z-ai/glm-5.2-exacto")==5
     and mc.get("openrouter/moonshotai/kimi-k3")==2
     and mc.get("openrouter/anthropic/claude-opus-5")==1)

@@ -2,6 +2,9 @@
 
 This eval answers one bounded question: should Kimi K3 become an explicit escalation lane without replacing the cheap DeepSeek/GLM defaults?
 
+It does not test whether Sisyphus invokes a category. That separate parent →
+`task` → child/model contract lives in `../orchestration-routing/`.
+
 It is intentionally not a leaderboard. All models receive the same evidence-only cases and output contract. Deterministic checks cover schema adherence, required evidence, known hallucinations, and false execution claims. Human review is still required for architectural quality.
 
 ## Budget contract
@@ -29,7 +32,7 @@ Use `--models` and `--cases` for a targeted retry after diagnosing a failed requ
 
 Stage 1 compares:
 
-- `deepseek/deepseek-v4-flash` — cheap baseline and current 0731 route;
+- `deepseek/deepseek-v4-flash-0731` — cheap baseline and current 0731 route;
 - `moonshotai/kimi-k3` — proposed deep-agentic escalation;
 - `anthropic/claude-sonnet-5` — paid API control on the identical harness.
 

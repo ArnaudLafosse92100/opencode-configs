@@ -2,7 +2,7 @@
 
 **OpenConfig v1.5.40** · CLI `oc` · identity `openconfig/opencode-configs` (`signature.json`)
 
-This file is loaded every OpenCode session. It is the **policy + decision log** for **OpenConfig** (`oc`) — pinned stack for OpenCode + OpenRouter + oh-my-openagent (OmO). Day-to-day coding rules live in `prompts/core.md` (stance + team eligibility + research tool matrix). `/goal` is **disabled** for pinned OmO 4.19.1 (see `prompts/goal.md`). Deep reference: `README.md`.
+This file is loaded every OpenCode session. It is the **policy + decision log** for **OpenConfig** (`oc`) — pinned stack for OpenCode + OpenRouter + oh-my-openagent (OmO). Day-to-day coding rules live in `prompts/core.md` (stance + team eligibility + research tool matrix). `/goal` is **disabled** for pinned OmO 4.19.4 (see `prompts/goal.md`). Deep reference: `README.md`.
 
 ## Stance
 
@@ -33,14 +33,16 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 
 ### Routing logic (short)
 
+- **Codex bridge entry** → `codex-router` on GLM Exacto. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
 - **Orchestration / tool loops** → GLM `5.2:exacto` (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) — Exacto = tool-call quality on OpenRouter.
-- **Fast parallel recon** → DeepSeek Flash `:nitro` (explore, librarian, sisyphus-junior, quick) — Nitro = throughput.
+- **Fast parallel recon** → DeepSeek Flash 0731 `:nitro` (explore, librarian, sisyphus-junior, quick) — Nitro = throughput.
 - **Deep implement / critique** → subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review). OpenRouter GPT remains a paid fallback.
 - **Visual / writing** → Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.6 Flash Nitro).
 - **Hard ceiling** → Claude Opus 5 max for `ultrawork` / unspecified-high (Fable 5 / Opus 4.8 / 4.7 / Sol fallbacks).
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k3` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
 - **Content-aware research** → DeepSeek V4 Flash 0731 primary, with Kimi K3 and GPT review as bounded escalation.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/Sonnet canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
+- **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
 
 ### Team eligibility (why)
 

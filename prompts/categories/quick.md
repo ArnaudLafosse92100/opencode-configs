@@ -1,4 +1,4 @@
-# Category: quick (DeepSeek Flash Nitro)
+# Category: quick (DeepSeek Flash 0731 Nitro)
 
 Trivial / bounded work. Prefer single-file or small scoped changes. Used by `explorers` scout-docs for fast docs/API recon.
 

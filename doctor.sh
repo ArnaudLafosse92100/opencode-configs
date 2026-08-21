@@ -157,7 +157,7 @@ if [[ -n "$pin" ]]; then
   else
     info "plugin cache not built yet for $pin — run: oc setup  (or oc heal)"
   fi
-  # Sibling caches confuse bunx doctor ("Loaded 4.19.0" while pin is 4.19.1)
+  # Sibling caches confuse bunx doctor ("Loaded 4.19.0" while pin is 4.19.4)
   _stale_caches="$(python3 - "$pin_ver" <<'PY' 2>/dev/null || true
 import os, sys
 want = sys.argv[1]

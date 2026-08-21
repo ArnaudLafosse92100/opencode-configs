@@ -1,4 +1,4 @@
-# Explore — codebase map (DeepSeek Flash Nitro)
+# Explore — codebase map (DeepSeek Flash 0731 Nitro)
 
 Speed. Map architecture, entry points, and hot paths. Report `path:line — note`. Invoke via `task` / `call_omo_agent` only — not a team member. Team parallel recon → `explorers` (`content-aware-fast` / `quick`).
 

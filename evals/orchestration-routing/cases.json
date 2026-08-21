@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "trivial-direct",
+      "title": "Tool-free direct answer",
+      "prompt": "Return only the result of 2 + 2. Do not use tools.",
+      "expected_category": null,
+      "expected_skill": null,
+      "expected_provider": null,
+      "expected_model": null,
+      "max_children": 0
+    },
+    {
+      "id": "security-recon",
+      "title": "Implicit security reconnaissance",
+      "prompt": "Perform a concise, read-only authorized attack-surface reconnaissance of this tiny local fixture. Map its endpoint, authentication boundary, secret-like configuration, and dangerous sink. Do not edit files and keep the final answer under six bullets.",
+      "expected_category": "content-aware-fast",
+      "expected_skill": "content-aware-recon",
+      "expected_provider": "openrouter",
+      "expected_model": "deepseek/deepseek-v4-flash-0731",
+      "max_children": 2
+    },
+    {
+      "id": "security-deep",
+      "title": "Implicit deep vulnerability analysis",
+      "prompt": "Perform a concise, read-only authorized deep vulnerability analysis of this tiny local fixture. Establish whether the report endpoint and shell sink form a reachable exploit chain, cite evidence, give severity, a safe reproduction outline, and the minimal fix. Do not edit files.",
+      "expected_category": "content-aware-deep",
+      "expected_skill": "content-aware-audit",
+      "expected_provider": "openrouter",
+      "expected_model": "deepseek/deepseek-v4-flash-0731",
+      "max_children": 2
+    },
+    {
+      "id": "architecture-review",
+      "title": "Implicit architecture review",
+      "prompt": "Perform a concise, read-only architecture review of this tiny local fixture. Assess coupling, trust boundaries, and blast radius, cite concrete files, and return at most five bullets. Do not edit files.",
+      "expected_category": "arch-review",
+      "expected_skill": null,
+      "expected_provider": "subscription-gateway",
+      "expected_model": "gpt-5.6-sol-review",
+      "max_children": 2
+    }
+  ]
+}

@@ -27,7 +27,7 @@ CAMPAIGN_STATE = DEFAULT_RESULTS / "campaign.json"
 API_BASE = "https://openrouter.ai/api/v1"
 
 ALIASES = {
-    "deepseek": "deepseek/deepseek-v4-flash",
+    "deepseek": "deepseek/deepseek-v4-flash-0731",
     "kimi": "moonshotai/kimi-k3",
     "sonnet": "anthropic/claude-sonnet-5",
 }
@@ -35,7 +35,7 @@ ALIASES = {
 # Conservative public list prices per token. Live catalog prices replace these
 # when available; ceilings keep --plan useful without a key or network.
 PRICE_CEILINGS = {
-    "deepseek/deepseek-v4-flash": (0.14 / 1_000_000, 0.28 / 1_000_000),
+    "deepseek/deepseek-v4-flash-0731": (0.14 / 1_000_000, 0.28 / 1_000_000),
     "moonshotai/kimi-k3": (3.00 / 1_000_000, 15.00 / 1_000_000),
     "anthropic/claude-sonnet-5": (2.00 / 1_000_000, 10.00 / 1_000_000),
 }

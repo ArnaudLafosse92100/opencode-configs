@@ -74,6 +74,21 @@ if retired_route_hits:
 else:
     ok("retired deepseek-v4-pro route absent from runtime config and profiles")
 
+# OpenRouter keeps the April 0423 and July 0731 Flash releases as distinct
+# slugs. Never let the unversioned 0423 route masquerade as 0731 again.
+legacy_flash = re.compile(r"deepseek/deepseek-v4-flash(?!-0731)")
+flash_route_files = retired_route_files + [
+    os.path.join(repo, "evals", "model-routing", "run.py"),
+]
+legacy_flash_hits = []
+for path in flash_route_files:
+    if os.path.isfile(path) and legacy_flash.search(open(path, encoding="utf-8").read()):
+        legacy_flash_hits.append(os.path.relpath(path, repo))
+if legacy_flash_hits:
+    err("legacy DeepSeek V4 Flash 0423 route present in: " + ", ".join(legacy_flash_hits))
+else:
+    ok("DeepSeek Flash routes pin the exact 0731 release")
+
 # ---- 2. opencode.json runtime footguns ----
 if oc:
     exp = oc.get("experimental", {})
@@ -109,6 +124,13 @@ if oc:
                 err(f"opencode.json lsp.{name}: missing command")
 
     models = prov.get("models", {})
+    flash = models.get("deepseek/deepseek-v4-flash-0731")
+    if not isinstance(flash, dict):
+        err("opencode.json: exact DeepSeek V4 Flash 0731 model definition missing")
+    elif flash.get("id") != "deepseek/deepseek-v4-flash-0731:nitro":
+        err("opencode.json: DeepSeek V4 Flash 0731 must use the :nitro API id")
+    else:
+        ok("DeepSeek V4 Flash 0731 Nitro definition exact")
     # Whitelist must match models{} keys (orphans / missing entries cause silent routing gaps).
     wl = prov.get("whitelist")
     if isinstance(wl, list):
@@ -137,6 +159,8 @@ if oc:
             if k in o:
                 err(f"opencode.json[{mid}]: model-level options.{k} is not honored — set it on the agent (temperature/top_p) or drop it.")
         pv = o.get("provider", {})
+        if "preferred_min_throughput" in pv or "preferred_max_latency" in pv:
+            err(f"opencode.json[{mid}]: remove redundant preferred throughput/latency settings; native provider routing owns selection.")
         q = pv.get("quantizations")
         fam = m.get("family")
         # Exacto: OpenRouter docs say append :exacto to the slug (quality-first tool routing).
@@ -155,8 +179,6 @@ if oc:
                 err(f"opencode.json[{mid}]: provider.sort={sort!r} overrides Exacto — remove sort (the :exacto suffix already sets quality-first routing).")
             if sort == "exacto":
                 warn(f"opencode.json[{mid}]: provider.sort='exacto' is redundant with id ':exacto' — drop sort.")
-            if "preferred_min_throughput" in pv or "preferred_max_latency" in pv:
-                err(f"opencode.json[{mid}]: Exacto + preferred_min_throughput/preferred_max_latency fights quality ranking — remove soft prefs.")
             if q is not None:
                 warn(f"opencode.json[{mid}]: Exacto + quantizations filter may drop quality Exacto providers — prefer ignore/max_price only.")
         if is_nitro:
@@ -235,6 +257,8 @@ if oc and os.path.isfile(tui_path):
 if omo:
     # Schema URL must resolve (upstream asset basename is still oh-my-opencode.schema.json)
     schema = omo.get("$schema") or ""
+    plugin_pins = [p for p in ((oc or {}).get("plugin") or []) if isinstance(p, str) and p.startswith("oh-my-openagent@")]
+    schema_pin = plugin_pins[0].split("@", 1)[1] if plugin_pins else ""
     if not schema:
         err("oh-my-openagent.json: missing $schema")
     elif "oh-my-openagent.schema.json" in schema:
@@ -244,6 +268,8 @@ if omo:
         )
     elif "oh-my-opencode.schema.json" not in schema:
         warn(f"oh-my-openagent.json: unexpected $schema URL: {schema}")
+    elif schema_pin and f"/v{schema_pin}/" not in schema:
+        err(f"oh-my-openagent.json: schema version must match plugin pin {schema_pin}")
     else:
         try:
             import urllib.request
@@ -258,6 +284,7 @@ if omo:
             warn(f"oh-my-openagent.json: could not HEAD $schema ({e}) — skipped reachability check")
 
     hexre = re.compile(r"^#[0-9A-Fa-f]{6}$")
+    valid_effort = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
     agents = omo.get("agents", {})
     for n, a in agents.items():
         c = a.get("color")
@@ -266,6 +293,17 @@ if omo:
         for bad in ("hidden", "steps", "providerOptions"):
             if bad in a:
                 warn(f"oh-my-openagent.json[{n}]: key '{bad}' is not in the plugin agent schema (stripped/ignored).")
+        if "reasoningEffort" in a:
+            err(f"oh-my-openagent.json[agents.{n}]: reasoningEffort is obsolete on OmO 4.19.4 — use reasoning.")
+        if a.get("reasoning") is not None and a.get("reasoning") not in valid_effort:
+            err(f"oh-my-openagent.json[agents.{n}]: invalid reasoning={a.get('reasoning')!r}")
+    for n, category in (omo.get("categories") or {}).items():
+        if not isinstance(category, dict):
+            continue
+        if "reasoningEffort" in category:
+            err(f"oh-my-openagent.json[categories.{n}]: reasoningEffort is obsolete on OmO 4.19.4 — use reasoning.")
+        if category.get("reasoning") is not None and category.get("reasoning") not in valid_effort:
+            err(f"oh-my-openagent.json[categories.{n}]: invalid reasoning={category.get('reasoning')!r}")
     if agents:
         ok(f"{len(agents)} plugin agents, all colors valid")
 
@@ -762,6 +800,27 @@ elif checked:
     ok(f"{checked} prompt file:// path(s) resolve")
 else:
     warn("no file:// prompt_append entries found")
+
+# Native custom agents do not receive OmO prompt_append at runtime. The strict
+# Codex router must therefore carry its critical category contract directly in
+# agents/codex-router.md; merely resolving the mirrored prompt URI is not enough.
+codex_router_path = os.path.join(repo, "agents", "codex-router.md")
+codex_router_markers = (
+    "Every request that needs tools **must**",
+    "When using `category`, do not also set `subagent_type`",
+    "content-aware-fast",
+    "content-aware-deep",
+    "run_in_background=false",
+)
+if not os.path.isfile(codex_router_path):
+    err("agents/codex-router.md missing")
+else:
+    codex_router_body = open(codex_router_path, encoding="utf-8").read()
+    missing_router_markers = [marker for marker in codex_router_markers if marker not in codex_router_body]
+    if missing_router_markers:
+        err(f"agents/codex-router.md missing effective runtime contract markers: {missing_router_markers}")
+    else:
+        ok("agents/codex-router.md embeds the effective category-routing contract")
 
 # ---- 4c. profile instructions[] must resolve (repo-relative from profiles/) ----
 prof_missing = []
