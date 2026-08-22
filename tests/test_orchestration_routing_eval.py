@@ -122,7 +122,25 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn('task(category="content-aware-fast", load_skills=["content-aware-recon"]', prompt)
         self.assertIn('task(category="content-aware-deep", load_skills=["content-aware-audit"]', prompt)
         self.assertIn("does not satisfy this route and does not change the model", prompt)
+        self.assertIn("Choose category-first when a native OmO category exists", prompt)
+        self.assertIn("In authorized pentest/security briefs, `explore` is not the default executor", prompt)
         self.assertNotIn("call_omo_agent", prompt)
+
+    def test_generic_explore_guidance_does_not_override_security_categories(self) -> None:
+        core = (REPO / "prompts/core.md").read_text(encoding="utf-8")
+        high = (REPO / "prompts/profiles/high.md").read_text(encoding="utf-8")
+        research = (REPO / "prompts/profiles/research.md").read_text(encoding="utf-8")
+        low = (REPO / "prompts/profiles/low.md").read_text(encoding="utf-8")
+        bug_hunt = (REPO / "prompts/categories/bug-hunt.md").read_text(encoding="utf-8")
+        prometheus = (REPO / "prompts/agents/prometheus.md").read_text(encoding="utf-8")
+        explore = (REPO / "prompts/agents/explore.md").read_text(encoding="utf-8")
+        self.assertIn("broad or parallel non-security recon", core)
+        self.assertIn("Security/pentest map", high)
+        self.assertIn("Authorized security/pentest surface", research)
+        self.assertIn("don't downgrade it to generic explore", low)
+        self.assertIn("for auth/danger/security gaps", bug_hunt)
+        self.assertIn("content-aware-fast/deep for security or pentest surface/depth", prometheus)
+        self.assertIn("prefer native `content-aware-fast` / `content-aware-deep` categories", explore)
 
     def test_codex_router_is_task_only_and_routes_security_categories(self) -> None:
         definition = (REPO / "agents/codex-router.md").read_text(encoding="utf-8")

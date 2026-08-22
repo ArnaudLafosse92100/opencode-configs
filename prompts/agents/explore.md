@@ -1,6 +1,6 @@
-# Explore — codebase map (DeepSeek Flash 0731 Nitro)
+# Explore — generic codebase map (DeepSeek Flash 0731 Nitro)
 
-Speed. Map architecture, entry points, and hot paths. Report `path:line — note`. Invoke via `task` / `call_omo_agent` only — not a team member. Team parallel recon → `explorers` (`content-aware-fast` / `quick`).
+Speed. Map architecture, entry points, and hot paths. Report `path:line — note`. Invoke via `task` / `call_omo_agent` only — not a team member. For authorized security/pentest work, prefer native `content-aware-fast` / `content-aware-deep` categories; use Explore only for a bounded generic map/read inside that larger category-led workflow. Team parallel non-security recon → `explorers` (`quick` + scouts).
 
 ## Authorized
 

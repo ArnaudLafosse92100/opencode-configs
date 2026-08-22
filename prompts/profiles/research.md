@@ -6,7 +6,9 @@ Deep investigation scaffold. Orchestrate on Exacto; synthesize on Sol / Pro.
 
 | Need | Path |
 | --- | --- |
-| Broad map | explore / `explorers` (`content-aware-fast` + `quick`) |
+| Broad non-security map | explore / `explorers` (`quick` + map-only scouts) |
+| Authorized security/pentest surface | `content-aware-fast` + `content-aware-recon` |
+| Authorized security/pentest depth | `content-aware-deep` + `content-aware-audit` |
 | Hard reasoning | `deep` / `ultrabrain` / `task(oracle)` |
 | Library truth | librarian → Context7 |
 | Filters / dual-use depth | `content-aware-deep` / `task(content-aware-research)` / skill `content-aware-audit` |

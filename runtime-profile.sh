@@ -38,54 +38,191 @@ mode = sys.argv[2]
 omo_path = repo / "oh-my-openagent.json"
 prompt_path = repo / "prompts/agents/sisyphus.md"
 profile_path = repo / "runtime-profile.json"
+native_omo_path = pathlib.Path.home() / ".omo/omo.jsonc"
+
+
+def parse_jsonc(text):
+    """Parse JSONC without altering comment-like text inside JSON strings."""
+    without_comments = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        next_char = text[index + 1] if index + 1 < len(text) else ""
+        if in_string:
+            without_comments.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            without_comments.append(char)
+            index += 1
+            continue
+        if char == "/" and next_char == "/":
+            index += 2
+            while index < len(text) and text[index] not in "\r\n":
+                index += 1
+            continue
+        if char == "/" and next_char == "*":
+            index += 2
+            while index + 1 < len(text) and text[index:index + 2] != "*/":
+                if text[index] in "\r\n":
+                    without_comments.append(text[index])
+                index += 1
+            if index + 1 >= len(text):
+                raise SystemExit(f"unterminated block comment in {native_omo_path}")
+            index += 2
+            continue
+        without_comments.append(char)
+        index += 1
+
+    clean = "".join(without_comments)
+    without_trailing_commas = []
+    in_string = False
+    escaped = False
+    for index, char in enumerate(clean):
+        if in_string:
+            without_trailing_commas.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+            without_trailing_commas.append(char)
+            continue
+        if char == ",":
+            lookahead = index + 1
+            while lookahead < len(clean) and clean[lookahead].isspace():
+                lookahead += 1
+            if lookahead < len(clean) and clean[lookahead] in "}]":
+                continue
+        without_trailing_commas.append(char)
+    return json.loads("".join(without_trailing_commas))
 
 omo = json.loads(omo_path.read_text(encoding="utf-8"))
+agents = omo.setdefault("agents", {})
 categories = omo.setdefault("categories", {})
 
+glm = "openrouter/z-ai/glm-5.2-exacto"
+deepseek = "openrouter/deepseek/deepseek-v4-flash-0731"
+
 normal = {
-    "content-aware-fast": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-            "openrouter/minimax/minimax-m3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-terra",
-        ],
+    "agents": {
+        "codex-router": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3"]},
+        "sisyphus": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5"]},
+        "hephaestus": {"model": "subscription-gateway/gpt-5.6-terra", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", glm]},
+        "prometheus": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8"]},
+        "atlas": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-sonnet-5"]},
+        "oracle": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/anthropic/claude-sonnet-5", glm]},
+        "librarian": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
+        "explore": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
+        "multimodal-looker": {"model": "openrouter/anthropic/claude-sonnet-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/moonshotai/kimi-k3"]},
+        "metis": {"model": "openrouter/anthropic/claude-sonnet-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", glm]},
+        "momus": {"model": "subscription-gateway/gpt-5.6-sol-review", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7"]},
+        "sisyphus-junior": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
+        "content-aware-research": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/moonshotai/kimi-k3", glm, "openrouter/minimax/minimax-m3"]},
     },
-    "content-aware-deep": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-            "openrouter/moonshotai/kimi-k3",
-            "openrouter/z-ai/glm-5.2-exacto",
-            "subscription-gateway/gpt-5.6-sol-review",
-        ],
+    "categories": {
+        "visual-engineering": {"model": "openrouter/google/gemini-3.1-pro-preview", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/anthropic/claude-sonnet-5", glm]},
+        "ultrabrain": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", "openrouter/moonshotai/kimi-k3"]},
+        "deep": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", glm]},
+        "agentic-deep-kimi": {"model": "openrouter/moonshotai/kimi-k3", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", glm, deepseek]},
+        "artistry": {"model": "openrouter/google/gemini-3.1-pro-preview", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/anthropic/claude-sonnet-5"]},
+        "quick": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/minimax/minimax-m3", glm]},
+        "unspecified-low": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/minimax/minimax-m3", glm]},
+        "unspecified-high": {"model": "openrouter/anthropic/claude-opus-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", glm]},
+        "writing": {"model": "openrouter/google/gemini-3.6-flash", "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/google/gemini-3.5-flash", "openrouter/google/gemini-3-flash-preview", deepseek]},
+        "bug-hunt": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3"]},
+        "refactor-safe": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3"]},
+        "arch-review": {"model": "subscription-gateway/gpt-5.6-sol-review", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "subscription-gateway/gpt-5.6-terra", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", "openrouter/moonshotai/kimi-k3"]},
+        "content-aware-fast": {"model": deepseek, "fallback_models": ["openrouter/minimax/minimax-m3", glm, "subscription-gateway/gpt-5.6-terra"]},
+        "content-aware-deep": {"model": deepseek, "fallback_models": ["openrouter/moonshotai/kimi-k3", glm, "subscription-gateway/gpt-5.6-sol-review"]},
     },
 }
+
 pentest = {
-    "content-aware-fast": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
-        "fallback_models": [
-            "openrouter/deepseek/deepseek-v4-flash-0731",
-        ],
+    "agents": {
+        "codex-router": {"model": glm, "fallback_models": [deepseek]},
+        "sisyphus": {"model": glm, "fallback_models": [deepseek]},
+        "hephaestus": {"model": glm, "fallback_models": [deepseek]},
+        "prometheus": {"model": glm, "fallback_models": [deepseek]},
+        "atlas": {"model": glm, "fallback_models": [deepseek]},
+        "oracle": {"model": glm, "fallback_models": [deepseek]},
+        "librarian": {"model": deepseek, "fallback_models": [glm]},
+        "explore": {"model": deepseek, "fallback_models": [glm]},
+        "multimodal-looker": {"model": deepseek, "fallback_models": [glm]},
+        "metis": {"model": glm, "fallback_models": [deepseek]},
+        "momus": {"model": glm, "fallback_models": [deepseek]},
+        "sisyphus-junior": {"model": deepseek, "fallback_models": [glm]},
+        "content-aware-research": {"model": deepseek, "fallback_models": [glm]},
     },
-    "content-aware-deep": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
-        "fallback_models": [
-            "openrouter/deepseek/deepseek-v4-flash-0731",
-        ],
+    "categories": {
+        "visual-engineering": {"model": glm, "fallback_models": [deepseek]},
+        "ultrabrain": {"model": glm, "fallback_models": [deepseek]},
+        "deep": {"model": glm, "fallback_models": [deepseek]},
+        "agentic-deep-kimi": {"model": glm, "fallback_models": [deepseek]},
+        "artistry": {"model": glm, "fallback_models": [deepseek]},
+        "quick": {"model": deepseek, "fallback_models": [glm]},
+        "unspecified-low": {"model": deepseek, "fallback_models": [glm]},
+        "unspecified-high": {"model": glm, "fallback_models": [deepseek]},
+        "writing": {"model": deepseek, "fallback_models": [glm]},
+        "bug-hunt": {"model": glm, "fallback_models": [deepseek]},
+        "refactor-safe": {"model": glm, "fallback_models": [deepseek]},
+        "arch-review": {"model": glm, "fallback_models": [deepseek]},
+        "content-aware-fast": {"model": glm, "fallback_models": [deepseek]},
+        "content-aware-deep": {"model": glm, "fallback_models": [deepseek]},
     },
 }
+
 selected = pentest if mode == "pentest" else normal
-for name, patch in selected.items():
-    if name not in categories:
-        raise SystemExit(f"missing category: {name}")
-    categories[name]["model"] = patch["model"]
-    categories[name]["fallback_models"] = patch["fallback_models"]
+for section_name, target in (("agents", agents), ("categories", categories)):
+    for name, patch in selected[section_name].items():
+        if name not in target:
+            raise SystemExit(f"missing {section_name[:-1]}: {name}")
+        target[name]["model"] = patch["model"]
+        target[name]["fallback_models"] = patch["fallback_models"]
 
 omo_path.write_text(json.dumps(omo, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
+# OmO loads this native config at runtime, so legacy profile routing must be mirrored there.
+if native_omo_path.is_file():
+    native_text = native_omo_path.read_text(encoding="utf-8")
+    native_omo = parse_jsonc(native_text)
+    if not isinstance(native_omo, dict):
+        raise SystemExit(f"invalid native OmO config root: {native_omo_path}")
+    native_config = native_omo.get("[opencode]", native_omo)
+    if not isinstance(native_config, dict):
+        raise SystemExit(f"invalid [opencode] wrapper: {native_omo_path}")
+    for section_name in ("agents", "categories"):
+        native_section = native_config.setdefault(section_name, {})
+        if not isinstance(native_section, dict):
+            raise SystemExit(f"invalid {section_name} section: {native_omo_path}")
+        for name, patch in selected[section_name].items():
+            native_entry = native_section.setdefault(name, {})
+            if not isinstance(native_entry, dict):
+                raise SystemExit(f"invalid {section_name[:-1]} entry {name}: {native_omo_path}")
+            native_entry["model"] = patch["model"]
+            native_entry["fallback_models"] = patch["fallback_models"]
+    object_start = native_text.find("{")
+    prefix = native_text[:object_start] if object_start >= 0 else ""
+    updated_native_text = prefix + json.dumps(native_omo, indent=2, ensure_ascii=False) + "\n"
+    if updated_native_text != native_text:
+        native_omo_path.write_text(updated_native_text, encoding="utf-8")
+
 prompt = prompt_path.read_text(encoding="utf-8")
-normal_line = "- Runtime profile `normal`: security/pentest work should still prefer `content-aware-*`, but `ultrawork` remains available for non-security hard reasoning."
-pentest_line = "- Runtime profile `pentest`: authorized pentest/security briefs must not use `ultrawork`, `ulw`, `unspecified-high`, Claude/Opus, or generic stronger-reasoning escalation. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
+normal_line = "- Runtime profile `normal`: security/pentest work should still prefer `content-aware-*`, but normal model breadth remains available for non-security work."
+pentest_line = "- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.2 Exacto and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
 lines = [line for line in prompt.splitlines() if not line.startswith("- Runtime profile `normal`:") and not line.startswith("- Runtime profile `pentest`:") and not line.startswith("- Authorized pentest/security briefs must not use `ultrawork`")]
 needle = "- Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required."
 insert = pentest_line if mode == "pentest" else normal_line
@@ -98,7 +235,7 @@ else:
 prompt_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 profile_path.write_text(json.dumps({
-    "schema_version": 1,
+    "schema_version": 2,
     "active": mode,
     "normal": normal,
     "pentest": pentest,

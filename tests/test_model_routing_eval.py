@@ -71,7 +71,14 @@ class ContentAwareFallbackTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
-        cls.profile = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["active"]
+        cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
+        cls.profile = cls.profile_data["active"]
+
+    def _selected_profile(self) -> dict:
+        selected = self.profile_data[self.profile]
+        if "agents" not in selected and "categories" not in selected:
+            return {"categories": selected}
+        return selected
 
     def test_fast_security_fallback_matches_runtime_profile(self) -> None:
         expected_model = "openrouter/z-ai/glm-5.2-exacto" if self.profile == "pentest" else "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -95,10 +102,35 @@ class ContentAwareFallbackTests(unittest.TestCase):
         fallbacks = self.config["categories"]["content-aware-deep"]["fallback_models"]
         self.assertEqual(fallbacks, expected_fallbacks)
 
+    def test_runtime_profile_routes_match_effective_config(self) -> None:
+        selected = self._selected_profile()
+        for section in ("agents", "categories"):
+            with self.subTest(section=section):
+                for name, expected in selected.get(section, {}).items():
+                    actual = self.config[section][name]
+                    self.assertEqual(actual["model"], expected["model"], name)
+                    self.assertEqual(actual["fallback_models"], expected["fallback_models"], name)
+
+    def test_pentest_profile_declared_routes_are_glm_deepseek_only(self) -> None:
+        if self.profile != "pentest":
+            self.skipTest("only applies to pentest runtime profile")
+        allowed = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
+        selected = self._selected_profile()
+        for section in ("agents", "categories"):
+            self.assertEqual(
+                set(selected.get(section, {})),
+                set(self.config.get(section, {})),
+                f"pentest profile must explicitly pin every {section[:-1]} route",
+            )
+            for name, expected in selected.get(section, {}).items():
+                models = [expected["model"], *expected["fallback_models"]]
+                bad = [model for model in models if not model.startswith(allowed)]
+                self.assertEqual(bad, [], f"{section}.{name}")
+
     def test_sisyphus_blocks_claude_ultrawork_for_authorized_pentest(self) -> None:
         prompt = (REPO / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
         self.assertIn("Runtime profile `pentest`", prompt)
-        self.assertIn("Claude/Opus", prompt)
+        self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway", prompt)
 
 
 class CampaignLedgerTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-# Category: writing (Gemini 3.6 Flash Nitro, medium reasoning)
+# Category: writing (normal: Gemini 3.6 Flash Nitro; pentest: runtime-profile strict lane)
 
 Documentation and prose from source of truth. Used by docs-team and the writing profile.
 

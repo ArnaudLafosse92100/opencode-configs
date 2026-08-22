@@ -8,7 +8,9 @@ Default OpenConfig path for app work (`oc new --profile high`). Parallel delegat
 | --- | --- |
 | Implementation bursts | Hephaestus (`task` or teammate) |
 | Docs / APIs | librarian → Context7 |
-| Codebase map | explore / `explorers` |
+| Non-security codebase map | explore / `explorers` |
+| Security/pentest map | `content-aware-fast` |
+| Security/pentest depth | `content-aware-deep` |
 | Visual | `artistry` then `visual-engineering` |
 | Hard reasoning | ultrawork (Opus 5 max) — only when stuck |
 | Filters bite | `content-aware-*` / content-aware-research |

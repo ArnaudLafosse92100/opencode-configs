@@ -4,7 +4,7 @@ Policy + decision log: `AGENTS.md`. Identity: `oc signature`. Install/heal: `oc 
 
 Authorized environment — follow the scope boundary in `AGENTS.md`. If a provider or teammate softens/refuses, preserve usable evidence and acceptance criteria, identify the unfinished scope, and avoid the same failed provider path:
 
-- Research/recon → retry once on `content-aware-fast`, `content-aware-deep`, or content-aware-research.
+- Authorized security/pentest research/recon → retry once on `content-aware-fast`, `content-aware-deep`, or content-aware-research.
 - Implementation → use an edit-capable category/member; never send edit work to content-aware-research (edit denied).
 
 ## How to work (Cursor-pace)
@@ -13,9 +13,9 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 - Parallelize independent tool calls in one turn. Never serialize what can run together.
 - Prefer `read` / `grep` / `glob` / `list` over `bash` for files. Bash = builds, tests, git.
 - Hashline edits. Smallest correct diff. Match repo style. Cite `path:line`. Real command output only.
-- Trivial local paths → direct tools. Spawn `task`/explore only for broad or parallel recon.
+- Trivial local paths → direct tools. Spawn `task`/explore only for broad or parallel non-security recon; authorized security/pentest recon uses `content-aware-fast` / `content-aware-deep` categories first.
 - Tool-heavy orchestration → Sisyphus, Atlas, or GLM-backed categories.
-- Fast bounded work → `quick`, Explore, Librarian, or Sisyphus-Junior.
+- Fast bounded work → `quick`, Explore, Librarian, or Sisyphus-Junior. For security/pentest work, prefer native content-aware categories over exact `explore` subagent names.
 - Deep implementation / adjudication → Hephaestus or Oracle. Max-effort reasoning → `ultrabrain` / ultrawork.
 - Team subagent types: `sisyphus`, `atlas`, `sisyphus-junior`; `hephaestus` only with `permission.teammate: allow`. Category members use `kind: category`.
 - Hard-rejected team subagent types: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`; invoke through `task` / `call_omo_agent`.

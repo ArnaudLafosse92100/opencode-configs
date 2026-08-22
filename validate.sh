@@ -419,37 +419,57 @@ if omo:
         ok(f"runtime profile {runtime_profile!r}")
 
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
-    # subscription gateway only. Most OpenRouter-primary lanes must try that
-    # independent provider first so a key-level limit does not cascade through
-    # several models backed by the same exhausted key. Content-aware security
-    # lanes switch by runtime profile. Normal keeps subscription-gateway as the
-    # last fallback; pentest keeps the lane OpenRouter-only and GLM-first.
+    # subscription gateway only. Runtime profiles are the authority for routes
+    # they list. Normal keeps broad fallbacks where useful; pentest keeps all
+    # listed agents/categories inside the GLM/DeepSeek-only lane.
     forbidden_paid_gpt = (
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
     )
+    runtime_profile_data = {}
+    if os.path.isfile(runtime_profile_path):
+        try:
+            runtime_profile_data = json.load(open(runtime_profile_path))
+        except Exception:
+            runtime_profile_data = {}
+    selected_profile = runtime_profile_data.get(runtime_profile) if isinstance(runtime_profile_data, dict) else {}
+    if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
+        # Backward-compatible schema v1: category map at profile root.
+        selected_profile = {"categories": selected_profile}
+    profile_expected = {}
+    for section in ("agents", "categories"):
+        for name, expected in ((selected_profile or {}).get(section) or {}).items():
+            if isinstance(expected, dict):
+                profile_expected[(section, name)] = (
+                    str(expected.get("model") or ""),
+                    [str(x) for x in (expected.get("fallback_models") or [])],
+                )
     if runtime_profile == "pentest":
-        content_aware_fallbacks = {
-            ("categories", "content-aware-fast"): (
-                "openrouter/z-ai/glm-5.2-exacto",
-                ["openrouter/deepseek/deepseek-v4-flash-0731"],
-            ),
-            ("categories", "content-aware-deep"): (
-                "openrouter/z-ai/glm-5.2-exacto",
-                ["openrouter/deepseek/deepseek-v4-flash-0731"],
-            ),
+        actual_routes = {
+            (section, name)
+            for section in ("agents", "categories")
+            for name, cfg in (omo.get(section) or {}).items()
+            if isinstance(cfg, dict)
         }
-    else:
-        content_aware_fallbacks = {
-            ("categories", "content-aware-fast"): (
-                "openrouter/deepseek/deepseek-v4-flash-0731",
-                ["openrouter/minimax/minimax-m3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-terra"],
-            ),
-            ("categories", "content-aware-deep"): (
-                "openrouter/deepseek/deepseek-v4-flash-0731",
-                ["openrouter/moonshotai/kimi-k3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-sol-review"],
-            ),
-        }
+        missing_from_profile = sorted(
+            f"{section}.{name}"
+            for section, name in (actual_routes - set(profile_expected))
+        )
+        extra_in_profile = sorted(
+            f"{section}.{name}"
+            for section, name in (set(profile_expected) - actual_routes)
+        )
+        if missing_from_profile:
+            err(
+                "runtime-profile.json[pentest]: every real agent/category must be explicitly pinned; "
+                f"missing {missing_from_profile}"
+            )
+        if extra_in_profile:
+            err(
+                "runtime-profile.json[pentest]: profile contains routes absent from oh-my-openagent.json: "
+                f"{extra_in_profile}"
+            )
+    pentest_safe_prefixes = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
             if not isinstance(cfg, dict):
@@ -459,14 +479,23 @@ if omo:
             if bad:
                 err(f"oh-my-openagent.json[{section}.{name}]: paid OpenRouter GPT fallback forbidden: {bad}")
             primary = str(cfg.get("model") or "")
-            content_aware_expected = content_aware_fallbacks.get((section, name))
-            if content_aware_expected:
-                expected_primary, expected_fallbacks = content_aware_expected
+            profile_route_expected = profile_expected.get((section, name))
+            if profile_route_expected:
+                expected_primary, expected_fallbacks = profile_route_expected
                 if primary != expected_primary or fallbacks != expected_fallbacks:
                     err(
-                        f"oh-my-openagent.json[{section}.{name}]: content-aware route must be "
+                        f"oh-my-openagent.json[{section}.{name}]: runtime profile route must be "
                         f"{expected_primary} with fallbacks {expected_fallbacks}"
                     )
+                if runtime_profile == "pentest":
+                    bad_models = [
+                        model for model in [primary, *fallbacks]
+                        if not model.startswith(pentest_safe_prefixes)
+                    ]
+                    if bad_models:
+                        err(
+                            f"oh-my-openagent.json[{section}.{name}]: pentest profile route has non GLM/DeepSeek models: {bad_models}"
+                        )
                 continue
             if primary.startswith("openrouter/") and (
                 not fallbacks or not fallbacks[0].startswith("subscription-gateway/")
@@ -923,9 +952,11 @@ cats = omo.get("categories") or {}
 kimi_lane = cats.get("agentic-deep-kimi")
 if not isinstance(kimi_lane, dict):
     err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
-elif kimi_lane.get("model") != "openrouter/moonshotai/kimi-k3":
+elif runtime_profile == "pentest" and kimi_lane.get("model") == "openrouter/z-ai/glm-5.2-exacto":
+    ok("agentic-deep-kimi is disabled by pentest strict GLM/DeepSeek overlay")
+elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k3":
     err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k3")
-else:
+elif runtime_profile != "pentest":
     ok("agentic-deep-kimi is the explicit Kimi primary lane")
 
 kimi_primary = []
@@ -933,9 +964,11 @@ for section, blob in (("agent", omo.get("agents") or {}), ("category", cats)):
     for name, cfg in blob.items():
         if isinstance(cfg, dict) and cfg.get("model") == "openrouter/moonshotai/kimi-k3":
             kimi_primary.append(f"{section}:{name}")
-if kimi_primary != ["category:agentic-deep-kimi"]:
+if runtime_profile == "pentest" and kimi_primary == []:
+    ok("Kimi has no primary route in pentest strict profile")
+elif runtime_profile != "pentest" and kimi_primary != ["category:agentic-deep-kimi"]:
     err(f"Kimi primary routing must stay explicit-only (got {kimi_primary})")
-else:
+elif runtime_profile != "pentest":
     ok("Kimi is not a global/daily primary")
 
 eval_required = (

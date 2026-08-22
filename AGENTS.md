@@ -41,6 +41,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 - **Hard ceiling** → Claude Opus 5 max for `ultrawork` / unspecified-high (Fable 5 / Opus 4.8 / 4.7 / Sol fallbacks).
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k3` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
 - **Content-aware research** → DeepSeek V4 Flash 0731 primary, with Kimi K3 and GPT review as bounded escalation.
+- **Runtime profile override** → `oc profile pentest` keeps every agent/category available but pins every real route to GLM 5.2 Exacto or DeepSeek V4 Flash 0731 only. `oc profile normal` restores the broader matrix above.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/Sonnet canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 - **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
 

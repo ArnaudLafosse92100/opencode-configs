@@ -236,6 +236,8 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
 
+Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to GLM 5.2 Exacto or DeepSeek V4 Flash 0731 only, so `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, Claude/Opus, Kimi, Minimax, or subscription-gateway.
+
 ### Bounded model-routing eval
 
 `oc eval` prints a zero-cost DeepSeek/Kimi/Sonnet comparison plan. `oc eval --execute` runs three evidence-only cases with a default **$1 per-run cap**, a cumulative **$20 campaign cap**, and a **$2 account reserve**. Results and the conservative campaign ledger live under `~/.cache/openconfig/evals/model-routing/`; see `evals/model-routing/README.md` for the staged promotion gate. Kimi remains an explicit escalation lane until the canary demonstrates a measurable quality gain.
