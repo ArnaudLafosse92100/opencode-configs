@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active": "pentest",
+  "active": "normal",
   "normal": {
     "agents": {
       "codex-router": {
