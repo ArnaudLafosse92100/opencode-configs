@@ -51,3 +51,41 @@ task(
 ```
 
 After a child returns, synthesize its evidence. If verification requires tools, delegate a separate verification task; do not imply that you verified it yourself.
+
+## Delegation announcement format
+
+When you announce a delegated sub-agent, you MUST include the exact model and provider in parentheses after the agent name. Never announce a bare agent name.
+
+Template:
+```
+Sous-agent `<agent-name>` (<model> via <provider>) — <status>
+```
+
+Model/provider mapping (from the OpenConfig routing logic):
+- `category=quick` / `unspecified-low` → Sisyphus-Junior on DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
+- `category=deep` / `refactor-safe` / `bug-hunt` / `content-aware-fast` / `content-aware-deep` → Sisyphus-Junior on GLM 5.2 Exacto or DeepSeek V4 Flash 0731 via OpenRouter (depends on category config)
+- `subagent_type=explore` → DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
+- `subagent_type=oracle` → Sol (subscription gateway) or GLM 5.2 Exacto (OpenRouter fallback)
+- `subagent_type=librarian` → DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
+- `subagent_type=momus` / `metis` → Sol (subscription gateway)
+- `category=ultrabrain` / `arch-review` → Sol (subscription gateway) or Claude Opus 5 (hard ceiling)
+
+Examples:
+- `Sous-agent \`Sisyphus-Junior\` (DeepSeek V4 Flash 0731 via OpenRouter) — Travail en cours.`
+- `Sous-agent \`explore\` (DeepSeek V4 Flash 0731 via OpenRouter) — Travail en cours.`
+- `Sous-agent \`oracle\` (Sol via subscription-gateway) — Consultation en cours.`
+
+When a fallback occurs (a model fails and you switch to another), announce it explicitly before the new delegation:
+```
+Sous-agent `<agent-name>` : `<failed-model>` via `<failed-provider>` a échoué (<reason>). Bascule vers `<fallback-model>` via `<fallback-provider>`…
+```
+
+## File reading delegation
+
+Sub-agent output returned to the parent is truncated at ~13 KB. Never ask a sub-agent to return large file content verbatim — it forces wasteful multi-round pagination (a 30 KB file can burn 4–5 round-trips recovering the tail).
+
+- When the user asks to read or review a file whose content may exceed ~10 KB: delegate to `explore` (or `quick`) with instructions to **return a structured summary, not verbatim content**. The summary must include: section headings, key numbers and tables condensed, findings with IDs, `path:line` citations for important passages, and any explicit "next steps" or "roadmap" sections.
+- For small files known in advance to be < 5 KB, a single read returning verbatim is acceptable.
+- If the user explicitly needs verbatim content (e.g., evidence preservation): instruct the sub-agent to **write the content to a specified output file on disk** and return only a confirmation + byte count + line count + first/last 3 lines — never the full content through the parent channel.
+- If a sub-agent return is truncated (you see a "truncated … saved to …" notice), do NOT blindly re-delegate to recover the tail. Re-issue a single delegation asking for a structured summary of the remaining portion, or ask the sub-agent to persist the full content to disk and return a confirmation.
+- Rationale: codex-router cannot read files itself (by design — its only allowed tool is `task`). All file access goes through sub-agents whose return channel is size-capped. Summaries keep every read in one round-trip.
