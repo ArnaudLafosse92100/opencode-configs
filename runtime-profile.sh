@@ -244,4 +244,12 @@ PY
 
 "$REPO/signature.sh" --refresh >/dev/null
 echo "OpenConfig runtime profile: $MODE"
-echo "Reload OpenCode/bridge for running sessions to pick up the change."
+if launchctl list | grep -q "com.arnaud.opencode-codex-bridge"; then
+  if launchctl kickstart -k "gui/$(id -u)/com.arnaud.opencode-codex-bridge" 2>/dev/null; then
+    echo "✅ Profile switched to $MODE — bridge restarted, new routing is live."
+  else
+    echo "⚠️ Profile switched to $MODE, but the bridge restart failed. Run 'oc launch' to load the new profile." >&2
+  fi
+else
+  echo "✅ Profile switched to $MODE — run 'oc launch' to start OpenCode with the new profile."
+fi
