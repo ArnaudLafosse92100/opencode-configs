@@ -2,7 +2,18 @@
 
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
-## Unreleased — 2026-08-09
+## Unreleased — 2026-08-23
+
+### Final upstream 1.5.60 parity audit for mixed routing
+- Add the compatible 1.5.60 capability guards to `validate.sh`: normal visual routes must stay `attachment:true` end-to-end, and every tool-using route must stay `tool_call:true`
+- Keep the pentest profile intentionally GLM/DeepSeek-only while validating the broad normal profile separately, so security mode does not create false vision-capability failures
+- Remove Hermes from the normal `content-aware-deep` fallback chain; Hermes stays reserved for `content-aware-research`, where tools/edit are intentionally denied
+- Remove GLM from the normal `visual-engineering` fallback chain; every normal visual fallback is now vision-capable
+- Port live-provider pin guards for DeepSeek and MiniMax, stale `provider.only` detection for unpinned families, and `codegraph.auto_provision` / `daemon` validation
+- Make `oc fix` repair the same provider pin invariants and always repair CodeGraph provisioning, independent of `start_work.auto_commit`
+- Refresh README routing/concurrency wording so it matches the runtime-profile source of truth
+
+### Previous local hardening
 
 ### Schema-clean runtime fallback retries
 - Keep native OmO `runtime_fallback` upstream-compatible and move custom same-primary retry knobs to OpenConfig-owned `OPENCONFIG_OMO_*` environment exports

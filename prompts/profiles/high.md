@@ -1,6 +1,6 @@
-# Profile: high (GLM Exacto / sisyphus)
+# Profile: high (GLM 5.3 / sisyphus)
 
-Default OpenConfig path for app work (`oc new --profile high`). Parallel delegation. Exacto for tool-call quality.
+Default OpenConfig path for app work (`oc new --profile high`). Parallel delegation. GLM 5.3 for tool-call quality.
 
 ## Routing
 
@@ -12,7 +12,7 @@ Default OpenConfig path for app work (`oc new --profile high`). Parallel delegat
 | Security/pentest map | `content-aware-fast` |
 | Security/pentest depth | `content-aware-deep` |
 | Visual | `artistry` then `visual-engineering` |
-| Hard reasoning | ultrawork (Opus 5 max) — only when stuck |
+| Hard reasoning | deep / ultrabrain — only when stuck |
 | Filters bite | `content-aware-*` / content-aware-research |
 
 ## Ops

@@ -164,6 +164,33 @@ if oc:
             err(f"opencode.json[{mid}]: remove redundant preferred throughput/latency settings; native provider routing owns selection.")
         q = pv.get("quantizations")
         fam = m.get("family")
+        expected_require_parameters = fam in ("glm", "minimax")
+        # Live-provider pins ported from upstream 1.5.60, adapted for the local
+        # mixed OpenRouter + subscription-gateway stack. GLM 5.3 intentionally
+        # remains unpinned: a stale GLM provider.only roster blackholes it.
+        want_only = {
+            "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
+            "minimax": ["gmicloud", "novita", "deepinfra", "together"],
+        }.get(fam)
+        if want_only is not None:
+            if pv.get("only") != want_only:
+                err(f"opencode.json[{mid}]: {fam} must pin provider.only={want_only} (live-verified unmoderated hosts, no fp4). Run: oc fix")
+            if fam == "deepseek":
+                if pv.get("require_parameters") is not False:
+                    err(f"opencode.json[{mid}]: deepseek provider.require_parameters must be false. Run: oc fix")
+            elif pv.get("require_parameters") is not expected_require_parameters:
+                err(
+                    f"opencode.json[{mid}]: provider.require_parameters must be "
+                    f"{str(expected_require_parameters).lower()} for {fam} routing. Run: oc fix"
+                )
+        else:
+            if pv.get("only"):
+                err(f"opencode.json[{mid}]: stale provider.only pin {pv.get('only')} — {fam or 'this family'} has no live pin roster. Run: oc fix")
+            if pv.get("require_parameters") is not expected_require_parameters:
+                err(
+                    f"opencode.json[{mid}]: provider.require_parameters must be "
+                    f"{str(expected_require_parameters).lower()} for {fam or 'this family'} routing. Run: oc fix"
+                )
         # Exacto: OpenRouter docs say append :exacto to the slug (quality-first tool routing).
         # Do NOT also set sort to price/throughput/latency — that overrides Exacto.
         # Soft preferred_* / tight quant filters fight Exacto's provider ranking.
@@ -438,6 +465,10 @@ if omo:
     cg = omo.get("codegraph") or {}
     if cg.get("enabled") is False:
         err("oh-my-openagent.json: codegraph.enabled is false")
+    elif cg.get("auto_provision") is not True:
+        err("oh-my-openagent.json: codegraph.auto_provision must be true — run: oc fix")
+    elif cg.get("daemon") is not True:
+        err("oh-my-openagent.json: codegraph.daemon must be true — run: oc fix")
     else:
         idir = cg.get("install_dir")
         if idir and "cache/opencode/codegraph" in str(idir):
@@ -497,6 +528,65 @@ if omo:
     if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
         # Backward-compatible schema v1: category map at profile root.
         selected_profile = {"categories": selected_profile}
+    def _normalize_profile(profile):
+        if not isinstance(profile, dict):
+            return {}
+        if "agents" not in profile and "categories" not in profile:
+            return {"categories": profile}
+        return profile
+    def _route_refs(profile, section, name):
+        cfg = (((profile or {}).get(section) or {}).get(name) or {})
+        if not isinstance(cfg, dict):
+            return []
+        refs = []
+        if isinstance(cfg.get("model"), str):
+            refs.append(cfg["model"])
+        refs.extend(x for x in (cfg.get("fallback_models") or []) if isinstance(x, str))
+        return refs
+    provider_configs = (oc or {}).get("provider") or {}
+    def _model_config_for_ref(ref):
+        if not isinstance(ref, str) or "/" not in ref:
+            return None
+        provider, model_id = ref.split("/", 1)
+        pcfg = provider_configs.get(provider) or {}
+        return (pcfg.get("models") or {}).get(model_id)
+    normal_profile = _normalize_profile(runtime_profile_data.get("normal") if isinstance(runtime_profile_data, dict) else {})
+    selected_profile = _normalize_profile(selected_profile)
+    # Upstream 1.5.60 invariant: normal-mode vision chains must stay vision-capable
+    # end-to-end. The pentest profile is a deliberate GLM/DeepSeek-only lane, so
+    # validate the normal profile separately instead of flagging active pentest.
+    for section, names in (
+        ("agents", ("multimodal-looker",)),
+        ("categories", ("visual-engineering", "artistry")),
+    ):
+        for name in names:
+            refs = _route_refs(normal_profile, section, name)
+            if not refs:
+                continue
+            for ref in refs:
+                model_cfg = _model_config_for_ref(ref)
+                if not isinstance(model_cfg, dict):
+                    err(f"runtime-profile.json[normal.{section}.{name}]: cannot verify attachment capability for undefined model {ref!r}")
+                elif model_cfg.get("attachment") is not True:
+                    err(f"runtime-profile.json[normal.{section}.{name}]: {ref} lacks attachment:true in a vision route")
+    ok("normal profile vision chains stay attachment-capable")
+    # Tool-using routes must not fall back to a no-tools model. Hermes is allowed
+    # only for content-aware-research, where edit/tools are intentionally denied.
+    capability_profiles = [(runtime_profile, selected_profile)]
+    if normal_profile and runtime_profile != "normal":
+        capability_profiles.append(("normal", normal_profile))
+    for profile_name, profile in capability_profiles:
+        for section in ("agents", "categories"):
+            for name, cfg in ((profile or {}).get(section) or {}).items():
+                if name == "content-aware-research":
+                    continue
+                for ref in _route_refs(profile, section, name):
+                    model_cfg = _model_config_for_ref(ref)
+                    if not isinstance(model_cfg, dict):
+                        err(f"runtime-profile.json[{profile_name}.{section}.{name}]: cannot verify tool_call capability for undefined model {ref!r}")
+                    elif model_cfg.get("tool_call") is not True:
+                        err(f"runtime-profile.json[{profile_name}.{section}.{name}]: {ref} lacks tool_call:true in a tool-using route")
+    ok("runtime-profile tool-using chains stay tool-capable")
     codex_router_expected = (((selected_profile or {}).get("agents") or {}).get("codex-router") or {}).get("model")
     if codex_router_expected:
         if (oc or {}).get("model") != codex_router_expected:

@@ -90,17 +90,42 @@ for mid, m in prov.get("models", {}).items():
         changes.append(f"[{mid}] options.reasoning_effort -> reasoning.effort")
     for k in ("temperature", "top_p", "thinking"):
         if k in o: del o[k]; changes.append(f"[{mid}] stripped model-level options.{k}")
-    pv = o.get("provider", {})
+    pv = o.get("provider")
+    if not isinstance(pv, dict):
+        pv = {}
+        o["provider"] = pv
+        changes.append(f"[{mid}] provider options initialized")
     for key in ("preferred_min_throughput", "preferred_max_latency"):
         if key in pv:
             del pv[key]
             changes.append(f"[{mid}] removed provider.{key} (native provider routing owns selection)")
+    fam = m.get("family")
+    expected_require_parameters = fam in ("glm", "minimax")
+    want_only = {
+        "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
+        "minimax": ["gmicloud", "novita", "deepinfra", "together"],
+    }.get(fam)
+    if want_only is not None:
+        if pv.get("only") != want_only:
+            pv["only"] = want_only
+            changes.append(f"[{mid}] provider.only -> live {fam} roster")
+        want_require_parameters = False if fam == "deepseek" else expected_require_parameters
+        if pv.get("require_parameters") is not want_require_parameters:
+            pv["require_parameters"] = want_require_parameters
+            changes.append(f"[{mid}] provider.require_parameters -> {str(want_require_parameters).lower()}")
+    else:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed stale provider.only")
+        if pv.get("require_parameters") is not expected_require_parameters:
+            pv["require_parameters"] = expected_require_parameters
+            changes.append(f"[{mid}] provider.require_parameters -> {str(expected_require_parameters).lower()}")
     # Only claude/deepseek NEED 'unknown' (their first-party endpoints report it).
     # GLM intentionally excludes it to drop fp4 providers — do not touch that.
     q = pv.get("quantizations")
-    if isinstance(q, list) and "unknown" not in q and m.get("family") in ("claude","deepseek"):
-        pv["quantizations"] = q + ["unknown"]; changes.append(f"[{mid}] quantizations += 'unknown' ({m.get('family')} first-party)")
-    if m.get("family") == "claude":
+    if isinstance(q, list) and "unknown" not in q and fam in ("claude","deepseek"):
+        pv["quantizations"] = q + ["unknown"]; changes.append(f"[{mid}] quantizations += 'unknown' ({fam} first-party)")
+    if fam == "claude":
         if pv.get("require_parameters") is True:
             pv["require_parameters"] = False; changes.append(f"[{mid}] Claude require_parameters -> false")
         if m.get("temperature") is True:
@@ -415,15 +440,15 @@ sw = omo.setdefault("start_work", {})
 if isinstance(sw, dict) and sw.get("auto_commit") is not False:
     sw["auto_commit"] = False; changes.append("start_work.auto_commit -> false")
 
-    # codegraph: provision the runtime binary, but do not auto-index projects.
-    cg2 = omo.setdefault("codegraph", {})
-    if isinstance(cg2, dict):
-        if cg2.get("auto_init") is not False:
-            cg2["auto_init"] = False; changes.append("codegraph.auto_init -> false")
-        if cg2.get("auto_provision") is not True:
-            cg2["auto_provision"] = True; changes.append("codegraph.auto_provision -> true")
-        if cg2.get("daemon") is not True:
-            cg2["daemon"] = True; changes.append("codegraph.daemon -> true")
+# codegraph: provision the runtime binary, but do not auto-index projects.
+cg2 = omo.setdefault("codegraph", {})
+if isinstance(cg2, dict):
+    if cg2.get("auto_init") is not False:
+        cg2["auto_init"] = False; changes.append("codegraph.auto_init -> false")
+    if cg2.get("auto_provision") is not True:
+        cg2["auto_provision"] = True; changes.append("codegraph.auto_provision -> true")
+    if cg2.get("daemon") is not True:
+        cg2["daemon"] = True; changes.append("codegraph.daemon -> true")
 
 # Hephaestus needs teammate:allow to be a team member (OmO conditional)
 agents = omo.setdefault("agents", {})

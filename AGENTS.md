@@ -20,8 +20,8 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | --- | --- | --- |
 | Runtime | [OpenCode](https://opencode.ai) | Provider-agnostic coding agent TUI/CLI; config-as-code; LSP; MCP |
 | Orchestration | [oh-my-openagent (OmO)](https://omo.vibetip.help/docs) | Multi-model agents, categories, team mode, ultrawork, hyperplan — docs on VibeTip |
-| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM Exacto, DeepSeek Nitro, Claude, Gemini, MiniMax; Exacto/Nitro variants |
-| GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; OpenRouter GPT is fallback only |
+| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Nitro, Gemini, Qwen, Kimi, Laguna, Hermes, MiniMax |
+| GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; GPT is not routed through OpenRouter |
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
 | GitHub code | OmO `grep_app` | Real call-site examples across public repos |
@@ -40,7 +40,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash); pentest overrides these lanes to DeepSeek Flash 0731 primary.
 - **Hard ceiling** → subscription-gateway Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
-- **Content-aware research** → DeepSeek V4 Flash 0731 / Hermes / GLM 5.3 depending on normal vs pentest profile, with Kimi K2.7 as bounded normal-mode escalation.
+- **Content-aware research** → normal uses Hermes 4 405B with DeepSeek/GLM/MiniMax/Qwen fallbacks; pentest uses DeepSeek Flash 0731 with GLM fallback. `content-aware-deep` stays tool-capable end-to-end and must not fall back to Hermes.
 - **Runtime profile override** → `oc profile pentest` keeps every agent/category available but pins every real route to DeepSeek V4 Flash 0731 primary with GLM fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. `oc profile normal` restores the broader matrix above.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/GLM canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 - **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
@@ -69,7 +69,7 @@ Re-running install / setup / heal / fix on a healthy box must **not** clobber `.
 
 - Parallel tool batches. Prefer `read`/`grep`/`glob` over bash for files. Hashline edits. Smallest diff. Cite `path:line`. Real output only.
 - **Tool matrix:** local code → read/grep/codegraph · library APIs → **Context7** · GitHub patterns → **grep_app** · current web → **Exa websearch** → webfetch. Never invent APIs.
-- Visual → `artistry` / `visual-engineering`. Exacto/Flash for tool loops; escalate when stuck. Long multi-iteration plans → `/start-work` → Atlas (`/goal` disabled — see `prompts/goal.md`).
+- Visual → `artistry` / `visual-engineering`. GLM/DeepSeek for tool loops; escalate when stuck. Long multi-iteration plans → `/start-work` → Atlas (`/goal` disabled — see `prompts/goal.md`).
 - No speculative fallbacks / `as any` / `@ts-ignore`. Plain markdown. Stop when done.
 
 Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.

@@ -17,7 +17,7 @@ source ~/.zshrc && oc doctor && oc launch
 | | |
 | --- | --- |
 | **Pins** | OpenConfig `1.5.60` · OpenCode `1.18.17+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.17` |
-| **Default lead** | `sisyphus` (runtime-profile routed; normal GLM Exacto, pentest DeepSeek) |
+| **Default lead** | `sisyphus` (runtime-profile routed; normal GLM 5.3, pentest DeepSeek) |
 | **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
 | **Config path** | `~/.config/opencode` → this repo (symlink) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
@@ -145,7 +145,7 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | **hephaestus** | Runtime-profile routed | Implementation |
 | **prometheus** | Runtime-profile routed | Planner |
 | **atlas** | Runtime-profile routed | Plan executor after `/start-work` |
-| **content-aware-research** | DeepSeek V4 Flash 0731 | Full-depth research (edit denied) |
+| **content-aware-research** | Runtime-profile routed (normal Hermes, pentest DeepSeek) | Full-depth research (edit denied) |
 
 ### Subagents (`task` / `call_omo_agent` — not team members)
 
@@ -177,7 +177,7 @@ OpenCode TUI sessions continue to use `sisyphus`.
 | `refactor-safe` | Runtime-profile routed | Behavior-preserving refactors |
 | `arch-review` | Runtime-profile routed | Coupling / blast radius |
 | `content-aware-fast` | DeepSeek Flash 0731 Nitro | Attack-surface recon |
-| `content-aware-deep` | DeepSeek Flash 0731 → Kimi / GPT review | Deep vuln research |
+| `content-aware-deep` | DeepSeek Flash 0731 → GLM / Qwen / MiniMax / Laguna | Deep vuln research |
 | `agentic-deep-kimi` | Runtime-profile routed | Explicit long-horizon escalation after evaluation |
 | `writing` | Runtime-profile routed | Docs / prose |
 | `visual-engineering` | Runtime-profile routed | Ship UI |
@@ -228,10 +228,12 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | Orchestration | `z-ai/glm-5.3` | Sisyphus / Atlas / Prometheus / bug-hunt |
 | GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
 | Recon | `deepseek/deepseek-v4-flash-0731:nitro` | explore / librarian / sisyphus-junior / quick |
-| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → Hermes / GLM / Qwen fallback | content-aware |
+| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → GLM / Qwen / MiniMax / Laguna fallback | content-aware-deep |
+| Research-only | Hermes 4 405B → DeepSeek / GLM / MiniMax / Qwen fallback | content-aware-research (tools/edit denied) |
 | Agentic escalation | `moonshotai/kimi-k2.7-code` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
 | Multimodal | Gemini 3.1 Pro → Gemini 3.7 Flash / Qwen / Kimi K2.7 fallback | multimodal-looker |
-| Visual / writing | Gemini 3.1 Pro · 3.7 Flash | artistry / visual / writing |
+| Visual | Gemini 3.1 Pro → Gemini 3.7 Flash / Qwen / MiniMax fallback | artistry / visual |
+| Writing | Gemini 3.7 Flash → Laguna / Qwen / DeepSeek fallback | writing |
 | Ceiling | `subscription-gateway/gpt-5.6-sol` / GLM 5.3 ultrawork | deep · ultrabrain · ultrawork |
 
 OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Qwen, Laguna, Hermes, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
@@ -262,7 +264,10 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | --- | --- |
 | `background_task.defaultConcurrency` | **6** |
 | OpenRouter / subscription gateway / Anthropic | **8 / 4 / 2** |
-| Flash / Exacto / Sol / Opus 5 / Fable | **6 / 5 / 3 / 1 / 1** |
+| DeepSeek Flash / Gemini Flash / Laguna | **10 / 10 / 10** |
+| GLM / MiniMax / LongCat | **8 / 8 / 8** |
+| Qwen / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 3** |
+| Hermes / Opus 5 / Fable | **2 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |
 
@@ -311,13 +316,13 @@ oc projects --list
 
 | Profile | Agent | Tuning |
 | --- | --- | --- |
-| `high` | sisyphus | Default Exacto · balanced tool_output |
+| `high` | sisyphus | GLM 5.3 default · balanced tool_output |
 | `low` | sisyphus | Cost-first · smaller tool_output |
 | `fast` | hephaestus | GPT Sol via subscription gateway · skip ceremony |
 | `research` | sisyphus | Large tool_output · deep / ultrabrain / content-aware |
 | `debug` | sisyphus | Large tool_output · bug-hunt / debug-team |
 | `writing` | sisyphus | Gemini Flash small_model · writing category |
-| `content-aware` | content-aware-research | Edit deny · Pro + recon/audit skills |
+| `content-aware` | content-aware-research | Edit deny · research/recon/audit skills |
 
 Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to `.opencode/profile.json`.
 
@@ -327,7 +332,7 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 
 - Allow-everything locally for normal tools (trusted box).
 - Hard-deny bash: `rm -rf /|~`, `mkfs`, `sudo`, `git push --force*`, `gh repo delete*`.
-- Providers allowed: OpenRouter + subscription gateway; direct OpenAI remains a compatibility fallback.
+- Providers allowed: OpenRouter + subscription gateway; direct OpenAI is disabled in this fork.
 - Server: `127.0.0.1:4097` · share disabled · mdns off · Basic Auth via
   `~/.local/state/opencode-codex-bridge/opencode-server-password` when managed
   by the bridge.
@@ -383,7 +388,7 @@ Idempotency: re-running install / setup / heal / fix on a healthy box must not c
 | --- | --- | --- |
 | OpenCode | [opencode.ai/docs](https://opencode.ai/docs) | [anomalyco/opencode](https://github.com/anomalyco/opencode) |
 | OmO | [omo.vibetip.help/docs](https://omo.vibetip.help/docs) | [code-yeongyu/oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) |
-| OpenRouter | [openrouter.ai/docs](https://openrouter.ai/docs) | Exacto / Nitro routing |
+| OpenRouter | [openrouter.ai/docs](https://openrouter.ai/docs) | Provider routing / model variants |
 | Context7 | [context7.com](https://context7.com) | [upstash/context7](https://github.com/upstash/context7) |
 | Exa | [docs.exa.ai](https://docs.exa.ai) | [exa-labs](https://github.com/exa-labs) |
 

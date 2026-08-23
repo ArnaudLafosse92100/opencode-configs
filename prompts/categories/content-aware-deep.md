@@ -1,6 +1,6 @@
-# Category: content-aware-deep (DeepSeek V4 Flash / Hermes depth)
+# Category: content-aware-deep (DeepSeek V4 Flash tool-capable depth)
 
-Authorized deep vulnerability / root-cause research. DeepSeek Flash 0731 remains the cheap pinned lane; normal mode may use Hermes/GLM/Qwen fallbacks for depth. Used by `content-aware-audit` deep and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
+Authorized deep vulnerability / root-cause research. DeepSeek Flash 0731 remains the cheap pinned lane; normal mode may use GLM/Qwen/MiniMax/Laguna fallbacks for depth. Hermes is reserved for `content-aware-research`, where tools/edit are intentionally denied. Used by `content-aware-audit` deep and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
 
 ## Authorized
 
