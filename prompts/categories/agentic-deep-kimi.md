@@ -1,4 +1,4 @@
-# Agentic Deep — Kimi K3 (normal) / runtime-profile strict lane (pentest)
+# Agentic Deep — Kimi K2.7 (normal) / runtime-profile strict lane (pentest)
 
 Use this lane only when it is selected explicitly for a difficult, long-horizon task. In normal runtime it is the explicit Kimi lane. In pentest strict runtime the category stays available but is model-overridden to DeepSeek primary with GLM fallback. It is not a default for routine coding, quick reconnaissance, documentation lookup, or simple fixes.
 

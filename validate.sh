@@ -13,6 +13,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib/common.sh
 source "$REPO/lib/common.sh"
+VALIDATE_REPO="${OC_VALIDATE_REPO:-$REPO}"
 QUIET=""
 for arg in "$@"; do
   case "$arg" in
@@ -24,7 +25,7 @@ done
 
 [[ "$QUIET" == "--quiet" ]] && export VALIDATE_QUIET=1
 
-python3 - "$REPO" <<'PY'
+python3 - "$VALIDATE_REPO" <<'PY'
 import json, sys, os, re, glob, subprocess
 
 repo = sys.argv[1]
@@ -747,6 +748,15 @@ if omo:
         "oracle", "librarian", "explore", "multimodal-looker",
         "metis", "momus", "prometheus", "plan",
     }
+    TEAM_KEYS = {"version", "name", "description", "lead", "members"}
+    LEAD_KEYS = {"kind", "subagent_type", "category", "prompt"}
+    MEMBER_KEYS = {"kind", "subagent_type", "category", "name", "prompt"}
+    DEPENDENCY_GATES = {
+        "debug-team": {"root-cause": "reproducer"},
+        "refactor-team": {"executor": "analyzer"},
+        "content-aware-audit": {"deep": "recon"},
+        "ship-feature": {"verifier": "forge"},
+    }
     NAME_RE = re.compile(r"^[a-z0-9-]+$")
     team_cfgs = sorted(glob.glob(os.path.join(repo, "teams", "*", "config.json")))
     if not team_cfgs:
@@ -760,6 +770,13 @@ if omo:
             except Exception as e:
                 err(f"{rel}: invalid JSON ({e})")
                 continue
+            unknown = sorted(set(team) - TEAM_KEYS)
+            if unknown:
+                err(f"{rel}: unknown top-level keys: {unknown}")
+            if team.get("version") != 1:
+                err(f"{rel}: version must be 1 (got {team.get('version')!r})")
+            if not isinstance(team.get("description"), str) or not team.get("description", "").strip():
+                err(f"{rel}: description must be a non-empty string")
             tname = team.get("name") or ""
             dirname = os.path.basename(os.path.dirname(cfg_path))
             if tname != dirname:
@@ -768,6 +785,9 @@ if omo:
                 err(f"{rel}: name must match ^[a-z0-9-]+$")
             lead = team.get("lead") or {}
             if lead:
+                lead_unknown = sorted(set(lead) - LEAD_KEYS)
+                if lead_unknown:
+                    err(f"{rel}: lead has unknown keys: {lead_unknown}")
                 lk = lead.get("kind")
                 if lk == "subagent_type":
                     lst = lead.get("subagent_type")
@@ -777,11 +797,20 @@ if omo:
                         err(f"{rel}: lead subagent_type '{lst}' is not team-eligible (use sisyphus/atlas/sisyphus-junior/hephaestus)")
                     elif lst == "hephaestus" and hep_perm != "allow":
                         err(f"{rel}: lead hephaestus needs agents.hephaestus.permission.teammate=allow")
+                    elif lst in disabled_agents:
+                        err(f"{rel}: lead subagent_type '{lst}' is disabled")
+                    elif lst not in agents:
+                        err(f"{rel}: lead subagent_type '{lst}' is not declared in agents")
                 elif lk == "category":
-                    if not lead.get("category") or not lead.get("prompt"):
+                    lcat = lead.get("category")
+                    if not lcat or not lead.get("prompt"):
                         err(f"{rel}: lead kind=category requires category + prompt")
+                    elif lcat not in cats:
+                        err(f"{rel}: lead category '{lcat}' is not declared")
                 else:
                     err(f"{rel}: lead.kind must be subagent_type or category")
+            else:
+                err(f"{rel}: lead must be a non-empty object")
             members = team.get("members") or []
             if not isinstance(members, list) or not (1 <= len(members) <= 8):
                 err(f"{rel}: members must be an array of length 1..8 (got {len(members) if isinstance(members, list) else type(members).__name__})")
@@ -791,6 +820,9 @@ if omo:
                 if not isinstance(m, dict):
                     err(f"{rel}: members[{i}] must be an object")
                     continue
+                member_unknown = sorted(set(m) - MEMBER_KEYS)
+                if member_unknown:
+                    err(f"{rel}: members[{i}] has unknown keys: {member_unknown}")
                 mname = m.get("name") or ""
                 if not mname or not NAME_RE.match(mname):
                     err(f"{rel}: members[{i}].name must match ^[a-z0-9-]+$")
@@ -802,11 +834,21 @@ if omo:
                 prompt = (m.get("prompt") or "").strip()
                 if not prompt:
                     err(f"{rel}: members[{i}] ({mname or i}) requires non-empty inline prompt")
-                elif "ROLE:" not in prompt or "Mailbox" not in prompt:
-                    warn(
-                        f"{rel}: members[{i}] ({mname}) prompt should include ROLE: … and Mailbox … "
-                        "(OpenConfig team prompt shape)"
-                    )
+                else:
+                    clauses = {
+                        "ROLE:": "ROLE:" in prompt,
+                        "METHOD:/DELIVERABLE:": "METHOD:" in prompt or "DELIVERABLE:" in prompt,
+                        "OWNERSHIP:": "OWNERSHIP:" in prompt,
+                        "Mailbox": "mailbox" in prompt.lower(),
+                        "VERIFY:": "VERIFY:" in prompt,
+                        "SHUTDOWN:": "SHUTDOWN:" in prompt and "approval" in prompt.lower(),
+                    }
+                    missing_clauses = [name for name, present in clauses.items() if not present]
+                    if missing_clauses:
+                        err(
+                            f"{rel}: members[{i}] ({mname}) prompt missing team contract clauses: "
+                            f"{', '.join(missing_clauses)}"
+                        )
                 if kind == "category":
                     cat = m.get("category")
                     if not cat:
@@ -822,9 +864,45 @@ if omo:
                             err(f"{rel}: members[{i}] hephaestus needs agents.hephaestus.permission.teammate=allow")
                     elif st not in TEAM_ELIGIBLE:
                         err(f"{rel}: members[{i}] subagent_type '{st}' not team-eligible (sisyphus/atlas/sisyphus-junior/hephaestus)")
+                    elif st in disabled_agents:
+                        err(f"{rel}: members[{i}] subagent_type '{st}' is disabled")
+                    elif st not in agents:
+                        err(f"{rel}: members[{i}] subagent_type '{st}' is not declared in agents")
                 else:
                     err(f"{rel}: members[{i}].kind must be category or subagent_type")
-        ok(f"{len(team_cfgs)} team spec(s) pass OmO eligibility rules")
+
+            # Dependency-gated phases must name their upstream owner explicitly.
+            by_name = {m.get("name"): m for m in members if isinstance(m, dict)}
+            for downstream, upstream in DEPENDENCY_GATES.get(tname, {}).items():
+                prompt = str((by_name.get(downstream) or {}).get("prompt") or "")
+                if "DEPENDENCY:" not in prompt or upstream not in prompt:
+                    err(
+                        f"{rel}: member '{downstream}' must include DEPENDENCY: naming upstream '{upstream}'"
+                    )
+
+            # Two editing members cannot claim the same explicit ownership scope.
+            ownership = {}
+            for m in members:
+                if not isinstance(m, dict):
+                    continue
+                prompt = str(m.get("prompt") or "")
+                low = prompt.lower()
+                read_only = any(marker in low for marker in (
+                    "read-only", "do not edit", "findings only", "proposals only",
+                    "reproduce only", "plan only",
+                ))
+                match = re.search(r"OWNERSHIP:\s*([^.\n]+)", prompt, re.I)
+                if read_only or not match:
+                    continue
+                scope = re.sub(r"\s+", " ", match.group(1).strip().lower())
+                if scope in ownership:
+                    err(
+                        f"{rel}: overlapping edit ownership '{scope}' for "
+                        f"'{ownership[scope]}' and '{m.get('name')}'"
+                    )
+                else:
+                    ownership[scope] = m.get("name")
+        ok(f"{len(team_cfgs)} team spec(s) checked against OmO eligibility and lifecycle rules")
         # Provisioned ~/.omo/teams entries must be symlinks into this repo
         base = (tm.get("base_dir") or "~/.omo")
         if isinstance(base, str) and base.startswith("~/"):
@@ -1037,15 +1115,15 @@ if not isinstance(kimi_lane, dict):
     err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
 elif runtime_profile == "pentest" and str(kimi_lane.get("model") or "").startswith(pentest_safe_prefixes):
     ok("agentic-deep-kimi is overridden by pentest strict GLM/DeepSeek overlay")
-elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k3":
-    err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k3")
+elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k2.7-code":
+    err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k2.7-code")
 elif runtime_profile != "pentest":
     ok("agentic-deep-kimi is the explicit Kimi primary lane")
 
 kimi_primary = []
 for section, blob in (("agent", omo.get("agents") or {}), ("category", cats)):
     for name, cfg in blob.items():
-        if isinstance(cfg, dict) and cfg.get("model") == "openrouter/moonshotai/kimi-k3":
+        if isinstance(cfg, dict) and cfg.get("model") == "openrouter/moonshotai/kimi-k2.7-code":
             kimi_primary.append(f"{section}:{name}")
 if runtime_profile == "pentest" and kimi_primary == []:
     ok("Kimi has no primary route in pentest strict profile")

@@ -27,7 +27,7 @@
 # Usage:
 #   ./fix.sh                       repair + format + validate
 #   ./fix.sh --dry-run             show what would change, write nothing
-#   ./fix.sh --set model=openrouter/z-ai/glm-5.2
+#   ./fix.sh --set model=openrouter/z-ai/glm-5.3
 #   ./fix.sh --set default_agent=atlas --set small_model=openrouter/deepseek/deepseek-v4-flash-0731
 
 set -uo pipefail
@@ -346,7 +346,21 @@ if isinstance(bt, dict):
                 pc[provider] = cap; changes.append(f"providerConcurrency.{provider} -> {cap}")
     mc = bt.setdefault("modelConcurrency", {})
     if isinstance(mc, dict):
+        pinned_model_concurrency = {
+            "openrouter/z-ai/glm-5.3": 8,
+            "openrouter/poolside/laguna-s-2.1": 10,
+            "openrouter/meituan/longcat-2.0": 8,
+            "openrouter/minimax/minimax-m3": 8,
+            "openrouter/google/gemini-3.1-pro-preview": 5,
+            "openrouter/google/gemini-3.7-flash": 10,
+            "openrouter/qwen/qwen3.8-max": 5,
+            "openrouter/moonshotai/kimi-k2.7-code": 5,
+            "openrouter/deepseek/deepseek-v4-flash-0731": 10,
+            "openrouter/nousresearch/hermes-4-405b": 2,
+        }
         def _model_concurrency(model):
+            if model in pinned_model_concurrency:
+                return pinned_model_concurrency[model]
             low = str(model).lower()
             if any(name in low for name in ("opus", "fable")):
                 return 1
@@ -401,13 +415,15 @@ sw = omo.setdefault("start_work", {})
 if isinstance(sw, dict) and sw.get("auto_commit") is not False:
     sw["auto_commit"] = False; changes.append("start_work.auto_commit -> false")
 
-# codegraph: never auto-build giant indexes
-cg2 = omo.setdefault("codegraph", {})
-if isinstance(cg2, dict):
-    if cg2.get("auto_init") is not False:
-        cg2["auto_init"] = False; changes.append("codegraph.auto_init -> false")
-    if cg2.get("auto_provision") is not False:
-        cg2["auto_provision"] = False; changes.append("codegraph.auto_provision -> false")
+    # codegraph: provision the runtime binary, but do not auto-index projects.
+    cg2 = omo.setdefault("codegraph", {})
+    if isinstance(cg2, dict):
+        if cg2.get("auto_init") is not False:
+            cg2["auto_init"] = False; changes.append("codegraph.auto_init -> false")
+        if cg2.get("auto_provision") is not True:
+            cg2["auto_provision"] = True; changes.append("codegraph.auto_provision -> true")
+        if cg2.get("daemon") is not True:
+            cg2["daemon"] = True; changes.append("codegraph.daemon -> true")
 
 # Hephaestus needs teammate:allow to be a team member (OmO conditional)
 agents = omo.setdefault("agents", {})
@@ -501,8 +517,8 @@ for n, a in omo.get("categories", {}).items():
             del a["color"]
             changes.append(f"category {n}: removed non-hex color '{c}'")
 
-# OmO skills sources — mirror opencode.json (global config + project ./skills)
-ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills", "./skills"]
+    # OmO skills sources — keep a single canonical global skill source.
+    ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills"]
 osk = omo.setdefault("skills", {})
 srcs = []
 for s in (osk.get("sources") or []):

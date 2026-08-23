@@ -2,27 +2,28 @@
   "schema_version": 2,
   "active": "pentest",
   "normal": {
+    "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "helper_model": "openrouter/deepseek/deepseek-v4-flash-0731",
     "agents": {
       "codex-router": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/qwen/qwen3.8-max",
           "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/minimax/minimax-m3"
+          "openrouter/poolside/laguna-s-2.1"
         ]
       },
       "sisyphus": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/poolside/laguna-s-2.1",
+          "openrouter/qwen/qwen3.8-max",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
           "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/minimax/minimax-m3",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8",
-          "openrouter/anthropic/claude-opus-5",
-          "openrouter/anthropic/claude-fable-5"
+          "openrouter/minimax/minimax-m3"
         ]
       },
       "hephaestus": {
@@ -30,29 +31,30 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol-review",
           "subscription-gateway/gpt-5.6-sol",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/meituan/longcat-2.0"
         ]
       },
       "prometheus": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "openrouter/poolside/laguna-s-2.1",
           "openrouter/minimax/minimax-m3",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8"
+          "openrouter/qwen/qwen3.8-max",
+          "subscription-gateway/gpt-5.6-terra",
+          "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
       },
       "atlas": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "openrouter/poolside/laguna-s-2.1",
           "openrouter/minimax/minimax-m3",
-          "openrouter/anthropic/claude-sonnet-5"
+          "openrouter/qwen/qwen3.8-max",
+          "subscription-gateway/gpt-5.6-terra",
+          "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
       },
       "oracle": {
@@ -60,44 +62,45 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol-review",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/anthropic/claude-sonnet-5",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "librarian": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/moonshotai/kimi-k2.7-code",
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "subscription-gateway/gpt-5.6-terra"
         ]
       },
       "explore": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/poolside/laguna-s-2.1",
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
       },
       "multimodal-looker": {
-        "model": "openrouter/anthropic/claude-sonnet-5",
+        "model": "openrouter/google/gemini-3.1-pro-preview",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "openrouter/google/gemini-3.6-flash",
-          "openrouter/google/gemini-3.5-flash",
-          "openrouter/moonshotai/kimi-k3"
+          "openrouter/google/gemini-3.7-flash",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/minimax/minimax-m3"
         ]
       },
       "metis": {
-        "model": "openrouter/anthropic/claude-sonnet-5",
+        "model": "openrouter/google/gemini-3.1-pro-preview",
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "momus": {
@@ -105,30 +108,27 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/anthropic/claude-opus-5",
-          "openrouter/anthropic/claude-fable-5",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8",
-          "openrouter/anthropic/claude-opus-4.7"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "sisyphus-junior": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/poolside/laguna-s-2.1",
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "content-aware-research": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "model": "openrouter/nousresearch/hermes-4-405b",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/z-ai/glm-5.2-exacto",
-          "openrouter/minimax/minimax-m3"
+          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/minimax/minimax-m3",
+          "openrouter/qwen/qwen3.8-max"
         ]
       }
     },
@@ -136,11 +136,10 @@
       "visual-engineering": {
         "model": "openrouter/google/gemini-3.1-pro-preview",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "openrouter/google/gemini-3.6-flash",
-          "openrouter/google/gemini-3.5-flash",
-          "openrouter/anthropic/claude-sonnet-5",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/google/gemini-3.7-flash",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/minimax/minimax-m3",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "ultrabrain": {
@@ -148,12 +147,10 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol-review",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/anthropic/claude-opus-5",
-          "openrouter/anthropic/claude-fable-5",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8",
-          "openrouter/anthropic/claude-opus-4.7",
-          "openrouter/moonshotai/kimi-k3"
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code"
         ]
       },
       "deep": {
@@ -161,76 +158,75 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol-review",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "agentic-deep-kimi": {
-        "model": "openrouter/moonshotai/kimi-k3",
+        "model": "openrouter/moonshotai/kimi-k2.7-code",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "openrouter/z-ai/glm-5.2-exacto",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/z-ai/glm-5.3",
           "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
       },
       "artistry": {
         "model": "openrouter/google/gemini-3.1-pro-preview",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "openrouter/google/gemini-3.6-flash",
-          "openrouter/google/gemini-3.5-flash",
-          "openrouter/anthropic/claude-sonnet-5"
+          "openrouter/google/gemini-3.7-flash",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/minimax/minimax-m3"
         ]
       },
       "quick": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "model": "openrouter/poolside/laguna-s-2.1",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
+          "openrouter/deepseek/deepseek-v4-flash-0731",
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "unspecified-low": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "model": "openrouter/poolside/laguna-s-2.1",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
+          "openrouter/deepseek/deepseek-v4-flash-0731",
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "unspecified-high": {
-        "model": "openrouter/anthropic/claude-opus-5",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol",
-          "openrouter/anthropic/claude-fable-5",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8",
-          "openrouter/anthropic/claude-opus-4.7",
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/deepseek/deepseek-v4-flash-0731",
+          "subscription-gateway/gpt-5.6-terra"
         ]
       },
       "writing": {
-        "model": "openrouter/google/gemini-3.6-flash",
+        "model": "openrouter/google/gemini-3.7-flash",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/google/gemini-3.5-flash",
-          "openrouter/google/gemini-3-flash-preview",
+          "openrouter/poolside/laguna-s-2.1",
+          "openrouter/qwen/qwen3.8-max",
           "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
       },
       "bug-hunt": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
           "openrouter/minimax/minimax-m3"
         ]
       },
       "refactor-safe": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k3",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/poolside/laguna-s-2.1",
           "openrouter/minimax/minimax-m3"
         ]
       },
@@ -239,108 +235,110 @@
         "fallback_models": [
           "subscription-gateway/gpt-5.6-sol",
           "subscription-gateway/gpt-5.6-terra",
-          "openrouter/anthropic/claude-opus-4.8-fast",
-          "openrouter/anthropic/claude-opus-4.8",
-          "openrouter/anthropic/claude-opus-4.7",
-          "openrouter/moonshotai/kimi-k3"
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/moonshotai/kimi-k2.7-code"
         ]
       },
       "content-aware-fast": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
           "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.2-exacto",
-          "subscription-gateway/gpt-5.6-terra"
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/poolside/laguna-s-2.1"
         ]
       },
       "content-aware-deep": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/moonshotai/kimi-k3",
-          "openrouter/z-ai/glm-5.2-exacto",
-          "subscription-gateway/gpt-5.6-sol-review"
+          "openrouter/nousresearch/hermes-4-405b",
+          "openrouter/z-ai/glm-5.3",
+          "openrouter/qwen/qwen3.8-max",
+          "openrouter/minimax/minimax-m3"
         ]
       }
     }
   },
   "pentest": {
+    "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "helper_model": "openrouter/deepseek/deepseek-v4-flash-0731",
     "agents": {
       "codex-router": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "sisyphus": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "hephaestus": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "prometheus": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "atlas": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "oracle": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "librarian": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "explore": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "multimodal-looker": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "metis": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "momus": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "sisyphus-junior": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "content-aware-research": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       }
     },
@@ -348,11 +346,11 @@
       "visual-engineering": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "ultrabrain": {
-        "model": "openrouter/z-ai/glm-5.2-exacto",
+        "model": "openrouter/z-ai/glm-5.3",
         "fallback_models": [
           "openrouter/deepseek/deepseek-v4-flash-0731"
         ]
@@ -360,73 +358,73 @@
       "deep": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "agentic-deep-kimi": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "artistry": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "quick": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "unspecified-low": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "unspecified-high": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "writing": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "bug-hunt": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "refactor-safe": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "arch-review": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "content-aware-fast": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       },
       "content-aware-deep": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
         "fallback_models": [
-          "openrouter/z-ai/glm-5.2-exacto"
+          "openrouter/z-ai/glm-5.3"
         ]
       }
     }

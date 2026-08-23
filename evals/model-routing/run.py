@@ -28,16 +28,16 @@ API_BASE = "https://openrouter.ai/api/v1"
 
 ALIASES = {
     "deepseek": "deepseek/deepseek-v4-flash-0731",
-    "kimi": "moonshotai/kimi-k3",
-    "sonnet": "anthropic/claude-sonnet-5",
+    "kimi": "moonshotai/kimi-k2.7-code",
+    "glm": "z-ai/glm-5.3",
 }
 
 # Conservative public list prices per token. Live catalog prices replace these
 # when available; ceilings keep --plan useful without a key or network.
 PRICE_CEILINGS = {
     "deepseek/deepseek-v4-flash-0731": (0.14 / 1_000_000, 0.28 / 1_000_000),
-    "moonshotai/kimi-k3": (3.00 / 1_000_000, 15.00 / 1_000_000),
-    "anthropic/claude-sonnet-5": (2.00 / 1_000_000, 10.00 / 1_000_000),
+    "moonshotai/kimi-k2.7-code": (3.00 / 1_000_000, 15.00 / 1_000_000),
+    "z-ai/glm-5.3": (0.20 / 1_000_000, 0.80 / 1_000_000),
 }
 
 
@@ -217,7 +217,7 @@ def add_reported_cost(campaign: dict, value: float) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true", help="perform billable calls (default is plan only)")
-    parser.add_argument("--models", default="deepseek,kimi,sonnet")
+    parser.add_argument("--models", default="deepseek,kimi,glm")
     parser.add_argument("--cases", help="comma-separated case ids (default: all)")
     parser.add_argument("--max-output", type=int, default=2400)
     parser.add_argument("--run-budget", type=float, default=1.0)

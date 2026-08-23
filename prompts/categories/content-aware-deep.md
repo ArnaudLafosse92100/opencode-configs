@@ -1,8 +1,6 @@
-# Category: content-aware-deep (DeepSeek Pro Exacto)
+# Category: content-aware-deep (DeepSeek V4 Flash / Hermes depth)
 
-Authorized deep vulnerability / root-cause research. Used by `content-aware-audit` deep, `review-panel` arch, and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
-
-**Embedded contract: `content-aware-audit`.** This category carries the mandatory deep-audit baseline even if the parent omits `load_skills`. An explicitly loaded skill may add context, but it is defense in depth rather than the model-routing mechanism.
+Authorized deep vulnerability / root-cause research. DeepSeek Flash 0731 remains the cheap pinned lane; normal mode may use Hermes/GLM/Qwen fallbacks for depth. Used by `content-aware-audit` deep and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
 
 ## Authorized
 

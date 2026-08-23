@@ -1,6 +1,6 @@
 # OpenConfig model-routing canary
 
-This eval answers one bounded question: should Kimi K3 become an explicit escalation lane without replacing the cheap DeepSeek/GLM defaults?
+This eval answers one bounded question: should Kimi K2.7 become an explicit escalation lane without replacing the cheap DeepSeek/GLM defaults?
 
 It does not test whether Sisyphus invokes a category. That separate parent →
 `task` → child/model contract lives in `../orchestration-routing/`.
@@ -33,16 +33,14 @@ Use `--models` and `--cases` for a targeted retry after diagnosing a failed requ
 Stage 1 compares:
 
 - `deepseek/deepseek-v4-flash-0731` — cheap baseline and current 0731 route;
-- `moonshotai/kimi-k3` — proposed deep-agentic escalation;
-- `anthropic/claude-sonnet-5` — paid API control on the identical harness.
-
-The Sonnet request is deliberately included despite the active Claude subscription because that subscription cannot be used through OpenRouter, and changing the harness would make the comparison ambiguous. The stage is small enough that this control costs only a few cents.
+- `moonshotai/kimi-k2.7-code` — proposed deep-agentic escalation;
+- `z-ai/glm-5.3` — orchestration/control lane on the identical harness.
 
 ## Promotion gate
 
 Do not promote Kimi globally. Consider it for `agentic-deep-kimi` or a premium fallback only when:
 
-1. it has no deterministic regression against Sonnet on the shared cases;
+1. it has no deterministic regression against GLM 5.3 on the shared cases;
 2. it materially beats DeepSeek on at least one representative difficult task;
 3. its additional cost or latency buys fewer retries or less human correction;
 4. the task is appropriate for the selected provider and data policy;

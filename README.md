@@ -2,7 +2,7 @@
 
 Pinned global config for [OpenCode](https://opencode.ai) + [OpenRouter](https://openrouter.ai) + [oh-my-openagent (OmO)](https://omo.vibetip.help/docs).
 
-**v1.5.40** · CLI **`oc`** · identity `openconfig/opencode-configs`
+**v1.5.60** · CLI **`oc`** · identity `openconfig/opencode-configs`
 
 ```bash
 git clone https://github.com/jesseoue/opencode-configs.git
@@ -16,7 +16,7 @@ source ~/.zshrc && oc doctor && oc launch
 
 | | |
 | --- | --- |
-| **Pins** | OpenConfig `1.5.40` · OpenCode `1.18.11+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.11` |
+| **Pins** | OpenConfig `1.5.60` · OpenCode `1.18.17+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.17` |
 | **Default lead** | `sisyphus` (runtime-profile routed; normal GLM Exacto, pentest DeepSeek) |
 | **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
 | **Config path** | `~/.config/opencode` → this repo (symlink) |
@@ -94,8 +94,8 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 
 | Package | Source of truth | Current |
 | --- | --- | --- |
-| OpenConfig | `versions.json` → `opencode_configs` | `1.5.40` |
-| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.11+` |
+| OpenConfig | `versions.json` → `opencode_configs` | `1.5.60` |
+| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.17+` |
 | OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.4` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
 
@@ -154,8 +154,8 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | oracle | GPT-5.6 Sol (subscription gateway) | Critique / adjudication |
 | librarian | DeepSeek Flash 0731 Nitro | Docs (Context7-first) |
 | explore | DeepSeek Flash 0731 Nitro | Codebase map |
-| multimodal-looker | Claude Sonnet 5 | Vision (`look_at`) |
-| metis | Claude Sonnet 5 | Pre-planning critic |
+| multimodal-looker | Gemini 3.1 Pro | Vision (`look_at`) |
+| metis | Gemini 3.1 Pro | Pre-planning critic |
 | momus | GPT-5.6 Sol (subscription gateway) | Plan / review gate |
 | sisyphus-junior | DeepSeek Flash 0731 Nitro | Cheap delegated work |
 
@@ -192,7 +192,7 @@ OpenCode TUI sessions continue to use `sisyphus`.
 
 | Say | Effect |
 | --- | --- |
-| `ultrawork` / `ulw` | Claude Opus 5 max ceiling |
+| `ultrawork` / `ulw` | GLM 5.3 max inside Sisyphus |
 | `team` | Team-mode expansion |
 | `hyperplan` / `hpp` / `/hyperplan` | Adversarial planning (from **sisyphus**) |
 | `/goal` | **Disabled** — OmO 4.19 goal hook breaks `/start-work`. Use `/start-work` → Atlas (`prompts/goal.md`) |
@@ -225,16 +225,16 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 | Lane | Models | Used for |
 | --- | --- | --- |
-| Orchestration | `z-ai/glm-5.2:exacto` | Sisyphus / Atlas / Prometheus / bug-hunt |
+| Orchestration | `z-ai/glm-5.3` | Sisyphus / Atlas / Prometheus / bug-hunt |
 | GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
 | Recon | `deepseek/deepseek-v4-flash-0731:nitro` | explore / librarian / sisyphus-junior / quick |
-| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → Kimi K3 / GPT review fallback | content-aware |
-| Agentic escalation | `moonshotai/kimi-k3` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
-| Multimodal | Claude Sonnet 5 → Gemini Flash / Kimi K3 fallback | multimodal-looker |
-| Visual / writing | Gemini 3.1 Pro · 3.6 Flash Nitro | artistry / visual / writing |
-| Ceiling | `anthropic/claude-opus-5` | ultrawork · unspecified-high |
+| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → Hermes / GLM / Qwen fallback | content-aware |
+| Agentic escalation | `moonshotai/kimi-k2.7-code` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
+| Multimodal | Gemini 3.1 Pro → Gemini 3.7 Flash / Qwen / Kimi K2.7 fallback | multimodal-looker |
+| Visual / writing | Gemini 3.1 Pro · 3.7 Flash | artistry / visual / writing |
+| Ceiling | `subscription-gateway/gpt-5.6-sol` / GLM 5.3 ultrawork | deep · ultrabrain · ultrawork |
 
-OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Claude, Gemini, Kimi, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
+OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Qwen, Laguna, Hermes, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
 package cache so transient primary-provider glitches retry the same primary
@@ -248,11 +248,11 @@ falls back to GLM. Quota, missing-key, model-not-found, abort, and
 context-overflow failures skip same-model retries. Reapply/verify the patch
 with `oc plugin --fix`; `oc doctor` reports whether it is present.
 
-Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to DeepSeek V4 Flash 0731 primary with GLM 5.2 Exacto fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. Thus `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, Claude/Opus, Kimi, Minimax, or subscription-gateway.
+Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to DeepSeek V4 Flash 0731 primary with GLM 5.3 fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. Thus `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, GPT/subscription-gateway, Kimi, Qwen, Laguna, Hermes, or MiniMax.
 
 ### Bounded model-routing eval
 
-`oc eval` prints a zero-cost DeepSeek/Kimi/Sonnet comparison plan. `oc eval --execute` runs three evidence-only cases with a default **$1 per-run cap**, a cumulative **$20 campaign cap**, and a **$2 account reserve**. Results and the conservative campaign ledger live under `~/.cache/openconfig/evals/model-routing/`; see `evals/model-routing/README.md` for the staged promotion gate. Kimi remains an explicit escalation lane until the canary demonstrates a measurable quality gain.
+`oc eval` prints a zero-cost DeepSeek/Kimi/GLM comparison plan. `oc eval --execute` runs three evidence-only cases with a default **$1 per-run cap**, a cumulative **$20 campaign cap**, and a **$2 account reserve**. Results and the conservative campaign ledger live under `~/.cache/openconfig/evals/model-routing/`; see `evals/model-routing/README.md` for the staged promotion gate. Kimi remains an explicit escalation lane until the canary demonstrates a measurable quality gain.
 
 ### Concurrency
 

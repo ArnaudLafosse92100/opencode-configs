@@ -15,7 +15,7 @@
 #   validate|verify [--quiet]             Config validator + footgun detector
 #   signature [--refresh|--json]          Project identity verify / refresh
 #   locate [--json|--search]              Discover paths (read-only)
-#   test [smoke|idempotency]              Self-test suite
+#   test [smoke|idempotency|runtime]      Self-test suite
 #   fix [--dry-run|--set k=v]             Auto-repair configs
 #   cleanup [--dry-run|--yes]             Reconcile to known-good state
 #   maintain [--check|--clean|--plans]    Clean sessions, caches, logs
@@ -24,6 +24,7 @@
 #   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
 #   plugin [doctor|cache]                 OmO pin cache + OpenConfig patch health
+#   deploy [--dry-run|--force]            Guarded production config deployment
 #   run "<msg>" [-a agent] [-d dir]       Headless runner (run to completion)
 #   admin [status|health|ratelimit|...]   OpenRouter account admin
 #   launch [dir]                          Launch OpenCode (terminal-safe)
@@ -88,7 +89,7 @@ ${c_bold}Install & self-heal (start here):${c_0}
   ${c_g}heal${c_0}      [--ai|--no-ai]                 Unattended self-repair (AI when needed)
   ${c_g}locate${c_0}    [--json|--search]             Where is everything? (read-only)
   ${c_g}signature${c_0} [--refresh|--json]           Prove this is the OpenConfig repo
-  ${c_g}test${c_0}      [smoke|idempotency]           Self-test suite (safe)
+  ${c_g}test${c_0}      [smoke|idempotency|runtime]   Self-test suite (safe)
 
 ${c_bold}Setup & Health:${c_0}
   ${c_g}setup${c_0}     [--check|--force|--sync-env]   Idempotent provision (teams, LSP, projects)
@@ -111,6 +112,7 @@ ${c_bold}Models & Admin:${c_0}
                                          Package pins vs npm + GitHub (+ other repos)
   ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO pin cache + OpenConfig patch health
   ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + subscription gateway admin
+  ${c_g}deploy${c_0}    [--dry-run|--force]           Guarded production config deployment
 
 ${c_bold}Run & Launch:${c_0}
   ${c_g}run${c_0}       "<msg>" [-a agent] [-d dir]    Headless runner (run to completion)
@@ -151,6 +153,7 @@ ${c_bold}Examples:${c_0}
   oc signature                   Verify project identity fingerprint
   oc signature --refresh         Recompute fingerprint after intentional edits
   oc test                        Smoke + idempotency self-tests
+  oc test runtime                Runtime/profile diagnostics
   oc doctor                       Full health (OpenRouter latency, prompts, keys, skills, …)
   oc doctor --quick --json        Machine-readable readiness summary
   oc doctor --fix                 Repair configs + re-check
@@ -1124,20 +1127,21 @@ HEALHELP
   exit "$rc"
 }
 
-# ── Test suite (smoke + idempotency) ──
+# ── Test suite (smoke + idempotency + runtime) ──
 do_test() {
   local which="all"
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      smoke|idempotency|idempotent) which="$1"; shift ;;
+      smoke|idempotency|idempotent|runtime) which="$1"; shift ;;
       -h|--help)
         cat <<'TESTHELP'
 oc test — Verify OpenConfig can check itself
 
 Usage:
-  oc test                 smoke + idempotency
+  oc test                 smoke + idempotency + runtime diagnostics
   oc test smoke           validate, locate, dry-runs, setup --check
   oc test idempotency     sandbox: .env/symlink never-clobber + fix no-op
+  oc test runtime         runtime/profile diagnostics
 
 Safe: smoke is read-mostly; idempotency uses mktemp (never overwrites live .env).
 TESTHELP
@@ -1153,9 +1157,11 @@ TESTHELP
     all)
       "$REPO/tests/smoke.sh" || rc=1
       "$REPO/tests/idempotency.sh" || rc=1
+      "$REPO/tests/runtime-diagnostics.sh" || rc=1
       ;;
     smoke) "$REPO/tests/smoke.sh" || rc=1 ;;
     idempotency|idempotent) "$REPO/tests/idempotency.sh" || rc=1 ;;
+    runtime) "$REPO/tests/runtime-diagnostics.sh" || rc=1 ;;
   esac
   exit "$rc"
 }
@@ -1186,6 +1192,7 @@ case "$cmd" in
   locate|where|discover) dispatch locate.sh "$@" ;;
   signature|sig) dispatch signature.sh "$@" ;;
   profile) dispatch runtime-profile.sh "$@" ;;
+  deploy) dispatch deploy-guard.sh "$@" ;;
 
   admin)
     # Default to 'status' if no subcommand given

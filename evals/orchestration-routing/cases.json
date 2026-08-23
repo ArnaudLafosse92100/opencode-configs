@@ -18,7 +18,7 @@
       "expected_category": "content-aware-fast",
       "expected_skill": "content-aware-recon",
       "expected_provider": "openrouter",
-      "expected_model": "z-ai/glm-5.2-exacto",
+      "expected_model": "z-ai/glm-5.3",
       "max_children": 2
     },
     {
@@ -28,7 +28,7 @@
       "expected_category": "content-aware-deep",
       "expected_skill": "content-aware-audit",
       "expected_provider": "openrouter",
-      "expected_model": "z-ai/glm-5.2-exacto",
+      "expected_model": "z-ai/glm-5.3",
       "max_children": 2
     },
     {
@@ -38,7 +38,7 @@
       "expected_category": "content-aware-deep",
       "expected_skill": "content-aware-audit",
       "expected_provider": "openrouter",
-      "expected_model": "z-ai/glm-5.2-exacto",
+      "expected_model": "z-ai/glm-5.3",
       "max_children": 2
     },
     {

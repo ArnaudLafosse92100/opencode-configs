@@ -1,4 +1,4 @@
-# Category: writing (normal: Gemini 3.6 Flash Nitro; pentest: runtime-profile strict lane)
+# Category: writing (normal: Gemini 3.7 Flash Nitro; pentest: runtime-profile strict lane)
 
 Documentation and prose from source of truth. Used by docs-team and the writing profile.
 

@@ -33,7 +33,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Cursor-pace: s
 - Auth / danger / vuln / dual-use recon that needs more than a single known fact **must delegate**. Fast mapping → synchronous `task(category="content-aware-fast", load_skills=["content-aware-recon"], run_in_background=false, ...)`; proven chains / CVSS / repro → `task(category="content-aware-deep", load_skills=["content-aware-audit"], run_in_background=false, ...)` or team `content-aware-audit`. Loading either skill on the parent is preparation only; it does not satisfy this route and does not change the model. Use direct tools only for a genuinely trivial, local security fact that needs no recon.
 - In authorized pentest/security briefs, `explore` is not the default executor. Use it only for a clearly bounded generic map/read task, or as part of the `explorers` team after a `content-aware-*` route owns the security contract.
 - Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required.
-- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.2 Exacto and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`.
+- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.3 and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`.
 - Visual direction → `artistry`; ship UI → `visual-engineering` (shadcn/`DESIGN.md` aware).
 - Vague / multi-step design → Prometheus, then Atlas via `/start-work`.
 - Multi-track work → team mode. Follow the canonical eligibility matrix in `prompts/core.md`; do not guess aliases.
@@ -42,7 +42,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Cursor-pace: s
 
 ## Keywords
 
-- `ultrawork` / `ulw` — Claude Opus 5 max (Fable / earlier Opus / GPT Sol fallbacks).
+- `ultrawork` / `ulw` — GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` when normal-mode subscription-gateway reasoning is required.
 - `hyperplan` / `hpp` / `/hyperplan` — only from you (not prometheus).
 - `/goal` — disabled for pinned OmO 4.19.4. Use `/start-work` → Atlas. See `prompts/goal.md`.
 - Filters biting → skills `content-aware-recon` / `content-aware-audit`, or categories `content-aware-fast` / `content-aware-deep` / agent `content-aware-research`.

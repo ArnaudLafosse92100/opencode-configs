@@ -50,7 +50,7 @@ drift=0
 sec "Required files"
 REQUIRED=(
   opencode.json oh-my-openagent.json tui.json tmux.conf ghostty.conf zshrc.snippet bunfig.toml README.md AGENTS.md CHANGELOG.md .env.example .gitignore projects.json versions.json signature.json
-  validate.sh doctor.sh cleanup.sh fix.sh models.sh versions.sh diagnose.sh setup.sh install.sh maintain.sh eval-models.sh
+  validate.sh doctor.sh cleanup.sh fix.sh models.sh versions.sh diagnose.sh setup.sh install.sh maintain.sh
 # Add locate.sh to required list
   opencode.sh run.sh openrouter-admin.sh oc locate.sh signature.sh
   lib/common.sh
@@ -62,16 +62,13 @@ REQUIRED=(
   prompts/categories/content-aware-fast.md prompts/categories/content-aware-deep.md prompts/categories/bug-hunt.md
   prompts/categories/refactor-safe.md prompts/categories/arch-review.md
   prompts/categories/visual-engineering.md prompts/categories/ultrabrain.md prompts/categories/deep.md
-  prompts/categories/agentic-deep-kimi.md
   prompts/categories/artistry.md prompts/categories/quick.md prompts/categories/unspecified-low.md
   prompts/categories/unspecified-high.md prompts/categories/writing.md
   prompts/profiles/high.md prompts/profiles/low.md prompts/profiles/fast.md prompts/profiles/research.md
   prompts/profiles/debug.md prompts/profiles/writing.md prompts/profiles/content-aware.md
   profiles/high.json profiles/low.json profiles/research.json profiles/writing.json profiles/content-aware.json profiles/debug.json profiles/fast.json
   teams/explorers/config.json teams/review-panel/config.json teams/content-aware-audit/config.json teams/ship-feature/config.json teams/debug-team/config.json teams/docs-team/config.json teams/refactor-team/config.json
-  tests/test_model_routing_eval.py
   skills/.gitkeep
-  evals/model-routing/run.py evals/model-routing/cases.json evals/model-routing/README.md
 )
 missing=0
 for f in "${REQUIRED[@]}"; do
@@ -115,12 +112,16 @@ PIN="$(python3 -c "import json;p=[x for x in json.load(open('$REPO/opencode.json
 PIN_VER="${PIN##*@}"
 if [[ -z "$PIN" ]]; then
   bad "no oh-my-openagent plugin pinned in opencode.json"; drift=$((drift+1))
-elif command -v bunx >/dev/null 2>&1; then
-  loaded="$(bunx "oh-my-openagent@${PIN_VER:-latest}" doctor 2>/dev/null | grep -oE 'oh-my-openagent [0-9.]+' | grep -oE '[0-9.]+' | head -1)"
-  if [[ "$loaded" == "$PIN_VER" ]]; then ok "pinned $PIN loads v$loaded"
-  else warn "pinned $PIN but doctor loaded v${loaded:-unknown} (cache prune below will fix)"; fi
 else
-  warn "bun missing — cannot verify plugin load"
+  # NOTE: we check the plugin cache version statically, NOT via `bunx doctor`.
+  # Running the OmO CLI triggers its config-migration, which treats the repo's
+  # canonical oh-my-openagent.json as a legacy source and moves it into a backup,
+  # regenerating a broken ~/.omo/omo.jsonc. Static cache check avoids that.
+  cdir="$(oc_omo_plugin_cache_dir "$PIN" 2>/dev/null || true)"
+  cache_ver="$(python3 -c "import json;print(json.load(open('$cdir/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
+  if [[ -n "$cache_ver" && "$cache_ver" == "$PIN_VER" ]]; then ok "pinned $PIN cache v$cache_ver"
+  elif [[ -n "$cache_ver" ]]; then warn "pinned $PIN but cache v$cache_ver (cache prune below will fix)"
+  else warn "plugin cache not built yet for $PIN (oc setup will install)"; fi
 fi
 
 # ─── 4. Prune stale plugin caches ────────────────────────────────────

@@ -1,6 +1,6 @@
-# Category: unspecified-high (Claude Opus 5 max)
+# Category: unspecified-high (GLM 5.3 / subscription-gateway escalation)
 
-High-effort general work and hyperplan expensive critic. Fable / earlier Opus / GPT Sol are fallbacks if Opus 5 fails.
+High-effort general work and hyperplan expensive critic. Use GLM 5.3 plus the normal-profile subscription gateway deep lanes when stronger reasoning is genuinely required.
 
 ## Do
 

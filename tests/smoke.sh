@@ -135,10 +135,10 @@ ok=(bt.get("defaultConcurrency")==6
     and pc.get("openrouter")==8
     and pc.get("subscription-gateway")==4
     and pc.get("anthropic")==2
-    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==6
-    and mc.get("openrouter/z-ai/glm-5.2-exacto")==5
-    and mc.get("openrouter/moonshotai/kimi-k3")==2
-    and mc.get("openrouter/anthropic/claude-opus-5")==1)
+    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==10
+    and mc.get("openrouter/z-ai/glm-5.3")==8
+    and mc.get("openrouter/moonshotai/kimi-k2.7-code")==5
+    and mc.get("openrouter/nousresearch/hermes-4-405b")==2)
 sys.exit(0 if ok else 1)
 ' "$REPO/oh-my-openagent.json"; then
   ok "mixed-provider concurrency pins"

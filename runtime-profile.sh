@@ -117,84 +117,28 @@ opencode = json.loads(opencode_path.read_text(encoding="utf-8"))
 agents = omo.setdefault("agents", {})
 categories = omo.setdefault("categories", {})
 
-glm = "openrouter/z-ai/glm-5.2-exacto"
-deepseek = "openrouter/deepseek/deepseek-v4-flash-0731"
+if not profile_path.is_file():
+    raise SystemExit(f"missing runtime profile source: {profile_path}")
+profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
+normal = profile_data.get("normal")
+pentest = profile_data.get("pentest")
+if not isinstance(normal, dict) or not isinstance(pentest, dict):
+    raise SystemExit(f"invalid runtime profile source: {profile_path}")
+for profile_name, profile in (("normal", normal), ("pentest", pentest)):
+    for section_name in ("agents", "categories"):
+        if not isinstance(profile.get(section_name), dict):
+            raise SystemExit(f"invalid {profile_name}.{section_name} in {profile_path}")
 
-normal = {
-    "agents": {
-        "codex-router": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3"]},
-        "sisyphus": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5"]},
-        "hephaestus": {"model": "subscription-gateway/gpt-5.6-terra", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", glm]},
-        "prometheus": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8"]},
-        "atlas": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", deepseek, "openrouter/minimax/minimax-m3", "openrouter/anthropic/claude-sonnet-5"]},
-        "oracle": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/anthropic/claude-sonnet-5", glm]},
-        "librarian": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
-        "explore": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
-        "multimodal-looker": {"model": "openrouter/anthropic/claude-sonnet-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/moonshotai/kimi-k3"]},
-        "metis": {"model": "openrouter/anthropic/claude-sonnet-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", glm]},
-        "momus": {"model": "subscription-gateway/gpt-5.6-sol-review", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7"]},
-        "sisyphus-junior": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3", glm]},
-        "content-aware-research": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/moonshotai/kimi-k3", glm, "openrouter/minimax/minimax-m3"]},
-    },
-    "categories": {
-        "visual-engineering": {"model": "openrouter/google/gemini-3.1-pro-preview", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/anthropic/claude-sonnet-5", glm]},
-        "ultrabrain": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/anthropic/claude-opus-5", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", "openrouter/moonshotai/kimi-k3"]},
-        "deep": {"model": "subscription-gateway/gpt-5.6-sol", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", glm]},
-        "agentic-deep-kimi": {"model": "openrouter/moonshotai/kimi-k3", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", glm, deepseek]},
-        "artistry": {"model": "openrouter/google/gemini-3.1-pro-preview", "fallback_models": ["subscription-gateway/gpt-5.6-sol-review", "openrouter/google/gemini-3.6-flash", "openrouter/google/gemini-3.5-flash", "openrouter/anthropic/claude-sonnet-5"]},
-        "quick": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/minimax/minimax-m3", glm]},
-        "unspecified-low": {"model": deepseek, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/minimax/minimax-m3", glm]},
-        "unspecified-high": {"model": "openrouter/anthropic/claude-opus-5", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/anthropic/claude-fable-5", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", glm]},
-        "writing": {"model": "openrouter/google/gemini-3.6-flash", "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/google/gemini-3.5-flash", "openrouter/google/gemini-3-flash-preview", deepseek]},
-        "bug-hunt": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3"]},
-        "refactor-safe": {"model": glm, "fallback_models": ["subscription-gateway/gpt-5.6-terra", "openrouter/moonshotai/kimi-k3", "openrouter/minimax/minimax-m3"]},
-        "arch-review": {"model": "subscription-gateway/gpt-5.6-sol-review", "fallback_models": ["subscription-gateway/gpt-5.6-sol", "subscription-gateway/gpt-5.6-terra", "openrouter/anthropic/claude-opus-4.8-fast", "openrouter/anthropic/claude-opus-4.8", "openrouter/anthropic/claude-opus-4.7", "openrouter/moonshotai/kimi-k3"]},
-        "content-aware-fast": {"model": deepseek, "fallback_models": ["openrouter/minimax/minimax-m3", glm, "subscription-gateway/gpt-5.6-terra"]},
-        "content-aware-deep": {"model": deepseek, "fallback_models": ["openrouter/moonshotai/kimi-k3", glm, "subscription-gateway/gpt-5.6-sol-review"]},
-    },
-}
+selected = {"normal": normal, "pentest": pentest}[mode]
+small_model = selected.get("small_model") or selected["categories"].get("quick", {}).get("model") or selected["agents"]["codex-router"]["model"]
+helper_model = selected.get("helper_model") or small_model
 
-pentest = {
-    "agents": {
-        "codex-router": {"model": deepseek, "fallback_models": [glm]},
-        "sisyphus": {"model": deepseek, "fallback_models": [glm]},
-        "hephaestus": {"model": deepseek, "fallback_models": [glm]},
-        "prometheus": {"model": deepseek, "fallback_models": [glm]},
-        "atlas": {"model": deepseek, "fallback_models": [glm]},
-        "oracle": {"model": deepseek, "fallback_models": [glm]},
-        "librarian": {"model": deepseek, "fallback_models": [glm]},
-        "explore": {"model": deepseek, "fallback_models": [glm]},
-        "multimodal-looker": {"model": deepseek, "fallback_models": [glm]},
-        "metis": {"model": deepseek, "fallback_models": [glm]},
-        "momus": {"model": deepseek, "fallback_models": [glm]},
-        "sisyphus-junior": {"model": deepseek, "fallback_models": [glm]},
-        "content-aware-research": {"model": deepseek, "fallback_models": [glm]},
-    },
-    "categories": {
-        "visual-engineering": {"model": deepseek, "fallback_models": [glm]},
-        "ultrabrain": {"model": glm, "fallback_models": [deepseek]},
-        "deep": {"model": deepseek, "fallback_models": [glm]},
-        "agentic-deep-kimi": {"model": deepseek, "fallback_models": [glm]},
-        "artistry": {"model": deepseek, "fallback_models": [glm]},
-        "quick": {"model": deepseek, "fallback_models": [glm]},
-        "unspecified-low": {"model": deepseek, "fallback_models": [glm]},
-        "unspecified-high": {"model": deepseek, "fallback_models": [glm]},
-        "writing": {"model": deepseek, "fallback_models": [glm]},
-        "bug-hunt": {"model": deepseek, "fallback_models": [glm]},
-        "refactor-safe": {"model": deepseek, "fallback_models": [glm]},
-        "arch-review": {"model": deepseek, "fallback_models": [glm]},
-        "content-aware-fast": {"model": deepseek, "fallback_models": [glm]},
-        "content-aware-deep": {"model": deepseek, "fallback_models": [glm]},
-    },
-}
-
-selected = pentest if mode == "pentest" else normal
 opencode["model"] = selected["agents"]["codex-router"]["model"]
-opencode["small_model"] = deepseek
+opencode["small_model"] = small_model
 for helper_name in ("title", "summary", "compaction"):
     helper = opencode.setdefault("agent", {}).setdefault(helper_name, {})
     if isinstance(helper, dict):
-        helper["model"] = deepseek
+        helper["model"] = helper_model
 opencode_path.write_text(json.dumps(opencode, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 for section_name, target in (("agents", agents), ("categories", categories)):
@@ -237,22 +181,11 @@ if native_omo_path.is_file():
     native_omo = parse_jsonc(native_text)
     if not isinstance(native_omo, dict):
         raise SystemExit(f"invalid native OmO config root: {native_omo_path}")
-    native_config = native_omo.get("[opencode]", native_omo)
-    if not isinstance(native_config, dict):
-        raise SystemExit(f"invalid [opencode] wrapper: {native_omo_path}")
-    runtime_fallback = omo.get("runtime_fallback")
-    if isinstance(runtime_fallback, dict):
-        native_config["runtime_fallback"] = runtime_fallback
-    for section_name in ("agents", "categories"):
-        native_section = native_config.setdefault(section_name, {})
-        if not isinstance(native_section, dict):
-            raise SystemExit(f"invalid {section_name} section: {native_omo_path}")
-        for name, patch in selected[section_name].items():
-            native_entry = native_section.setdefault(name, {})
-            if not isinstance(native_entry, dict):
-                raise SystemExit(f"invalid {section_name[:-1]} entry {name}: {native_omo_path}")
-            native_entry["model"] = patch["model"]
-            native_entry["fallback_models"] = patch["fallback_models"]
+    mirrored_config = json.loads(json.dumps(omo))
+    if "[opencode]" in native_omo:
+        native_omo["[opencode]"] = mirrored_config
+    else:
+        native_omo = mirrored_config
     object_start = native_text.find("{")
     prefix = native_text[:object_start] if object_start >= 0 else ""
     updated_native_text = prefix + json.dumps(native_omo, indent=2, ensure_ascii=False) + "\n"
@@ -261,7 +194,7 @@ if native_omo_path.is_file():
 
 prompt = prompt_path.read_text(encoding="utf-8")
 normal_line = "- Runtime profile `normal`: security/pentest work should still prefer `content-aware-*`, but normal model breadth remains available for non-security work."
-pentest_line = "- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.2 Exacto and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
+pentest_line = "- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.3 and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
 lines = [line for line in prompt.splitlines() if not line.startswith("- Runtime profile `normal`:") and not line.startswith("- Runtime profile `pentest`:") and not line.startswith("- Authorized pentest/security briefs must not use `ultrawork`")]
 needle = "- Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required."
 insert = pentest_line if mode == "pentest" else normal_line
@@ -273,12 +206,12 @@ else:
     lines.append(insert)
 prompt_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
-profile_path.write_text(json.dumps({
-    "schema_version": 2,
-    "active": mode,
-    "normal": normal,
-    "pentest": pentest,
-}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+profile_output = dict(profile_data)
+profile_output["schema_version"] = 2
+profile_output["active"] = mode
+profile_output["normal"] = normal
+profile_output["pentest"] = pentest
+profile_path.write_text(json.dumps(profile_output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PY
 
 "$REPO/signature.sh" --refresh >/dev/null
@@ -301,8 +234,15 @@ if command -v lsof >/dev/null 2>&1; then
     fi
   done < <(lsof -tiTCP:4097 -sTCP:LISTEN 2>/dev/null || true)
 fi
-if launchctl list | grep -q "com.arnaud.opencode-codex-bridge"; then
-  if launchctl kickstart -k "gui/$(id -u)/com.arnaud.opencode-codex-bridge" 2>/dev/null; then
+bridge_label="com.arnaud.opencode-codex-bridge"
+bridge_domain="gui/$(id -u)"
+bridge_target="$bridge_domain/$bridge_label"
+bridge_plist="$HOME/Library/LaunchAgents/$bridge_label.plist"
+if launchctl print "$bridge_target" >/dev/null 2>&1 || launchctl list | grep -q "$bridge_label" || [[ -f "$bridge_plist" ]]; then
+  if ! launchctl print "$bridge_target" >/dev/null 2>&1 && [[ -f "$bridge_plist" ]]; then
+    launchctl bootstrap "$bridge_domain" "$bridge_plist" 2>/dev/null || true
+  fi
+  if launchctl kickstart -k "$bridge_target" 2>/dev/null; then
     ready=0
     password_file="${OPENCODE_SERVER_PASSWORD_FILE:-${OPENCODE_BRIDGE_STATE_DIR:-$HOME/.local/state/opencode-codex-bridge}/opencode-server-password}"
     oc_curl() {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # signature.sh — Verify / refresh OpenConfig project identity.
 #
-# Proves this tree is openconfig/opencode-configs (OpenConfig / oc), not a
+# Proves this tree is jesseoue/opencode-configs (OpenConfig / oc), not a
 # random OpenCode config clone. Markers check branding; fingerprint hashes
 # a stable file list in signature.json.
 #
@@ -49,7 +49,7 @@ if [[ $REFRESH -eq 1 ]]; then
   else
     printf "  ${c_g}✓${c_0} signature refreshed\n"
     printf "  ${c_dim}fingerprint: %s${c_0}\n" "$fp"
-    printf "  ${c_dim}id: openconfig/opencode-configs · product OpenConfig · cli oc${c_0}\n\n"
+    printf "  ${c_dim}id: jesseoue/opencode-configs · product OpenConfig · cli oc${c_0}\n\n"
   fi
   # Verify after write (fingerprint file itself is not hashed)
   out="$(oc_verify_signature "$REPO")" || {

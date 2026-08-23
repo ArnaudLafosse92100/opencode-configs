@@ -179,7 +179,7 @@ for mid in sorted(models.keys()):
     echo -e "${c_b}── Rate Limit Headers ──${c_0}"
     curl -sI -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"model":"z-ai/glm-5.2","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+      -d '{"model":"z-ai/glm-5.3","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
       "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null \
       | grep -i "x-ratelimit\|retry-after" \
       | while read -r line; do
@@ -226,7 +226,7 @@ for name, spec in sorted(expected.items()):
     echo ""
     headers=$(curl -sI -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"model":"z-ai/glm-5.2","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+      -d '{"model":"z-ai/glm-5.3","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
       "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null)
     if echo "$headers" | grep -qi "429"; then
       bad "RATE LIMITED (HTTP 429)"
