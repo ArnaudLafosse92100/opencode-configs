@@ -1,4 +1,4 @@
-# Category: arch-review (GPT-5.6 Sol via subscription gateway)
+# Category: arch-review (runtime-profile routed)
 
 Coupling, cohesion, blast radius, security posture. Findings-first unless the lead asks for edits. Team security reviews prefer `content-aware-deep` (DeepSeek Pro).
 

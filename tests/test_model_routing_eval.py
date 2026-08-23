@@ -81,26 +81,16 @@ class ContentAwareFallbackTests(unittest.TestCase):
         return selected
 
     def test_fast_security_fallback_matches_runtime_profile(self) -> None:
-        expected_model = "openrouter/z-ai/glm-5.2-exacto" if self.profile == "pentest" else "openrouter/deepseek/deepseek-v4-flash-0731"
-        expected_fallbacks = (
-            ["openrouter/deepseek/deepseek-v4-flash-0731"]
-            if self.profile == "pentest"
-            else ["openrouter/minimax/minimax-m3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-terra"]
-        )
-        self.assertEqual(self.config["categories"]["content-aware-fast"]["model"], expected_model)
-        fallbacks = self.config["categories"]["content-aware-fast"]["fallback_models"]
-        self.assertEqual(fallbacks, expected_fallbacks)
+        expected = self._selected_profile()["categories"]["content-aware-fast"]
+        actual = self.config["categories"]["content-aware-fast"]
+        self.assertEqual(actual["model"], expected["model"])
+        self.assertEqual(actual["fallback_models"], expected["fallback_models"])
 
     def test_deep_security_fallback_matches_runtime_profile(self) -> None:
-        expected_model = "openrouter/z-ai/glm-5.2-exacto" if self.profile == "pentest" else "openrouter/deepseek/deepseek-v4-flash-0731"
-        expected_fallbacks = (
-            ["openrouter/deepseek/deepseek-v4-flash-0731"]
-            if self.profile == "pentest"
-            else ["openrouter/moonshotai/kimi-k3", "openrouter/z-ai/glm-5.2-exacto", "subscription-gateway/gpt-5.6-sol-review"]
-        )
-        self.assertEqual(self.config["categories"]["content-aware-deep"]["model"], expected_model)
-        fallbacks = self.config["categories"]["content-aware-deep"]["fallback_models"]
-        self.assertEqual(fallbacks, expected_fallbacks)
+        expected = self._selected_profile()["categories"]["content-aware-deep"]
+        actual = self.config["categories"]["content-aware-deep"]
+        self.assertEqual(actual["model"], expected["model"])
+        self.assertEqual(actual["fallback_models"], expected["fallback_models"])
 
     def test_runtime_profile_routes_match_effective_config(self) -> None:
         selected = self._selected_profile()

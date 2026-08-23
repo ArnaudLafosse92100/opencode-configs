@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "docs-team",
-  "description": "Parallel docs via writing category (Gemini Nitro). Lead merges.",
+  "description": "Parallel docs via runtime-profile-routed writing category. Lead merges.",
   "lead": {
     "kind": "subagent_type",
     "subagent_type": "sisyphus"

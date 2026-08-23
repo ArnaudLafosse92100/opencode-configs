@@ -17,8 +17,8 @@ source ~/.zshrc && oc doctor && oc launch
 | | |
 | --- | --- |
 | **Pins** | OpenConfig `1.5.40` · OpenCode `1.18.11+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.11` |
-| **Default lead** | `sisyphus` (GLM Exacto) |
-| **Codex model-picker entry** | `codex-router` (GLM Exacto, task-only workspace access) |
+| **Default lead** | `sisyphus` (runtime-profile routed; normal GLM Exacto, pentest DeepSeek) |
+| **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
 | **Config path** | `~/.config/opencode` → this repo (symlink) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
 | **Health** | `oc doctor` · `oc versions` · `oc test` |
@@ -140,11 +140,11 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 
 | Agent | Model | Role |
 | --- | --- | --- |
-| **codex-router** | GLM 5.2 Exacto | Strict Codex bridge entry; delegates workspace actions to OmO categories |
-| **sisyphus** | GLM 5.2 Exacto | Default orchestrator / lead |
-| **hephaestus** | GPT-5.6 Terra (subscription gateway) | Implementation |
-| **prometheus** | GLM 5.2 Exacto | Planner |
-| **atlas** | GLM 5.2 Exacto | Plan executor after `/start-work` |
+| **codex-router** | Runtime-profile routed | Strict Codex bridge entry; delegates workspace actions to OmO categories |
+| **sisyphus** | Runtime-profile routed | Default orchestrator / lead |
+| **hephaestus** | Runtime-profile routed | Implementation |
+| **prometheus** | Runtime-profile routed | Planner |
+| **atlas** | Runtime-profile routed | Plan executor after `/start-work` |
 | **content-aware-research** | DeepSeek V4 Flash 0731 | Full-depth research (edit denied) |
 
 ### Subagents (`task` / `call_omo_agent` — not team members)
@@ -173,18 +173,18 @@ OpenCode TUI sessions continue to use `sisyphus`.
 
 | Category | Model | Use |
 | --- | --- | --- |
-| `bug-hunt` | GLM Exacto | Reproduce → root cause → fix |
-| `refactor-safe` | GLM Exacto | Behavior-preserving refactors |
-| `arch-review` | GPT-5.6 Sol (subscription gateway) | Coupling / blast radius |
+| `bug-hunt` | Runtime-profile routed | Reproduce → root cause → fix |
+| `refactor-safe` | Runtime-profile routed | Behavior-preserving refactors |
+| `arch-review` | Runtime-profile routed | Coupling / blast radius |
 | `content-aware-fast` | DeepSeek Flash 0731 Nitro | Attack-surface recon |
 | `content-aware-deep` | DeepSeek Flash 0731 → Kimi / GPT review | Deep vuln research |
-| `agentic-deep-kimi` | Kimi K3 | Explicit long-horizon escalation after evaluation |
-| `writing` | Gemini 3.6 Flash Nitro | Docs / prose |
-| `visual-engineering` | Gemini 3.1 Pro | Ship UI |
-| `artistry` | Gemini 3.1 Pro | Design direction |
+| `agentic-deep-kimi` | Runtime-profile routed | Explicit long-horizon escalation after evaluation |
+| `writing` | Runtime-profile routed | Docs / prose |
+| `visual-engineering` | Runtime-profile routed | Ship UI |
+| `artistry` | Runtime-profile routed | Design direction |
 | `quick` | DeepSeek Flash 0731 Nitro | Cheap fast tasks |
-| `deep` / `ultrabrain` | GPT-5.6 Sol (subscription gateway) | Heavy / max reasoning |
-| `unspecified-low` / `unspecified-high` | Flash / Claude Opus 5 | Hyperplan critics |
+| `deep` / `ultrabrain` | Runtime-profile routed | Heavy / max reasoning |
+| `unspecified-low` / `unspecified-high` | Runtime-profile routed | Hyperplan critics |
 
 ---
 
@@ -236,7 +236,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
 
-Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to GLM 5.2 Exacto or DeepSeek V4 Flash 0731 only, so `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, Claude/Opus, Kimi, Minimax, or subscription-gateway.
+Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to DeepSeek V4 Flash 0731 primary with GLM 5.2 Exacto fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. Thus `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, Claude/Opus, Kimi, Minimax, or subscription-gateway.
 
 ### Bounded model-routing eval
 

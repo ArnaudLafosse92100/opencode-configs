@@ -31,7 +31,7 @@ and guarded cost. Prompt/response bodies and credentials are never persisted.
 | `trivial-direct` | `codex-router` only; no child session for a tool-free answer |
 | `security-recon` | `task(category="content-aware-fast")`, embedded or explicit `content-aware-recon` contract, DeepSeek child, terminal `stop` |
 | `security-deep` | `task(category="content-aware-deep")`, embedded or explicit `content-aware-audit` contract, DeepSeek child, terminal `stop` |
-| `architecture-review` | `task(category="arch-review")`, subscription-gateway Sol review child, terminal `stop` |
+| `architecture-review` | `task(category="arch-review")`, active runtime-profile child, terminal `stop` |
 
 The content-aware category prompt is the mandatory specialization contract and
 travels with the category-selected model. `load_skills` is recorded as a useful

@@ -1,4 +1,4 @@
-# Category: refactor-safe (GLM Exacto)
+# Category: refactor-safe (runtime-profile routed)
 
 Tests-first, behavior-preserving. Small steps only.
 

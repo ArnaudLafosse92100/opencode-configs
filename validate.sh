@@ -950,10 +950,11 @@ else:
 # ---- 4c1b. Kimi must remain an explicit, evaluated escalation lane ----
 cats = omo.get("categories") or {}
 kimi_lane = cats.get("agentic-deep-kimi")
+pentest_safe_prefixes = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
 if not isinstance(kimi_lane, dict):
     err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
-elif runtime_profile == "pentest" and kimi_lane.get("model") == "openrouter/z-ai/glm-5.2-exacto":
-    ok("agentic-deep-kimi is disabled by pentest strict GLM/DeepSeek overlay")
+elif runtime_profile == "pentest" and str(kimi_lane.get("model") or "").startswith(pentest_safe_prefixes):
+    ok("agentic-deep-kimi is overridden by pentest strict GLM/DeepSeek overlay")
 elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k3":
     err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k3")
 elif runtime_profile != "pentest":

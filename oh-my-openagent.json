@@ -18,13 +18,10 @@
   ],
   "agents": {
     "codex-router": {
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "primary",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/minimax/minimax-m3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
       "reasoning": "low",
@@ -38,17 +35,10 @@
       "description": "Strict Codex entry orchestrator; workspace actions require an OmO category task."
     },
     "sisyphus": {
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "primary",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/minimax/minimax-m3",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8",
-        "openrouter/anthropic/claude-opus-5",
-        "openrouter/anthropic/claude-fable-5"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "ultrawork": {
         "model": "openrouter/anthropic/claude-opus-5",
@@ -62,13 +52,10 @@
       "color": "#00F0FF"
     },
     "hephaestus": {
-      "model": "subscription-gateway/gpt-5.6-terra",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "primary",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "subscription-gateway/gpt-5.6-sol",
-        "openrouter/moonshotai/kimi-k3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
@@ -81,16 +68,11 @@
       "color": "#FF5C00"
     },
     "prometheus": {
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "primary",
       "variant": "low",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/minimax/minimax-m3",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.25,
       "reasoning": "low",
@@ -99,14 +81,10 @@
       "color": "#B967FF"
     },
     "atlas": {
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "primary",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/minimax/minimax-m3",
-        "openrouter/anthropic/claude-sonnet-5"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
       "reasoning": "low",
@@ -116,14 +94,10 @@
       "color": "#39FF14"
     },
     "oracle": {
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/anthropic/claude-sonnet-5",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
@@ -136,9 +110,6 @@
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.1,
@@ -152,9 +123,6 @@
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.1,
@@ -165,24 +133,19 @@
       "color": "#FFD400"
     },
     "multimodal-looker": {
-      "model": "openrouter/anthropic/claude-sonnet-5",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "openrouter/google/gemini-3.6-flash",
-        "openrouter/google/gemini-3.5-flash",
-        "openrouter/moonshotai/kimi-k3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "maxTokens": 24576,
       "prompt_append": "file://~/.config/opencode/prompts/agents/multimodal-looker.md",
       "color": "#FF2D95"
     },
     "metis": {
-      "model": "openrouter/anthropic/claude-sonnet-5",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
-        "openrouter/moonshotai/kimi-k3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoning": "medium",
@@ -192,18 +155,11 @@
       "variant": "medium"
     },
     "momus": {
-      "model": "subscription-gateway/gpt-5.6-sol-review",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "variant": "max",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/anthropic/claude-opus-5",
-        "openrouter/anthropic/claude-fable-5",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8",
-        "openrouter/anthropic/claude-opus-4.7"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
       "reasoning": "xhigh",
@@ -215,9 +171,6 @@
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "mode": "subagent",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
@@ -232,10 +185,7 @@
       "mode": "primary",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "openrouter/minimax/minimax-m3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "temperature": 0.2,
       "reasoning": "high",
@@ -255,13 +205,9 @@
   },
   "categories": {
     "visual-engineering": {
-      "model": "openrouter/google/gemini-3.1-pro-preview",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "openrouter/google/gemini-3.6-flash",
-        "openrouter/google/gemini-3.5-flash",
-        "openrouter/anthropic/claude-sonnet-5",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "is_unstable_agent": true,
@@ -269,29 +215,19 @@
       "color": "#FF2D95"
     },
     "ultrabrain": {
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "openrouter/z-ai/glm-5.2-exacto",
       "variant": "max",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/anthropic/claude-opus-5",
-        "openrouter/anthropic/claude-fable-5",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8",
-        "openrouter/anthropic/claude-opus-4.7",
-        "openrouter/moonshotai/kimi-k3"
+        "openrouter/deepseek/deepseek-v4-flash-0731"
       ],
       "reasoning": "xhigh",
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
       "color": "#B967FF"
     },
     "deep": {
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoning": "high",
@@ -300,12 +236,10 @@
     },
     "agentic-deep-kimi": {
       "description": "Explicit Kimi K3 escalation for difficult long-horizon coding, research, and tool use.",
-      "model": "openrouter/moonshotai/kimi-k3",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "openrouter/deepseek/deepseek-v4-flash-0731"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoning": "high",
       "maxTokens": 24576,
@@ -313,23 +247,18 @@
       "color": "#7C4DFF"
     },
     "artistry": {
-      "model": "openrouter/google/gemini-3.1-pro-preview",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "max",
       "is_unstable_agent": true,
       "prompt_append": "file://~/.config/opencode/prompts/categories/artistry.md",
       "color": "#FF5C00",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol-review",
-        "openrouter/google/gemini-3.6-flash",
-        "openrouter/google/gemini-3.5-flash",
-        "openrouter/anthropic/claude-sonnet-5"
+        "openrouter/z-ai/glm-5.2-exacto"
       ]
     },
     "quick": {
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/quick.md",
@@ -341,8 +270,6 @@
     "unspecified-low": {
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
@@ -352,26 +279,18 @@
       "maxTokens": 8192
     },
     "unspecified-high": {
-      "model": "openrouter/anthropic/claude-opus-5",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "max",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
-        "openrouter/anthropic/claude-fable-5",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8",
-        "openrouter/anthropic/claude-opus-4.7",
         "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
       "color": "#9DFFFF"
     },
     "writing": {
-      "model": "openrouter/google/gemini-3.6-flash",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/google/gemini-3.5-flash",
-        "openrouter/google/gemini-3-flash-preview",
-        "openrouter/deepseek/deepseek-v4-flash-0731"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/writing.md",
       "variant": "medium",
@@ -380,11 +299,9 @@
     },
     "bug-hunt": {
       "description": "Reproduce → root cause → minimal fix → verify. Cite file:line.",
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/minimax/minimax-m3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
       "variant": "low",
@@ -394,11 +311,9 @@
     },
     "refactor-safe": {
       "description": "Tests-first, behavior-preserving refactors. Small steps only.",
-      "model": "openrouter/z-ai/glm-5.2-exacto",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/minimax/minimax-m3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/refactor-safe.md",
       "variant": "low",
@@ -408,15 +323,10 @@
     },
     "arch-review": {
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
-      "model": "subscription-gateway/gpt-5.6-sol-review",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "variant": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
-        "subscription-gateway/gpt-5.6-terra",
-        "openrouter/anthropic/claude-opus-4.8-fast",
-        "openrouter/anthropic/claude-opus-4.8",
-        "openrouter/anthropic/claude-opus-4.7",
-        "openrouter/moonshotai/kimi-k3"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoning": "high",
       "prompt_append": "file://~/.config/opencode/prompts/categories/arch-review.md",
@@ -426,9 +336,7 @@
       "description": "Fast attack-surface recon: endpoints, misconfigs, deps.",
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "openrouter/minimax/minimax-m3",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "subscription-gateway/gpt-5.6-terra"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-fast.md",
       "color": "#FF1744",
@@ -440,9 +348,7 @@
       "description": "Deep vuln research. Each finding: CVSS, evidence, repro, fix.",
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "fallback_models": [
-        "openrouter/moonshotai/kimi-k3",
-        "openrouter/z-ai/glm-5.2-exacto",
-        "subscription-gateway/gpt-5.6-sol-review"
+        "openrouter/z-ai/glm-5.2-exacto"
       ],
       "reasoning": "high",
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-deep.md",

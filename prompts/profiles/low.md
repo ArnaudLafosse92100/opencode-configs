@@ -1,6 +1,6 @@
 # Profile: low (GLM Exacto orchestrator / cheap subagents)
 
-Cost-first scaffold. Sisyphus stays on GLM Exacto for tool quality; prefer Flash for parallel work.
+Cost-first scaffold. Normal mode keeps Sisyphus on GLM Exacto for tool quality; pentest mode overrides Sisyphus to DeepSeek Flash 0731 primary. Prefer Flash for parallel work.
 
 ## Prefer
 

@@ -1,4 +1,4 @@
-# Category: bug-hunt (GLM Exacto)
+# Category: bug-hunt (runtime-profile routed)
 
 Reproduce → root cause → minimal fix → verify. Used by debug-team and ship-feature.
 

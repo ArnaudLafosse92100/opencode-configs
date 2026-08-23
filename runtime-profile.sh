@@ -36,6 +36,7 @@ import sys
 repo = pathlib.Path(sys.argv[1])
 mode = sys.argv[2]
 omo_path = repo / "oh-my-openagent.json"
+codex_router_path = repo / "agents/codex-router.md"
 prompt_path = repo / "prompts/agents/sisyphus.md"
 profile_path = repo / "runtime-profile.json"
 native_omo_path = pathlib.Path.home() / ".omo/omo.jsonc"
@@ -153,35 +154,35 @@ normal = {
 
 pentest = {
     "agents": {
-        "codex-router": {"model": glm, "fallback_models": [deepseek]},
-        "sisyphus": {"model": glm, "fallback_models": [deepseek]},
-        "hephaestus": {"model": glm, "fallback_models": [deepseek]},
-        "prometheus": {"model": glm, "fallback_models": [deepseek]},
-        "atlas": {"model": glm, "fallback_models": [deepseek]},
-        "oracle": {"model": glm, "fallback_models": [deepseek]},
+        "codex-router": {"model": deepseek, "fallback_models": [glm]},
+        "sisyphus": {"model": deepseek, "fallback_models": [glm]},
+        "hephaestus": {"model": deepseek, "fallback_models": [glm]},
+        "prometheus": {"model": deepseek, "fallback_models": [glm]},
+        "atlas": {"model": deepseek, "fallback_models": [glm]},
+        "oracle": {"model": deepseek, "fallback_models": [glm]},
         "librarian": {"model": deepseek, "fallback_models": [glm]},
         "explore": {"model": deepseek, "fallback_models": [glm]},
         "multimodal-looker": {"model": deepseek, "fallback_models": [glm]},
-        "metis": {"model": glm, "fallback_models": [deepseek]},
-        "momus": {"model": glm, "fallback_models": [deepseek]},
+        "metis": {"model": deepseek, "fallback_models": [glm]},
+        "momus": {"model": deepseek, "fallback_models": [glm]},
         "sisyphus-junior": {"model": deepseek, "fallback_models": [glm]},
         "content-aware-research": {"model": deepseek, "fallback_models": [glm]},
     },
     "categories": {
-        "visual-engineering": {"model": glm, "fallback_models": [deepseek]},
+        "visual-engineering": {"model": deepseek, "fallback_models": [glm]},
         "ultrabrain": {"model": glm, "fallback_models": [deepseek]},
-        "deep": {"model": glm, "fallback_models": [deepseek]},
-        "agentic-deep-kimi": {"model": glm, "fallback_models": [deepseek]},
-        "artistry": {"model": glm, "fallback_models": [deepseek]},
+        "deep": {"model": deepseek, "fallback_models": [glm]},
+        "agentic-deep-kimi": {"model": deepseek, "fallback_models": [glm]},
+        "artistry": {"model": deepseek, "fallback_models": [glm]},
         "quick": {"model": deepseek, "fallback_models": [glm]},
         "unspecified-low": {"model": deepseek, "fallback_models": [glm]},
-        "unspecified-high": {"model": glm, "fallback_models": [deepseek]},
+        "unspecified-high": {"model": deepseek, "fallback_models": [glm]},
         "writing": {"model": deepseek, "fallback_models": [glm]},
-        "bug-hunt": {"model": glm, "fallback_models": [deepseek]},
-        "refactor-safe": {"model": glm, "fallback_models": [deepseek]},
-        "arch-review": {"model": glm, "fallback_models": [deepseek]},
-        "content-aware-fast": {"model": glm, "fallback_models": [deepseek]},
-        "content-aware-deep": {"model": glm, "fallback_models": [deepseek]},
+        "bug-hunt": {"model": deepseek, "fallback_models": [glm]},
+        "refactor-safe": {"model": deepseek, "fallback_models": [glm]},
+        "arch-review": {"model": deepseek, "fallback_models": [glm]},
+        "content-aware-fast": {"model": deepseek, "fallback_models": [glm]},
+        "content-aware-deep": {"model": deepseek, "fallback_models": [glm]},
     },
 }
 
@@ -194,6 +195,31 @@ for section_name, target in (("agents", agents), ("categories", categories)):
         target[name]["fallback_models"] = patch["fallback_models"]
 
 omo_path.write_text(json.dumps(omo, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+# codex-router is an OpenCode-native custom agent, so its runtime model comes
+# from YAML frontmatter, not OmO's agent table.
+codex_router_text = codex_router_path.read_text(encoding="utf-8")
+codex_router_model = selected["agents"]["codex-router"]["model"]
+updated_codex_router_text = []
+replaced_codex_router_model = False
+in_frontmatter = False
+for index, line in enumerate(codex_router_text.splitlines()):
+    if index == 0 and line == "---":
+        in_frontmatter = True
+        updated_codex_router_text.append(line)
+        continue
+    if in_frontmatter and line == "---":
+        in_frontmatter = False
+        updated_codex_router_text.append(line)
+        continue
+    if in_frontmatter and line.startswith("model: "):
+        updated_codex_router_text.append(f"model: {codex_router_model}")
+        replaced_codex_router_model = True
+        continue
+    updated_codex_router_text.append(line)
+if not replaced_codex_router_model:
+    raise SystemExit(f"missing model frontmatter in {codex_router_path}")
+codex_router_path.write_text("\n".join(updated_codex_router_text).rstrip() + "\n", encoding="utf-8")
 
 # OmO loads this native config at runtime, so legacy profile routing must be mirrored there.
 if native_omo_path.is_file():
@@ -246,7 +272,21 @@ PY
 echo "OpenConfig runtime profile: $MODE"
 if launchctl list | grep -q "com.arnaud.opencode-codex-bridge"; then
   if launchctl kickstart -k "gui/$(id -u)/com.arnaud.opencode-codex-bridge" 2>/dev/null; then
-    echo "✅ Profile switched to $MODE — bridge restarted, new routing is live."
+    ready=0
+    for _ in $(seq 1 40); do
+      if curl -fsS http://127.0.0.1:10101/healthz >/dev/null 2>&1 \
+        && curl -fsS http://127.0.0.1:4097/global/health >/dev/null 2>&1; then
+        ready=1
+        break
+      fi
+      sleep 0.25
+    done
+    if [[ $ready -eq 1 ]]; then
+      echo "✅ Profile switched to $MODE — bridge restarted, new routing is live."
+    else
+      echo "⚠️ Profile switched to $MODE and the bridge restart was requested, but health did not recover within 10s. Check 'oc doctor'." >&2
+      exit 1
+    fi
   else
     echo "⚠️ Profile switched to $MODE, but the bridge restart failed. Run 'oc launch' to load the new profile." >&2
   fi

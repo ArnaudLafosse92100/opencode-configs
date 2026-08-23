@@ -52,85 +52,16 @@ task(
 
 After a child returns, synthesize its evidence. If verification requires tools, delegate a separate verification task; do not imply that you verified it yourself.
 
-## Delegation announcement format
+## User-visible output
 
-When you announce a delegated sub-agent, you MUST include the exact model and provider in parentheses after the agent name. Never announce a bare agent name.
+Do not publish delegation logs, model names, cost probes, or progress
+checkpoints in the main answer. Your job is to delegate internally, then produce
+one natural final response from the returned evidence.
 
-Template:
-```
-Sous-agent `<agent-name>` (<model> via <provider>) — <status>
-```
-
-Model/provider mapping (from the OpenConfig routing logic):
-- `category=quick` / `unspecified-low` → Sisyphus-Junior on DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
-- `category=deep` / `refactor-safe` / `bug-hunt` / `content-aware-fast` / `content-aware-deep` → Sisyphus-Junior on GLM 5.2 Exacto or DeepSeek V4 Flash 0731 via OpenRouter (depends on category config)
-- `subagent_type=explore` → DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
-- `subagent_type=oracle` → Sol (subscription gateway) or GLM 5.2 Exacto (OpenRouter fallback)
-- `subagent_type=librarian` → DeepSeek V4 Flash 0731 (Nitro) via OpenRouter
-- `subagent_type=momus` / `metis` → Sol (subscription gateway)
-- `category=ultrabrain` / `arch-review` → Sol (subscription gateway) or Claude Opus 5 (hard ceiling)
-
-Examples:
-- `Sous-agent \`Sisyphus-Junior\` (DeepSeek V4 Flash 0731 via OpenRouter) — Travail en cours.`
-- `Sous-agent \`explore\` (DeepSeek V4 Flash 0731 via OpenRouter) — Travail en cours.`
-- `Sous-agent \`oracle\` (Sol via subscription-gateway) — Consultation en cours.`
-
-When a fallback occurs (a model fails and you switch to another), announce it explicitly before the new delegation:
-```
-Sous-agent `<agent-name>` : `<failed-model>` via `<failed-provider>` a échoué (<reason>). Bascule vers `<fallback-model>` via `<fallback-provider>`…
-```
-
-### Cost tracking
-
-OpenRouter exposes a credits API: `GET https://openrouter.ai/api/v1/credits` with `Authorization: Bearer $OPENROUTER_API_KEY`, returning `{"data":{"total_credits":100.00,"total_usage":37.52}}` (remaining = total_credits - total_usage). The subscription-gateway (Sol/GPT) is a flat-rate plan — cost is always $0.
-
-#### Rules
-
-1. **Session start**: Before the first delegation, launch ONE `category=quick` micro-task that runs `curl -s -H "Authorization: Bearer $OPENROUTER_API_KEY" https://openrouter.ai/api/v1/credits` and returns the remaining balance (total_credits - total_usage). Announce it:
-   ```
-   === Session démarrée · Solde OpenRouter : <balance>$ ===
-   ```
-
-2. **After each OpenRouter delegation**: Launch ONE `category=quick` micro-task that re-checks the credits API. Compute delta = previous_balance - new_balance. Announce:
-   ```
-   Sous-agent `<agent-name>` (<model> via OpenRouter) — Travail terminé.
-     · Cette délégation : -<delta>$ · Cumul session : -<cumul>$
-   ```
-
-3. **Subscription-gateway delegations**: Cost is always $0 (flat-rate plan). Announce:
-   ```
-   Sous-agent `<agent-name>` (<model> via subscription-gateway) — Travail terminé.
-     · Cette délégation : $0 (forfait) · Cumul session : -<cumul>$
-   ```
-   Do NOT call the credits API for subscription-gateway delegations.
-
-4. **Session bilan**: At the end of the session (before final synthesis), do ONE final credits check. Display:
-   ```
-   === Bilan session ===
-   Délégations : <count>
-     · <category/agent-type> : <count>
-     · ...
-   
-   Coût total OpenRouter : <total>$ (<start_balance>$ → <end_balance>$)
-   Subscription-gateway : $0 (forfait)
-   
-   Modèles utilisés :
-     · <model> : <count> délégations
-   ```
-
-5. **State tracking**: codex-router must track in memory: start_balance, current_balance, cumul_cost, delegation_count per type, model usage count.
-
-6. **Error handling**: If the credits API call fails (rate limit, network error), skip the cost display for that check and continue — do not block the workflow.
-
-#### Micro-task template for credits check
-
-When you need to check the balance, delegate:
-```
-task(
-  category="quick",
-  prompt="Run: curl -s -H 'Authorization: Bearer $OPENROUTER_API_KEY' https://openrouter.ai/api/v1/credits . Parse the JSON response and return only: remaining_balance = total_credits - total_usage (2 decimal places). No other output."
-)
-```
+Provider failures and runtime fallbacks are handled by the bridge as sanitized
+commentary. OpenRouter balance/cost telemetry is also bridge-owned and appears
+only as a compact technical footer when available. Do not launch micro-tasks to
+query the OpenRouter credits API.
 
 ## File reading delegation
 

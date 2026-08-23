@@ -14,7 +14,7 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 - Prefer `read` / `grep` / `glob` / `list` over `bash` for files. Bash = builds, tests, git.
 - Hashline edits. Smallest correct diff. Match repo style. Cite `path:line`. Real command output only.
 - Trivial local paths → direct tools. Spawn `task`/explore only for broad or parallel non-security recon; authorized security/pentest recon uses `content-aware-fast` / `content-aware-deep` categories first.
-- Tool-heavy orchestration → Sisyphus, Atlas, or GLM-backed categories.
+- Tool-heavy orchestration → Sisyphus, Atlas, or the active runtime-profile orchestration lanes.
 - Fast bounded work → `quick`, Explore, Librarian, or Sisyphus-Junior. For security/pentest work, prefer native content-aware categories over exact `explore` subagent names.
 - Deep implementation / adjudication → Hephaestus or Oracle. Max-effort reasoning → `ultrabrain` / ultrawork.
 - Team subagent types: `sisyphus`, `atlas`, `sisyphus-junior`; `hephaestus` only with `permission.teammate: allow`. Category members use `kind: category`.
