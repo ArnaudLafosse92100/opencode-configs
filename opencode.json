@@ -75,6 +75,7 @@
         "google/gemini-3.7-flash",
         "qwen/qwen3.8-max",
         "moonshotai/kimi-k2.7-code",
+        "deepseek/deepseek-v4-pro-0813",
         "deepseek/deepseek-v4-flash-0731",
         "nousresearch/hermes-4-405b"
       ],
@@ -432,6 +433,62 @@
               "require_parameters": false,
               "data_collection": "allow",
               "allow_fallbacks": true
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "deepseek/deepseek-v4-pro-0813": {
+          "id": "deepseek/deepseek-v4-pro-0813",
+          "name": "DeepSeek V4 Pro 0813",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1048576,
+            "output": 384000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "low"
+            },
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "only": [
+                "gmicloud",
+                "novita",
+                "siliconflow",
+                "parasail",
+                "deepinfra",
+                "baidu",
+                "fireworks",
+                "digitalocean"
+              ]
             }
           },
           "variants": {

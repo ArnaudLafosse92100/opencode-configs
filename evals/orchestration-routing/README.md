@@ -29,9 +29,15 @@ and guarded cost. Prompt/response bodies and credentials are never persisted.
 | Case | Expected route |
 | --- | --- |
 | `trivial-direct` | `codex-router` only; no child session for a tool-free answer |
-| `security-recon` | `task(category="content-aware-fast")`, embedded or explicit `content-aware-recon` contract, DeepSeek child, terminal `stop` |
-| `security-deep` | `task(category="content-aware-deep")`, embedded or explicit `content-aware-audit` contract, DeepSeek child, terminal `stop` |
+| `security-recon` | `task(category="content-aware-fast")`, embedded or explicit `content-aware-recon` contract, active-profile Flash/fallback child, terminal `stop` |
+| `security-deep` | `task(category="content-aware-deep")`, embedded or explicit `content-aware-audit` contract, active-profile Pro/fallback child, terminal `stop` |
+| `security-recovery-deep` | `task(category="content-aware-deep")`, service-role/backend recovery contract, active-profile Pro/fallback child, terminal `stop` |
 | `architecture-review` | `task(category="arch-review")`, active runtime-profile child, terminal `stop` |
+
+Expected terminal models are resolved from `runtime-profile.json` when the
+suite loads. Both the configured primary and declared fallbacks are accepted;
+the canary therefore detects route drift without treating a legitimate
+provider fallback as a failure.
 
 The content-aware category prompt is the mandatory specialization contract and
 travels with the category-selected model. `load_skills` is recorded as a useful

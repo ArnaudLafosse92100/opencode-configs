@@ -38,6 +38,8 @@ mode = sys.argv[2]
 omo_path = repo / "oh-my-openagent.json"
 opencode_path = repo / "opencode.json"
 codex_router_path = repo / "agents/codex-router.md"
+content_aware_agent_path = repo / "agents/content-aware-research.md"
+content_aware_profile_path = repo / "profiles/content-aware.json"
 prompt_path = repo / "prompts/agents/sisyphus.md"
 profile_path = repo / "runtime-profile.json"
 native_omo_path = pathlib.Path.home() / ".omo/omo.jsonc"
@@ -150,30 +152,48 @@ for section_name, target in (("agents", agents), ("categories", categories)):
 
 omo_path.write_text(json.dumps(omo, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-# codex-router is an OpenCode-native custom agent, so its runtime model comes
-# from YAML frontmatter, not OmO's agent table.
-codex_router_text = codex_router_path.read_text(encoding="utf-8")
+def update_frontmatter_model(path, model):
+    text = path.read_text(encoding="utf-8")
+    updated = []
+    replaced = False
+    in_frontmatter = False
+    for index, line in enumerate(text.splitlines()):
+        if index == 0 and line == "---":
+            in_frontmatter = True
+            updated.append(line)
+            continue
+        if in_frontmatter and line == "---":
+            in_frontmatter = False
+            updated.append(line)
+            continue
+        if in_frontmatter and line.startswith("model: "):
+            updated.append(f"model: {model}")
+            replaced = True
+            continue
+        updated.append(line)
+    if not replaced:
+        raise SystemExit(f"missing model frontmatter in {path}")
+    path.write_text("\n".join(updated).rstrip() + "\n", encoding="utf-8")
+
+
+# OpenCode-native custom agents resolve their runtime model from YAML
+# frontmatter, not OmO's mirrored agent table. Keep both native definitions in
+# lockstep with the selected runtime profile.
 codex_router_model = selected["agents"]["codex-router"]["model"]
-updated_codex_router_text = []
-replaced_codex_router_model = False
-in_frontmatter = False
-for index, line in enumerate(codex_router_text.splitlines()):
-    if index == 0 and line == "---":
-        in_frontmatter = True
-        updated_codex_router_text.append(line)
-        continue
-    if in_frontmatter and line == "---":
-        in_frontmatter = False
-        updated_codex_router_text.append(line)
-        continue
-    if in_frontmatter and line.startswith("model: "):
-        updated_codex_router_text.append(f"model: {codex_router_model}")
-        replaced_codex_router_model = True
-        continue
-    updated_codex_router_text.append(line)
-if not replaced_codex_router_model:
-    raise SystemExit(f"missing model frontmatter in {codex_router_path}")
-codex_router_path.write_text("\n".join(updated_codex_router_text).rstrip() + "\n", encoding="utf-8")
+content_aware_model = selected["agents"]["content-aware-research"]["model"]
+update_frontmatter_model(codex_router_path, codex_router_model)
+update_frontmatter_model(content_aware_agent_path, content_aware_model)
+
+# The content-aware project scaffold is a real OpenCode overlay. Align its
+# primary and helper models with the active profile so it cannot silently
+# override the native agent route with a stale model.
+content_aware_profile = json.loads(content_aware_profile_path.read_text(encoding="utf-8"))
+content_aware_profile["model"] = content_aware_model
+content_aware_profile["small_model"] = small_model
+content_aware_profile_path.write_text(
+    json.dumps(content_aware_profile, indent=2, ensure_ascii=False) + "\n",
+    encoding="utf-8",
+)
 
 # OmO loads this native config at runtime, so legacy profile routing must be mirrored there.
 if native_omo_path.is_file():
@@ -194,7 +214,7 @@ if native_omo_path.is_file():
 
 prompt = prompt_path.read_text(encoding="utf-8")
 normal_line = "- Runtime profile `normal`: security/pentest work should still prefer `content-aware-*`, but normal model breadth remains available for non-security work."
-pentest_line = "- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.3 and DeepSeek V4 Flash. Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
+pentest_line = "- Runtime profile `pentest`: keep all agents/categories available, but pentest-safe routes use only GLM 5.3 and exact DeepSeek V4 snapshots (Flash 0731 for economical work, Pro 0813 for deep implementation/review). Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, `ultrawork`, `ulw`, or generic stronger-reasoning escalation inside pentest work. If filters bite, reroute unfinished work to `content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
 lines = [line for line in prompt.splitlines() if not line.startswith("- Runtime profile `normal`:") and not line.startswith("- Runtime profile `pentest`:") and not line.startswith("- Authorized pentest/security briefs must not use `ultrawork`")]
 needle = "- Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required."
 insert = pentest_line if mode == "pentest" else normal_line

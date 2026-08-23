@@ -20,7 +20,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | --- | --- | --- |
 | Runtime | [OpenCode](https://opencode.ai) | Provider-agnostic coding agent TUI/CLI; config-as-code; LSP; MCP |
 | Orchestration | [oh-my-openagent (OmO)](https://omo.vibetip.help/docs) | Multi-model agents, categories, team mode, ultrawork, hyperplan — docs on VibeTip |
-| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Nitro, Gemini, Qwen, Kimi, Laguna, Hermes, MiniMax |
+| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Flash/Pro, Gemini, Qwen, Kimi, Laguna, Hermes, MiniMax |
 | GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; GPT is not routed through OpenRouter |
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
@@ -36,12 +36,12 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 - **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
 - **Orchestration / tool loops** → normal uses GLM 5.3 (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) for tool-call quality; pentest overrides these routes to DeepSeek Flash 0731 primary with GLM fallback.
 - **Fast parallel recon** → DeepSeek Flash 0731 `:nitro` (explore, librarian, sisyphus-junior, quick) — Nitro = throughput.
-- **Deep implement / critique** → normal uses subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review). Pentest keeps only DeepSeek/GLM, with `ultrabrain` as the sole GLM-primary route.
+- **Deep implement / critique** → normal uses subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review), with DeepSeek Pro 0813 as the first OpenRouter depth fallback. Pentest uses Pro 0813 for those depth roles and keeps `ultrabrain` as the sole GLM-primary route.
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash); pentest overrides these lanes to DeepSeek Flash 0731 primary.
 - **Hard ceiling** → subscription-gateway Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
-- **Content-aware research** → normal uses Hermes 4 405B with DeepSeek/GLM/MiniMax/Qwen fallbacks; pentest uses DeepSeek Flash 0731 with GLM fallback. `content-aware-deep` stays tool-capable end-to-end and must not fall back to Hermes.
-- **Runtime profile override** → `oc profile pentest` keeps every agent/category available but pins every real route to DeepSeek V4 Flash 0731 primary with GLM fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. `oc profile normal` restores the broader matrix above.
+- **Content-aware research** → normal uses Hermes 4 405B with Pro 0813 / Flash 0731 / GLM / MiniMax / Qwen fallbacks; pentest uses Pro 0813 with GLM fallback. `content-aware-deep` uses Pro 0813 first and stays tool-capable end-to-end; it must not fall back to Hermes.
+- **Runtime profile override** → `oc profile pentest` keeps every agent/category available, uses Flash 0731 for economical work, Pro 0813 for explicit depth roles, and GLM 5.3 only as fallback except `ultrabrain` (GLM primary, Pro fallback). `oc profile normal` restores the broader matrix above.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/GLM canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 - **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
 

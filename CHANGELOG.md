@@ -2,7 +2,14 @@
 
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
-## Unreleased — 2026-08-23
+## Unreleased — 2026-08-24
+
+### Capability-tiered DeepSeek V4 routing
+- Add the exact OpenRouter `deepseek/deepseek-v4-pro-0813` definition and cap it at five concurrent tasks
+- Keep Flash 0731 Nitro as the economical default while routing explicit implementation, adjudication, review, and security-depth roles to Pro 0813 in pentest mode
+- Keep `ultrabrain` on GLM 5.3 with Pro 0813 fallback; normal mode retains subscription-gateway primaries and gains Pro as a bounded depth fallback
+- Synchronize native `content-aware-research` frontmatter and the content-aware project overlay during `oc profile` switches
+- Resolve orchestration-canary terminal models from the active profile so legitimate configured fallbacks are accepted without stale hard-coded expectations
 
 ### Final upstream 1.5.60 parity audit for mixed routing
 - Add the compatible 1.5.60 capability guards to `validate.sh`: normal visual routes must stay `attachment:true` end-to-end, and every tool-using route must stay `tool_call:true`

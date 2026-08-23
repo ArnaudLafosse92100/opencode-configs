@@ -105,10 +105,14 @@ oc=json.load(open(repo/"opencode.json"))
 omo=json.load(open(repo/"oh-my-openagent.json"))
 models=oc["provider"]["openrouter"]["models"]
 flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
+pro=models.get("deepseek/deepseek-v4-pro-0813") or {}
 runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
 rf=omo.get("runtime_fallback") or {}
 common=(repo/"lib/common.sh").read_text()
 ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
+    and pro.get("id")=="deepseek/deepseek-v4-pro-0813"
+    and pro.get("tool_call") is True
+    and pro.get("reasoning") is True
     and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
     and "reasoningEffort" not in runtime
     and rf.get("timeout_seconds")==20
@@ -119,7 +123,7 @@ ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
     and (repo/"scripts/patch-omo-runtime-fallback.mjs").is_file())
 sys.exit(0 if ok else 1)
 ' "$REPO"; then
-  ok "exact DeepSeek 0731 route + OmO schema-clean runtime fallback + OpenConfig retry policy"
+  ok "exact DeepSeek Flash 0731 / Pro 0813 routes + OmO schema-clean runtime fallback + OpenConfig retry policy"
 else
   bad "DeepSeek version, OmO reasoning schema, or OpenConfig runtime fallback retry policy drift"
 fi
@@ -135,6 +139,7 @@ ok=(bt.get("defaultConcurrency")==6
     and pc.get("openrouter")==8
     and pc.get("subscription-gateway")==4
     and pc.get("anthropic")==2
+    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==5
     and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==10
     and mc.get("openrouter/z-ai/glm-5.3")==8
     and mc.get("openrouter/moonshotai/kimi-k2.7-code")==5
@@ -166,7 +171,11 @@ if prof == "pentest":
     declared=set(expected)
     if actual != declared:
         raise SystemExit(5)
-allowed=("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
+allowed={
+    "openrouter/z-ai/glm-5.3",
+    "openrouter/deepseek/deepseek-v4-flash-0731",
+    "openrouter/deepseek/deepseek-v4-pro-0813",
+}
 for section in ("agents", "categories"):
     for name, cfg in (omo.get(section) or {}).items():
         if not isinstance(cfg, dict): continue
@@ -179,7 +188,7 @@ for section in ("agents", "categories"):
             expected_primary, expected_fallbacks = route_expected
             if primary != expected_primary or fbs != expected_fallbacks:
                 raise SystemExit(3)
-            if prof == "pentest" and any(not x.startswith(allowed) for x in [primary, *fbs]):
+            if prof == "pentest" and any(x not in allowed for x in [primary, *fbs]):
                 raise SystemExit(4)
             continue
         if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("subscription-gateway/")):

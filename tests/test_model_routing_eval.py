@@ -104,7 +104,11 @@ class ContentAwareFallbackTests(unittest.TestCase):
     def test_pentest_profile_declared_routes_are_glm_deepseek_only(self) -> None:
         if self.profile != "pentest":
             self.skipTest("only applies to pentest runtime profile")
-        allowed = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
+        allowed = {
+            "openrouter/z-ai/glm-5.3",
+            "openrouter/deepseek/deepseek-v4-flash-0731",
+            "openrouter/deepseek/deepseek-v4-pro-0813",
+        }
         selected = self._selected_profile()
         for section in ("agents", "categories"):
             self.assertEqual(
@@ -114,13 +118,49 @@ class ContentAwareFallbackTests(unittest.TestCase):
             )
             for name, expected in selected.get(section, {}).items():
                 models = [expected["model"], *expected["fallback_models"]]
-                bad = [model for model in models if not model.startswith(allowed)]
+                bad = [model for model in models if model not in allowed]
                 self.assertEqual(bad, [], f"{section}.{name}")
 
-    def test_sisyphus_blocks_claude_ultrawork_for_authorized_pentest(self) -> None:
+    def test_pentest_profile_separates_fast_deep_and_ultrabrain_lanes(self) -> None:
+        selected = self.profile_data["pentest"]
+        pro = "openrouter/deepseek/deepseek-v4-pro-0813"
+        flash = "openrouter/deepseek/deepseek-v4-flash-0731"
+        glm = "openrouter/z-ai/glm-5.3"
+        pro_routes = {
+            ("agents", "hephaestus"),
+            ("agents", "oracle"),
+            ("agents", "momus"),
+            ("agents", "content-aware-research"),
+            ("categories", "deep"),
+            ("categories", "unspecified-high"),
+            ("categories", "arch-review"),
+            ("categories", "content-aware-deep"),
+        }
+        for section in ("agents", "categories"):
+            for name, route in selected[section].items():
+                with self.subTest(section=section, name=name):
+                    if (section, name) == ("categories", "ultrabrain"):
+                        self.assertEqual(route, {"model": glm, "fallback_models": [pro]})
+                    elif (section, name) in pro_routes:
+                        self.assertEqual(route, {"model": pro, "fallback_models": [glm]})
+                    else:
+                        self.assertEqual(route, {"model": flash, "fallback_models": [glm]})
+
+    def test_native_content_aware_surfaces_match_active_profile(self) -> None:
+        expected = self._selected_profile()["agents"]["content-aware-research"]["model"]
+        definition = (REPO / "agents/content-aware-research.md").read_text(encoding="utf-8")
+        profile = json.loads((REPO / "profiles/content-aware.json").read_text(encoding="utf-8"))
+        self.assertIn(f"model: {expected}", definition)
+        self.assertEqual(profile["model"], expected)
+
+    def test_sisyphus_runtime_profile_guard_matches_active_profile(self) -> None:
         prompt = (REPO / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
-        self.assertIn("Runtime profile `pentest`", prompt)
-        self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway", prompt)
+        selected = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["active"]
+        self.assertIn(f"Runtime profile `{selected}`", prompt)
+        if selected == "pentest":
+            self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway", prompt)
+        else:
+            self.assertNotIn("Runtime profile `pentest`", prompt)
 
 
 class CampaignLedgerTests(unittest.TestCase):

@@ -59,26 +59,14 @@ omo_path = os.path.join(repo, "oh-my-openagent.json")
 oc = parsed.get(oc_path)
 omo = parsed.get(omo_path)
 
-# DeepSeek V4 Pro is intentionally retired. Keep this as a cross-file policy
-# guard so future upstream merges cannot silently reintroduce it as a primary,
-# fallback, profile default, concurrency entry, whitelist item, or model
-# definition.
-retired_route_files = [oc_path, omo_path]
-retired_route_files += sorted(glob.glob(os.path.join(repo, "profiles", "*.json")))
-retired_route_files += sorted(glob.glob(os.path.join(repo, "agents", "*.md")))
-retired_route_hits = []
-for path in retired_route_files:
-    if os.path.isfile(path) and "deepseek-v4-pro" in open(path).read():
-        retired_route_hits.append(os.path.relpath(path, repo))
-if retired_route_hits:
-    err("retired deepseek-v4-pro route reintroduced in: " + ", ".join(retired_route_hits))
-else:
-    ok("retired deepseek-v4-pro route absent from runtime config and profiles")
+runtime_route_files = [oc_path, omo_path]
+runtime_route_files += sorted(glob.glob(os.path.join(repo, "profiles", "*.json")))
+runtime_route_files += sorted(glob.glob(os.path.join(repo, "agents", "*.md")))
 
 # OpenRouter keeps the April 0423 and July 0731 Flash releases as distinct
 # slugs. Never let the unversioned 0423 route masquerade as 0731 again.
 legacy_flash = re.compile(r"deepseek/deepseek-v4-flash(?!-0731)")
-flash_route_files = retired_route_files + [
+flash_route_files = runtime_route_files + [
     os.path.join(repo, "evals", "model-routing", "run.py"),
 ]
 legacy_flash_hits = []
@@ -132,6 +120,15 @@ if oc:
         err("opencode.json: DeepSeek V4 Flash 0731 must use the :nitro API id")
     else:
         ok("DeepSeek V4 Flash 0731 Nitro definition exact")
+    pro = models.get("deepseek/deepseek-v4-pro-0813")
+    if not isinstance(pro, dict):
+        err("opencode.json: exact DeepSeek V4 Pro 0813 model definition missing")
+    elif pro.get("id") != "deepseek/deepseek-v4-pro-0813":
+        err("opencode.json: DeepSeek V4 Pro must pin the exact 0813 API id")
+    elif pro.get("tool_call") is not True or pro.get("reasoning") is not True:
+        err("opencode.json: DeepSeek V4 Pro 0813 must remain tool/reasoning capable")
+    else:
+        ok("DeepSeek V4 Pro 0813 definition exact and tool-capable")
     # Whitelist must match models{} keys (orphans / missing entries cause silent routing gaps).
     wl = prov.get("whitelist")
     if isinstance(wl, list):
@@ -551,7 +548,44 @@ if omo:
         pcfg = provider_configs.get(provider) or {}
         return (pcfg.get("models") or {}).get(model_id)
     normal_profile = _normalize_profile(runtime_profile_data.get("normal") if isinstance(runtime_profile_data, dict) else {})
+    pentest_profile = _normalize_profile(runtime_profile_data.get("pentest") if isinstance(runtime_profile_data, dict) else {})
     selected_profile = _normalize_profile(selected_profile)
+    pentest_pro_routes = {
+        ("agents", "hephaestus"),
+        ("agents", "oracle"),
+        ("agents", "momus"),
+        ("agents", "content-aware-research"),
+        ("categories", "deep"),
+        ("categories", "unspecified-high"),
+        ("categories", "arch-review"),
+        ("categories", "content-aware-deep"),
+    }
+    pentest_pro = "openrouter/deepseek/deepseek-v4-pro-0813"
+    pentest_flash = "openrouter/deepseek/deepseek-v4-flash-0731"
+    pentest_glm = "openrouter/z-ai/glm-5.3"
+    for section in ("agents", "categories"):
+        for name, cfg in ((pentest_profile or {}).get(section) or {}).items():
+            primary = str((cfg or {}).get("model") or "")
+            fallbacks = [str(x) for x in ((cfg or {}).get("fallback_models") or [])]
+            route = (section, name)
+            if route == ("categories", "ultrabrain"):
+                expected_primary, expected_fallbacks = pentest_glm, [pentest_pro]
+            elif route in pentest_pro_routes:
+                expected_primary, expected_fallbacks = pentest_pro, [pentest_glm]
+            else:
+                expected_primary, expected_fallbacks = pentest_flash, [pentest_glm]
+            if primary != expected_primary or fallbacks != expected_fallbacks:
+                err(
+                    f"runtime-profile.json[pentest.{section}.{name}]: capability lane must be "
+                    f"{expected_primary} with fallbacks {expected_fallbacks}"
+                )
+    if pentest_profile:
+        ok("pentest profile separates Flash economy, Pro depth, and GLM ultrabrain lanes")
+    normal_ca_deep = (((normal_profile or {}).get("categories") or {}).get("content-aware-deep") or {})
+    if normal_profile and normal_ca_deep.get("model") != pentest_pro:
+        err("runtime-profile.json[normal.categories.content-aware-deep]: primary must be DeepSeek V4 Pro 0813")
+    elif normal_profile:
+        ok("normal content-aware-deep uses DeepSeek V4 Pro 0813")
     # Upstream 1.5.60 invariant: normal-mode vision chains must stay vision-capable
     # end-to-end. The pentest profile is a deliberate GLM/DeepSeek-only lane, so
     # validate the normal profile separately instead of flagging active pentest.
@@ -642,7 +676,11 @@ if omo:
                 "runtime-profile.json[pentest]: profile contains routes absent from oh-my-openagent.json: "
                 f"{extra_in_profile}"
             )
-    pentest_safe_prefixes = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
+    pentest_safe_models = {
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/deepseek/deepseek-v4-flash-0731",
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+    }
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
             if not isinstance(cfg, dict):
@@ -663,7 +701,7 @@ if omo:
                 if runtime_profile == "pentest":
                     bad_models = [
                         model for model in [primary, *fallbacks]
-                        if not model.startswith(pentest_safe_prefixes)
+                        if model not in pentest_safe_models
                     ]
                     if bad_models:
                         err(
@@ -823,6 +861,10 @@ if omo:
                 if isinstance(fb, str):
                     ref_ids.add(fb)
     mc_keys = set(mc)
+    if mc.get("openrouter/deepseek/deepseek-v4-pro-0813") != 5:
+        err("modelConcurrency DeepSeek V4 Pro 0813 must be 5 — run: oc fix")
+    else:
+        ok("modelConcurrency DeepSeek V4 Pro 0813=5")
     miss_mc = sorted(i for i in ref_ids if not (_mc_aliases(i) & mc_keys))
     if miss_mc:
         warn(f"modelConcurrency missing {len(miss_mc)} model(s): {', '.join(miss_mc[:5])}"
@@ -1174,6 +1216,7 @@ elif prof_checked:
 # ---- 4c1. content-aware-research agent + profile alignment ----
 ca_md = os.path.join(repo, "agents", "content-aware-research.md")
 ca_prof = os.path.join(repo, "profiles", "content-aware.json")
+expected_ca_model = ((((selected_profile or {}).get("agents") or {}).get("content-aware-research") or {}).get("model"))
 if not os.path.isfile(ca_md):
     err("agents/content-aware-research.md missing (OpenCode-native content-aware agent)")
 else:
@@ -1183,6 +1226,15 @@ else:
         err("agents/content-aware-research.md: permission.edit must be deny")
     else:
         ok("agents/content-aware-research.md present (edit deny)")
+    model_match = re.search(r"(?m)^model:\s*(\S+)\s*$", body)
+    actual_ca_model = model_match.group(1) if model_match else None
+    if expected_ca_model and actual_ca_model != expected_ca_model:
+        err(
+            "agents/content-aware-research.md model must match active runtime profile "
+            f"({actual_ca_model!r} != {expected_ca_model!r})"
+        )
+    elif expected_ca_model:
+        ok("agents/content-aware-research.md model matches active runtime profile")
 if not os.path.isfile(ca_prof):
     err("profiles/content-aware.json missing")
 else:
@@ -1192,18 +1244,26 @@ else:
             err(f"profiles/content-aware.json default_agent must be content-aware-research (got {gp.get('default_agent')!r})")
         elif (gp.get("permission") or {}).get("edit") != "deny":
             err("profiles/content-aware.json permission.edit must be deny")
+        elif expected_ca_model and gp.get("model") != expected_ca_model:
+            err("profiles/content-aware.json model must match active content-aware-research route")
+        elif selected_profile and gp.get("small_model") != selected_profile.get("small_model"):
+            err("profiles/content-aware.json small_model must match active runtime profile")
         else:
-            ok("profiles/content-aware.json → content-aware-research (edit deny)")
+            ok("profiles/content-aware.json → active content-aware-research route (edit deny)")
     except Exception as e:
         err(f"profiles/content-aware.json: invalid JSON ({e})")
 
 # ---- 4c1b. Kimi must remain an explicit, evaluated escalation lane ----
 cats = omo.get("categories") or {}
 kimi_lane = cats.get("agentic-deep-kimi")
-pentest_safe_prefixes = ("openrouter/z-ai/glm-", "openrouter/deepseek/deepseek-v4-flash")
+pentest_safe_models = {
+    "openrouter/z-ai/glm-5.3",
+    "openrouter/deepseek/deepseek-v4-flash-0731",
+    "openrouter/deepseek/deepseek-v4-pro-0813",
+}
 if not isinstance(kimi_lane, dict):
     err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
-elif runtime_profile == "pentest" and str(kimi_lane.get("model") or "").startswith(pentest_safe_prefixes):
+elif runtime_profile == "pentest" and str(kimi_lane.get("model") or "") in pentest_safe_models:
     ok("agentic-deep-kimi is overridden by pentest strict GLM/DeepSeek overlay")
 elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k2.7-code":
     err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k2.7-code")

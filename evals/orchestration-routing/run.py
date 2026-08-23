@@ -88,7 +88,29 @@ def opencode_auth_headers() -> dict[str, str]:
 
 
 def load_cases() -> dict:
-    return json.loads((HERE / "cases.json").read_text(encoding="utf-8"))
+    suite = json.loads((HERE / "cases.json").read_text(encoding="utf-8"))
+    profiles = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
+    active = profiles.get("active", "normal")
+    selected = profiles.get(active) or {}
+    categories = selected.get("categories") or {}
+    for case in suite["cases"]:
+        category = case.get("expected_category")
+        if not category:
+            case["expected_routes"] = []
+            continue
+        route = categories.get(category)
+        if not isinstance(route, dict):
+            raise ValueError(f"active profile {active} has no category route for {category}")
+        refs = [route.get("model"), *(route.get("fallback_models") or [])]
+        expected_routes = []
+        for ref in refs:
+            if not isinstance(ref, str) or "/" not in ref:
+                raise ValueError(f"invalid model route for {active}.{category}: {ref!r}")
+            provider, model = ref.split("/", 1)
+            expected_routes.append({"provider": provider, "model": model})
+        case["expected_routes"] = expected_routes
+    suite["active_profile"] = active
+    return suite
 
 
 def select_cases(suite: dict, requested: str | None) -> list[dict]:
@@ -287,11 +309,14 @@ def grade(case: dict, evidence: dict) -> dict:
         embedded_skill = not expected_skill or category_prompt.is_file() and (
             f"Embedded contract: `{expected_skill}`" in category_prompt.read_text(encoding="utf-8")
         )
+        expected_routes = {
+            (route["provider"], route["model"])
+            for route in case.get("expected_routes", [])
+        }
         matching_children = [
             child
             for child in children
-            if child.get("terminal_provider") == case["expected_provider"]
-            and child.get("terminal_model") == case["expected_model"]
+            if (child.get("terminal_provider"), child.get("terminal_model")) in expected_routes
             and child.get("terminal_finish") == "stop"
             and not child.get("terminal_error")
         ]

@@ -45,7 +45,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-fast", "load_skills": ["content-aware-recon"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "z-ai/glm-5.3",
+                "terminal_model": "deepseek/deepseek-v4-flash-0731",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -76,6 +76,20 @@ class GradeTests(unittest.TestCase):
         self.assertFalse(grade["explicit_skill_loaded"])
         self.assertTrue(grade["checks"]["specialization_contract"])
 
+    def test_configured_fallback_model_is_accepted(self) -> None:
+        case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recon")
+        evidence = {
+            "root": {"agent": "codex-router"},
+            "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
+            "children": [{
+                "terminal_provider": "openrouter",
+                "terminal_model": "z-ai/glm-5.3",
+                "terminal_finish": "stop",
+                "terminal_error": None,
+            }],
+        }
+        self.assertTrue(runner.grade(case, evidence)["passed"])
+
     def test_service_role_recovery_case_requires_content_aware_deep(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recovery-deep")
         self.assertEqual(case["expected_category"], "content-aware-deep")
@@ -86,7 +100,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-deep", "load_skills": ["content-aware-audit"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "z-ai/glm-5.3",
+                "terminal_model": "deepseek/deepseek-v4-pro-0813",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -107,8 +121,8 @@ class GradeTests(unittest.TestCase):
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "arch-review", "load_skills": [], "status": "completed"}],
             "children": [{
-                "terminal_provider": "subscription-gateway",
-                "terminal_model": "gpt-5.6-sol-review",
+                "terminal_provider": "openrouter",
+                "terminal_model": "deepseek/deepseek-v4-pro-0813",
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],

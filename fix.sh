@@ -380,6 +380,7 @@ if isinstance(bt, dict):
             "openrouter/google/gemini-3.7-flash": 10,
             "openrouter/qwen/qwen3.8-max": 5,
             "openrouter/moonshotai/kimi-k2.7-code": 5,
+            "openrouter/deepseek/deepseek-v4-pro-0813": 5,
             "openrouter/deepseek/deepseek-v4-flash-0731": 10,
             "openrouter/nousresearch/hermes-4-405b": 2,
         }
@@ -398,7 +399,12 @@ if isinstance(bt, dict):
             if any(name in low for name in ("sonnet", "sol", "terra", "gpt-5.5", "gemini-3.1-pro")):
                 return 3
             return 1
+        for model, cap in pinned_model_concurrency.items():
+            if mc.get(model) != cap:
+                mc[model] = cap; changes.append(f"modelConcurrency.{model} -> {cap}")
         for model in list(mc):
+            if model in pinned_model_concurrency:
+                continue
             cap = _model_concurrency(model)
             if mc.get(model) != cap:
                 mc[model] = cap; changes.append(f"modelConcurrency.{model} -> {cap}")

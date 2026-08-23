@@ -145,19 +145,19 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 | **hephaestus** | Runtime-profile routed | Implementation |
 | **prometheus** | Runtime-profile routed | Planner |
 | **atlas** | Runtime-profile routed | Plan executor after `/start-work` |
-| **content-aware-research** | Runtime-profile routed (normal Hermes, pentest DeepSeek) | Full-depth research (edit denied) |
+| **content-aware-research** | Runtime-profile routed (normal Hermes, pentest Pro 0813) | Full-depth research (edit denied) |
 
 ### Subagents (`task` / `call_omo_agent` — not team members)
 
 | Agent | Model | Role |
 | --- | --- | --- |
-| oracle | GPT-5.6 Sol (subscription gateway) | Critique / adjudication |
-| librarian | DeepSeek Flash 0731 Nitro | Docs (Context7-first) |
-| explore | DeepSeek Flash 0731 Nitro | Codebase map |
-| multimodal-looker | Gemini 3.1 Pro | Vision (`look_at`) |
-| metis | Gemini 3.1 Pro | Pre-planning critic |
-| momus | GPT-5.6 Sol (subscription gateway) | Plan / review gate |
-| sisyphus-junior | DeepSeek Flash 0731 Nitro | Cheap delegated work |
+| oracle | Normal Sol / pentest Pro 0813 | Critique / adjudication |
+| librarian | Flash 0731 | Docs (Context7-first) |
+| explore | Normal GLM / pentest Flash 0731 | Codebase map |
+| multimodal-looker | Normal Gemini 3.1 Pro / pentest Flash 0731 | Vision (`look_at`) in normal mode |
+| metis | Normal Gemini 3.1 Pro / pentest Flash 0731 | Pre-planning critic |
+| momus | Normal Sol / pentest Pro 0813 | Plan / review gate |
+| sisyphus-junior | Flash 0731 Nitro | Cheap delegated work |
 
 Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff — do **not** put it in `disabled_agents`.
 
@@ -177,13 +177,13 @@ OpenCode TUI sessions continue to use `sisyphus`.
 | `refactor-safe` | Runtime-profile routed | Behavior-preserving refactors |
 | `arch-review` | Runtime-profile routed | Coupling / blast radius |
 | `content-aware-fast` | DeepSeek Flash 0731 Nitro | Attack-surface recon |
-| `content-aware-deep` | DeepSeek Flash 0731 → GLM / Qwen / MiniMax / Laguna | Deep vuln research |
+| `content-aware-deep` | DeepSeek Pro 0813 → Flash 0731 / GLM / Qwen / MiniMax / Laguna | Deep vuln research |
 | `agentic-deep-kimi` | Runtime-profile routed | Explicit long-horizon escalation after evaluation |
 | `writing` | Runtime-profile routed | Docs / prose |
 | `visual-engineering` | Runtime-profile routed | Ship UI |
 | `artistry` | Runtime-profile routed | Design direction |
 | `quick` | DeepSeek Flash 0731 Nitro | Cheap fast tasks |
-| `deep` / `ultrabrain` | Runtime-profile routed | Heavy / max reasoning |
+| `deep` / `ultrabrain` | Normal Sol / pentest Pro and GLM | Heavy / max reasoning |
 | `unspecified-low` / `unspecified-high` | Runtime-profile routed | Hyperplan critics |
 
 ---
@@ -228,8 +228,8 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | Orchestration | `z-ai/glm-5.3` | Sisyphus / Atlas / Prometheus / bug-hunt |
 | GPT subscription | `subscription-gateway/gpt-5.6-*` → gateway aliases `llm-agent-*` | Hephaestus / Oracle / Momus / deep |
 | Recon | `deepseek/deepseek-v4-flash-0731:nitro` | explore / librarian / sisyphus-junior / quick |
-| Depth | `deepseek/deepseek-v4-flash-0731:nitro` → GLM / Qwen / MiniMax / Laguna fallback | content-aware-deep |
-| Research-only | Hermes 4 405B → DeepSeek / GLM / MiniMax / Qwen fallback | content-aware-research (tools/edit denied) |
+| Depth | `deepseek/deepseek-v4-pro-0813` → Flash 0731 / GLM / Qwen / MiniMax / Laguna fallback | content-aware-deep; pentest Hephaestus / Oracle / Momus / deep / arch-review |
+| Research-only | Hermes 4 405B → Pro 0813 / Flash 0731 / GLM / MiniMax / Qwen fallback | content-aware-research in normal mode (edit denied) |
 | Agentic escalation | `moonshotai/kimi-k2.7-code` → GPT review / GLM / DeepSeek fallback | explicit `agentic-deep-kimi` only |
 | Multimodal | Gemini 3.1 Pro → Gemini 3.7 Flash / Qwen / Kimi K2.7 fallback | multimodal-looker |
 | Visual | Gemini 3.1 Pro → Gemini 3.7 Flash / Qwen / MiniMax fallback | artistry / visual |
@@ -245,12 +245,13 @@ upstream-schema compatible and only carries `timeout_seconds=20`; the custom
 retry knobs are OpenConfig-owned environment exports:
 `OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=3` and
 `OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS=20`. Thus in pentest mode a
-transient DeepSeek/OpenRouter stall retries DeepSeek up to three times, then
-falls back to GLM. Quota, missing-key, model-not-found, abort, and
+transient DeepSeek/OpenRouter stall retries the selected DeepSeek snapshot up
+to three times, then follows that route's fallback (GLM in pentest). Quota,
+missing-key, model-not-found, abort, and
 context-overflow failures skip same-model retries. Reapply/verify the patch
 with `oc plugin --fix`; `oc doctor` reports whether it is present.
 
-Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to DeepSeek V4 Flash 0731 primary with GLM 5.3 fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. Thus `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, GPT/subscription-gateway, Kimi, Qwen, Laguna, Hermes, or MiniMax.
+Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` uses Flash 0731 for ordinary/fast routes and Pro 0813 for Hephaestus, Oracle, Momus, content-aware-research, `deep`, `unspecified-high`, `arch-review`, and `content-aware-deep`; each falls back to GLM 5.3. `ultrabrain` stays GLM-primary with Pro fallback. Thus every route remains inside the exact DeepSeek/GLM allowlist without making the expensive Pro snapshot the daily default.
 
 ### Bounded model-routing eval
 
@@ -266,7 +267,7 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | OpenRouter / subscription gateway / Anthropic | **8 / 4 / 2** |
 | DeepSeek Flash / Gemini Flash / Laguna | **10 / 10 / 10** |
 | GLM / MiniMax / LongCat | **8 / 8 / 8** |
-| Qwen / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 3** |
+| DeepSeek Pro / Qwen / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 5 / 3** |
 | Hermes / Opus 5 / Fable | **2 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |

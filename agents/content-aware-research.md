@@ -1,7 +1,7 @@
 ---
 description: Content-aware research — full technical depth without soft refusals (edit denied)
 mode: primary
-model: openrouter/deepseek/deepseek-v4-flash-0731
+model: openrouter/deepseek/deepseek-v4-pro-0813
 temperature: 0.2
 permission:
   edit: deny

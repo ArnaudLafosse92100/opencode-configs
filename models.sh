@@ -232,7 +232,7 @@ def probe(rid):
         ms = round((time.perf_counter() - t0) * 1000)
         return {"http": 0, "ms": ms, "ok": False, "error": str(e)[:120]}
 
-def fastest_endpoint(bare):
+def fastest_endpoint(bare, requires_tools):
     try:
         req = urllib.request.Request(
             f"https://openrouter.ai/api/v1/models/{bare}/endpoints",
@@ -246,7 +246,7 @@ def fastest_endpoint(bare):
     for e in eps:
         if (e.get("status") or 0) != 0:
             continue
-        if "tools" not in set(e.get("supported_parameters") or []):
+        if requires_tools and "tools" not in set(e.get("supported_parameters") or []):
             continue
         tps = (e.get("throughput_last_30m") or {}).get("p50") or 0
         tag = (e.get("tag") or "").split("/")[0]
@@ -269,6 +269,7 @@ for cfg_key, cfg in sorted(models.items()):
         "bare": bare,
         "routing": route_label(prov, rid),
         "is_moderated": tp.get("is_moderated"),
+        "requires_tools": cfg.get("tool_call", True) is not False,
     })
 
 t0 = time.perf_counter()
@@ -280,7 +281,11 @@ with ThreadPoolExecutor(max_workers=workers) as ex:
 
 fastest = {}
 with ThreadPoolExecutor(max_workers=workers) as ex:
-    futs = {ex.submit(fastest_endpoint, it["bare"]): it["bare"] for it in items}
+    futs = {
+        ex.submit(fastest_endpoint, it["bare"], it["requires_tools"]):
+        (it["bare"], it["requires_tools"])
+        for it in items
+    }
     for fut in as_completed(futs):
         fastest[futs[fut]] = fut.result()
 
@@ -289,7 +294,7 @@ ok_n = sum(1 for it in items if results.get(it["route_id"], {}).get("ok"))
 out_rows = []
 for it in items:
     pr = results.get(it["route_id"], {})
-    fe = fastest.get(it["bare"])
+    fe = fastest.get((it["bare"], it["requires_tools"]))
     row = {
         **it,
         "http": pr.get("http"),
@@ -367,8 +372,11 @@ print(B("== Provider routing health (live OpenRouter endpoints) =="))
 for key,cfg in models.items():
     api=(cfg.get("id") or key).split(":",1)[0]
     prov=(cfg.get("options") or {}).get("provider") or {}
+    requires_tools=cfg.get("tool_call", True) is not False
+    only=list(prov.get("only") or [])
     order=list(prov.get("order") or [])
     ignore=set(prov.get("ignore") or [])
+    constrained=only or order
     try: eps=endpoints(api)
     except Exception as e:
         print("  "+R("✗")+f" {key}: endpoints failed ({e})"); issues+=1; continue
@@ -388,32 +396,38 @@ for key,cfg in models.items():
             except (TypeError, ValueError): return 0
         prompt_price=per_million(pricing.get("prompt"))
         completion_price=per_million(pricing.get("completion"))
-        score=(1000 if status==0 and tools else 0) + min(tps,200) + up*0.5
+        capability_ok=tools or not requires_tools
+        score=(1000 if status==0 and capability_ok else 0) + min(tps,200) + up*0.5
         if status!=0: score-=500
-        if not tools: score-=300
+        if requires_tools and not tools: score-=300
         if quant in ("fp4","int4"): score-=40
         cur=by.get(b)
         if not cur or score>cur["score"]:
             by[b]={"score":score,"status":status,"tools":tools,"tps":tps,"up":up,
                    "lat":lat,"prompt":prompt_price,"completion":completion_price,"quant":quant}
-    healthy=sorted([b for b,v in by.items() if v["status"]==0 and v["tools"]],
+    healthy=sorted([b for b,v in by.items()
+                    if v["status"]==0 and (v["tools"] or not requires_tools)],
                    key=lambda b: -by[b]["score"])
-    dead=[p for p in order if p not in by]
-    unhealthy=[p for p in order if p in by and (by[p]["status"]!=0 or not by[p]["tools"])]
+    dead=[p for p in constrained if p not in by]
+    unhealthy=[p for p in constrained if p in by and
+               (by[p]["status"]!=0 or (requires_tools and not by[p]["tools"]))]
     eligible=[p for p in healthy if p not in ignore]
-    reachable=[p for p in order if p in eligible] if order else eligible
-    top3=eligible[:3]
-    priced=[p for p in eligible if by[p]["completion"] > 0]
+    reachable=[p for p in constrained if p in eligible] if constrained else eligible
+    top3=reachable[:3]
+    priced=[p for p in reachable if by[p]["completion"] > 0]
     cheapest=min(priced, key=lambda b:(by[b]["completion"],by[b]["prompt"])) if priced else None
     flags=[]
     if dead: flags.append("dead="+",".join(dead)); issues+=1
     if unhealthy: flags.append("unhealthy="+",".join(unhealthy)); issues+=1
     if not reachable: flags.append("ZERO reachable"); issues+=1
-    elif order and order[0] not in top3 and order[0] in by:
+    elif order and not only and order[0] not in top3 and order[0] in by:
         flags.append(f"prefer {top3[0]} over {order[0]}")
     mark=G("✓") if not flags else Y("⚠")
     print(f"  {mark} {cfg.get('id') or key}")
-    route=(", ".join(order[:6])+("…" if len(order)>6 else "") if order else "OpenRouter auto")
+    route_values=only or order
+    route_prefix="only" if only else "order" if order else "auto"
+    route=(f"{route_prefix}: "+", ".join(route_values[:6])+
+           ("…" if len(route_values)>6 else "") if route_values else "OpenRouter auto")
     def endpoint_text(name):
         v=by[name]
         latency=f"{v['lat']/1000:.2f}s" if v["lat"] else "n/a"
