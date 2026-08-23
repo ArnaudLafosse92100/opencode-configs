@@ -240,6 +240,9 @@ if native_omo_path.is_file():
     native_config = native_omo.get("[opencode]", native_omo)
     if not isinstance(native_config, dict):
         raise SystemExit(f"invalid [opencode] wrapper: {native_omo_path}")
+    runtime_fallback = omo.get("runtime_fallback")
+    if isinstance(runtime_fallback, dict):
+        native_config["runtime_fallback"] = runtime_fallback
     for section_name in ("agents", "categories"):
         native_section = native_config.setdefault(section_name, {})
         if not isinstance(native_section, dict):

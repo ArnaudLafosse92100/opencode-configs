@@ -236,6 +236,15 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
 
+Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
+package cache so transient primary-provider glitches retry the same primary
+model before model fallback: `same_model_retries_before_fallback=3`,
+`timeout_seconds=20`, and `first_prompt_timeout_seconds=20`. Thus in pentest
+mode a transient DeepSeek/OpenRouter stall retries DeepSeek up to three times,
+then falls back to GLM. Quota, missing-key, model-not-found, abort, and
+context-overflow failures skip same-model retries. Reapply/verify the patch
+with `oc plugin --fix`; `oc doctor` reports whether it is present.
+
 Runtime profiles can override this matrix without removing native OmO agents/categories. `oc profile normal` keeps the broad matrix. `oc profile pentest` pins every real agent/category route to DeepSeek V4 Flash 0731 primary with GLM 5.2 Exacto fallback, except `ultrabrain` which is GLM primary with DeepSeek fallback. Thus `writing`, `quick`, `explore`, `librarian`, `Sisyphus-Junior`, `agentic-deep-kimi`, and content-aware work stay available but cannot silently call Gemini, Claude/Opus, Kimi, Minimax, or subscription-gateway.
 
 ### Bounded model-routing eval

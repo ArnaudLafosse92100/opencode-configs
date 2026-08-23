@@ -1611,7 +1611,16 @@ if [[ -n "${pin:-}" ]]; then
       opt "plugin cache empty AND ~/.bun/install/cache present — stale manifest may 404 the install; --harden clears it"
       HARDEN_REMOVE+=("$HOME/.bun/install/cache")
     fi
-  else ok "package caches healthy (plugin installed)"; fi
+  else
+    ok "package caches healthy (plugin installed)"
+    if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+      if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+        ok "OmO runtime-fallback primary retry patch present"
+      else
+        opt "OmO runtime-fallback primary retry patch missing — run: oc plugin --fix"
+      fi
+    fi
+  fi
 fi
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Harden (optional): remove opencode-owned externals + disable external loading ─

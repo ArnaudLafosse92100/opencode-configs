@@ -1661,6 +1661,16 @@ oc_omo_plugin_cache_ok() {
   [[ -f "$pkg" ]]
 }
 
+oc_patch_omo_runtime_fallback() {
+  [[ -n "${REPO:-}" ]] || return 0
+  [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] || return 0
+  command -v node >/dev/null 2>&1 || {
+    echo "oc: node required to patch OmO runtime fallback" >&2
+    return 1
+  }
+  node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --apply --repo "$REPO" >/dev/null
+}
+
 # Remove oh-my-openagent@* cache dirs that are not the current pin.
 # Prints pruned basenames (one per line). Returns 0 always (best-effort).
 oc_prune_stale_omo_plugin_caches() {
@@ -1694,6 +1704,7 @@ oc_ensure_omo_plugin_cache() {
   ver="${pin#oh-my-openagent@}"
   cdir="$(oc_omo_plugin_cache_dir "$pin")" || return 1
   if oc_omo_plugin_cache_ok "$pin"; then
+    oc_patch_omo_runtime_fallback || return 1
     return 0
   fi
   if ! command -v bun >/dev/null 2>&1; then
@@ -1736,6 +1747,7 @@ PKGJSON
     echo "oc: plugin cache still missing node_modules/oh-my-openagent after install ($pin)" >&2
     return 1
   fi
+  oc_patch_omo_runtime_fallback || return 1
   return 0
 }
 

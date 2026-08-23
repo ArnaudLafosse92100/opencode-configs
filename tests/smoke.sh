@@ -106,14 +106,19 @@ omo=json.load(open(repo/"oh-my-openagent.json"))
 models=oc["provider"]["openrouter"]["models"]
 flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
 runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
+rf=omo.get("runtime_fallback") or {}
 ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
     and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
-    and "reasoningEffort" not in runtime)
+    and "reasoningEffort" not in runtime
+    and rf.get("same_model_retries_before_fallback")==3
+    and rf.get("timeout_seconds")==20
+    and rf.get("first_prompt_timeout_seconds")==20
+    and (repo/"scripts/patch-omo-runtime-fallback.mjs").is_file())
 sys.exit(0 if ok else 1)
 ' "$REPO"; then
-  ok "exact DeepSeek 0731 route + OmO 4.19.4 reasoning schema"
+  ok "exact DeepSeek 0731 route + OmO 4.19.4 reasoning schema + primary retry policy"
 else
-  bad "DeepSeek version or OmO reasoning schema drift"
+  bad "DeepSeek version, OmO reasoning schema, or runtime fallback retry policy drift"
 fi
 
 # Fast OpenRouter lanes, bounded subscription gateway, expensive models capped.

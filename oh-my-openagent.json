@@ -425,9 +425,11 @@
     ],
     "max_fallback_attempts": 5,
     "cooldown_seconds": 10,
-    "timeout_seconds": 45,
+    "timeout_seconds": 20,
     "notify_on_fallback": true,
-    "restore_primary_after_cooldown": true
+    "restore_primary_after_cooldown": true,
+    "same_model_retries_before_fallback": 3,
+    "first_prompt_timeout_seconds": 20
   },
   "sisyphus_agent": {
     "disabled": false,

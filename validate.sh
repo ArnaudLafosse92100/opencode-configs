@@ -343,6 +343,53 @@ if omo:
             migrated = f.read()
         if '"[opencode]"' in migrated and re.search(r'"models"\s*:\s*\[', migrated):
             err("~/.omo/omo.jsonc has invalid migrated agents.models — run: oc fix")
+        def _parse_jsonc(text):
+            out = []
+            index = 0
+            in_string = False
+            escaped = False
+            while index < len(text):
+                char = text[index]
+                nxt = text[index + 1] if index + 1 < len(text) else ""
+                if in_string:
+                    out.append(char)
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                    index += 1
+                    continue
+                if char == '"':
+                    in_string = True
+                    out.append(char)
+                    index += 1
+                    continue
+                if char == "/" and nxt == "/":
+                    index += 2
+                    while index < len(text) and text[index] not in "\r\n":
+                        index += 1
+                    continue
+                if char == "/" and nxt == "*":
+                    index += 2
+                    while index + 1 < len(text) and text[index:index + 2] != "*/":
+                        index += 1
+                    index += 2
+                    continue
+                out.append(char)
+                index += 1
+            return json.loads(re.sub(r",\s*([}\]])", r"\1", "".join(out)))
+        try:
+            native_omo = _parse_jsonc(migrated)
+            native_config = native_omo.get("[opencode]", native_omo) if isinstance(native_omo, dict) else {}
+            native_runtime_fallback = native_config.get("runtime_fallback") if isinstance(native_config, dict) else None
+            if isinstance(omo.get("runtime_fallback"), dict) and native_runtime_fallback != omo.get("runtime_fallback"):
+                err("~/.omo/omo.jsonc runtime_fallback diverges from oh-my-openagent.json — run: oc profile $(oc profile show)")
+            else:
+                ok("~/.omo/omo.jsonc runtime_fallback mirrors OpenConfig")
+        except Exception as e:
+            warn(f"~/.omo/omo.jsonc could not be parsed for runtime_fallback sync check: {e}")
     else:
         ok("~/.omo/omo.jsonc absent (oh-my-openagent.json is canonical)")
 

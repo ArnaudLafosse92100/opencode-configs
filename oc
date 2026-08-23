@@ -211,6 +211,13 @@ PLUGINHELP
       if [[ -n "$cdir" && -f "$cdir/node_modules/oh-my-openagent/package.json" ]]; then
         ver="$(python3 -c "import json;print(json.load(open('$cdir/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
         ok "installed v${ver:-?}"
+        if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+          if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+            ok "runtime-fallback primary retry patch present"
+          else
+            opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
+          fi
+        fi
       else
         bad "cache empty/broken — run: oc plugin --fix"
       fi

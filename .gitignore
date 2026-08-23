@@ -28,6 +28,8 @@
 
 # ── Allowlist: scripts ──────────────────────────────────────────────
 !*.sh
+!scripts/
+!scripts/**
 
 # ── Allowlist: trees (dir + contents) ───────────────────────────────
 !agents/
