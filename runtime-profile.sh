@@ -301,6 +301,14 @@ fi
 if launchctl list | grep -q "com.arnaud.opencode-codex-bridge"; then
   if launchctl kickstart -k "gui/$(id -u)/com.arnaud.opencode-codex-bridge" 2>/dev/null; then
     ready=0
+    password_file="${OPENCODE_SERVER_PASSWORD_FILE:-${OPENCODE_BRIDGE_STATE_DIR:-$HOME/.local/state/opencode-codex-bridge}/opencode-server-password}"
+    oc_curl() {
+      if [[ -s "$password_file" ]]; then
+        curl -fsS -u "opencode:$(tr -d '\r\n' < "$password_file")" "$@"
+      else
+        curl -fsS "$@"
+      fi
+    }
     expected_model="$(python3 - "$PROFILE_FILE" "$MODE" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -309,8 +317,8 @@ PY
 )"
     for _ in $(seq 1 40); do
       if curl -fsS http://127.0.0.1:10101/healthz >/dev/null 2>&1 \
-        && curl -fsS http://127.0.0.1:4097/global/health >/dev/null 2>&1 \
-        && curl -fsS http://127.0.0.1:4097/agent 2>/dev/null | python3 -c 'import json, sys
+        && oc_curl http://127.0.0.1:4097/global/health >/dev/null 2>&1 \
+        && oc_curl http://127.0.0.1:4097/agent 2>/dev/null | python3 -c 'import json, sys
 expected = sys.argv[1]
 try:
     agents = json.load(sys.stdin)

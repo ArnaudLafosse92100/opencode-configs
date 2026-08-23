@@ -316,7 +316,9 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 - Allow-everything locally for normal tools (trusted box).
 - Hard-deny bash: `rm -rf /|~`, `mkfs`, `sudo`, `git push --force*`, `gh repo delete*`.
 - Providers allowed: OpenRouter + subscription gateway; direct OpenAI remains a compatibility fallback.
-- Server: `127.0.0.1:4097` · share disabled · mdns off.
+- Server: `127.0.0.1:4097` · share disabled · mdns off · Basic Auth via
+  `~/.local/state/opencode-codex-bridge/opencode-server-password` when managed
+  by the bridge.
 
 ---
 

@@ -9,6 +9,7 @@ local OpenCode SQLite database. Prompt and response content are never saved.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 import os
@@ -27,6 +28,7 @@ REPO = HERE.parents[1]
 DEFAULT_DB = pathlib.Path.home() / ".local/share/opencode/opencode.db"
 DEFAULT_RESULTS = pathlib.Path.home() / ".cache/openconfig/evals/orchestration-routing"
 DEFAULT_SERVER = "http://127.0.0.1:4097"
+DEFAULT_PASSWORD_FILE = pathlib.Path.home() / ".local/state/opencode-codex-bridge/opencode-server-password"
 DEFAULT_AGENT = "codex-router"
 OPENROUTER_CREDITS_URL = "https://openrouter.ai/api/v1/credits"
 
@@ -64,6 +66,27 @@ def openrouter_credits(key: str) -> dict[str, float]:
     return {"total": total, "used": used, "remaining": total - used}
 
 
+def opencode_server_password() -> str:
+    value = os.environ.get("OPENCODE_SERVER_PASSWORD", "").strip()
+    if value:
+        return value
+    password_file = pathlib.Path(
+        os.environ.get("OPENCODE_SERVER_PASSWORD_FILE", str(DEFAULT_PASSWORD_FILE))
+    ).expanduser()
+    if password_file.is_file():
+        return password_file.read_text(encoding="utf-8").strip()
+    return ""
+
+
+def opencode_auth_headers() -> dict[str, str]:
+    password = opencode_server_password()
+    if not password:
+        return {}
+    username = os.environ.get("OPENCODE_SERVER_USERNAME", "opencode")
+    token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+    return {"Authorization": f"Basic {token}"}
+
+
 def load_cases() -> dict:
     return json.loads((HERE / "cases.json").read_text(encoding="utf-8"))
 
@@ -93,6 +116,7 @@ def request(
     headers = {
         "content-type": "application/json",
         "x-opencode-directory": urllib.parse.quote(str(directory), safe=""),
+        **opencode_auth_headers(),
     }
     req = urllib.request.Request(server.rstrip("/") + path, data=data, headers=headers, method=method)
     try:
