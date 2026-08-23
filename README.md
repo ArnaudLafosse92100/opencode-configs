@@ -234,7 +234,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | Visual / writing | Gemini 3.1 Pro · 3.6 Flash Nitro | artistry / visual / writing |
 | Ceiling | `anthropic/claude-opus-5` | ultrawork · unspecified-high |
 
-OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the subscription gateway; OpenRouter GPT is their paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
+OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Claude, Gemini, Kimi, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **900s**.
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
 package cache so transient primary-provider glitches retry the same primary
