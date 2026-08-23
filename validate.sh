@@ -436,6 +436,28 @@ if omo:
     if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
         # Backward-compatible schema v1: category map at profile root.
         selected_profile = {"categories": selected_profile}
+    codex_router_expected = (((selected_profile or {}).get("agents") or {}).get("codex-router") or {}).get("model")
+    if codex_router_expected:
+        if (oc or {}).get("model") != codex_router_expected:
+            err(
+                "opencode.json: top-level model must match the active runtime profile "
+                f"codex-router route ({(oc or {}).get('model')!r} != {codex_router_expected!r})"
+            )
+        else:
+            ok("opencode.json top-level model matches active codex-router profile")
+        if (oc or {}).get("small_model") != "openrouter/deepseek/deepseek-v4-flash-0731":
+            err("opencode.json: small_model must stay on DeepSeek Flash 0731")
+        else:
+            ok("opencode.json small_model stays on DeepSeek Flash 0731")
+        for helper_name in ("title", "summary", "compaction"):
+            helper_model = (((oc or {}).get("agent") or {}).get(helper_name) or {}).get("model")
+            if helper_model != "openrouter/deepseek/deepseek-v4-flash-0731":
+                err(f"opencode.json: agent.{helper_name}.model must stay on DeepSeek Flash 0731")
+        if not any(
+            (((oc or {}).get("agent") or {}).get(helper_name) or {}).get("model") != "openrouter/deepseek/deepseek-v4-flash-0731"
+            for helper_name in ("title", "summary", "compaction")
+        ):
+            ok("opencode.json helper agents stay on DeepSeek Flash 0731")
     profile_expected = {}
     for section in ("agents", "categories"):
         for name, expected in ((selected_profile or {}).get(section) or {}).items():

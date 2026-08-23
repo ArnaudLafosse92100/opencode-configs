@@ -36,6 +36,7 @@ import sys
 repo = pathlib.Path(sys.argv[1])
 mode = sys.argv[2]
 omo_path = repo / "oh-my-openagent.json"
+opencode_path = repo / "opencode.json"
 codex_router_path = repo / "agents/codex-router.md"
 prompt_path = repo / "prompts/agents/sisyphus.md"
 profile_path = repo / "runtime-profile.json"
@@ -112,6 +113,7 @@ def parse_jsonc(text):
     return json.loads("".join(without_trailing_commas))
 
 omo = json.loads(omo_path.read_text(encoding="utf-8"))
+opencode = json.loads(opencode_path.read_text(encoding="utf-8"))
 agents = omo.setdefault("agents", {})
 categories = omo.setdefault("categories", {})
 
@@ -187,6 +189,14 @@ pentest = {
 }
 
 selected = pentest if mode == "pentest" else normal
+opencode["model"] = selected["agents"]["codex-router"]["model"]
+opencode["small_model"] = deepseek
+for helper_name in ("title", "summary", "compaction"):
+    helper = opencode.setdefault("agent", {}).setdefault(helper_name, {})
+    if isinstance(helper, dict):
+        helper["model"] = deepseek
+opencode_path.write_text(json.dumps(opencode, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
 for section_name, target in (("agents", agents), ("categories", categories)):
     for name, patch in selected[section_name].items():
         if name not in target:
@@ -270,12 +280,50 @@ PY
 
 "$REPO/signature.sh" --refresh >/dev/null
 echo "OpenConfig runtime profile: $MODE"
+if command -v lsof >/dev/null 2>&1; then
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$command_line" == *"opencode serve"* && "$command_line" == *"--port 4097"* ]]; then
+      kill "$pid" 2>/dev/null || true
+      for _ in $(seq 1 20); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+          break
+        fi
+        sleep 0.1
+      done
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+      fi
+    fi
+  done < <(lsof -tiTCP:4097 -sTCP:LISTEN 2>/dev/null || true)
+fi
 if launchctl list | grep -q "com.arnaud.opencode-codex-bridge"; then
   if launchctl kickstart -k "gui/$(id -u)/com.arnaud.opencode-codex-bridge" 2>/dev/null; then
     ready=0
+    expected_model="$(python3 - "$PROFILE_FILE" "$MODE" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(data[sys.argv[2]]["agents"]["codex-router"]["model"].split("/", 1)[1])
+PY
+)"
     for _ in $(seq 1 40); do
       if curl -fsS http://127.0.0.1:10101/healthz >/dev/null 2>&1 \
-        && curl -fsS http://127.0.0.1:4097/global/health >/dev/null 2>&1; then
+        && curl -fsS http://127.0.0.1:4097/global/health >/dev/null 2>&1 \
+        && curl -fsS http://127.0.0.1:4097/agent 2>/dev/null | python3 -c 'import json, sys
+expected = sys.argv[1]
+try:
+    agents = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+for agent in agents if isinstance(agents, list) else []:
+    if agent.get("name") == "codex-router":
+        model = agent.get("model")
+        if isinstance(model, dict):
+            raise SystemExit(0 if model.get("modelID") == expected else 1)
+        raise SystemExit(0 if agent.get("modelID") == expected else 1)
+raise SystemExit(1)' "$expected_model"
+      then
         ready=1
         break
       fi

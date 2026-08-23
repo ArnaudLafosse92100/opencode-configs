@@ -3,7 +3,7 @@
   "shell": "/bin/zsh",
   "logLevel": "WARN",
   "username": "user",
-  "model": "openrouter/z-ai/glm-5.2-exacto",
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
   "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
   "default_agent": "sisyphus",
   "autoupdate": false,
