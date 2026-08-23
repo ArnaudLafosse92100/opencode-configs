@@ -238,10 +238,13 @@ OpenRouter is primary for GLM, DeepSeek, Claude and Gemini. GPT roles use the su
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
 package cache so transient primary-provider glitches retry the same primary
-model before model fallback: `same_model_retries_before_fallback=3`,
-`timeout_seconds=20`, and `first_prompt_timeout_seconds=20`. Thus in pentest
-mode a transient DeepSeek/OpenRouter stall retries DeepSeek up to three times,
-then falls back to GLM. Quota, missing-key, model-not-found, abort, and
+model before model fallback. The native OmO `runtime_fallback` stays
+upstream-schema compatible and only carries `timeout_seconds=20`; the custom
+retry knobs are OpenConfig-owned environment exports:
+`OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=3` and
+`OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS=20`. Thus in pentest mode a
+transient DeepSeek/OpenRouter stall retries DeepSeek up to three times, then
+falls back to GLM. Quota, missing-key, model-not-found, abort, and
 context-overflow failures skip same-model retries. Reapply/verify the patch
 with `oc plugin --fix`; `oc doctor` reports whether it is present.
 
@@ -365,7 +368,9 @@ opencode-configs/
 
 ```bash
 oc signature && oc test && oc validate && oc versions && oc doctor
-bunx oh-my-openagent@4.19.4 doctor   # upstream: System OK
+oc plugin doctor                     # pin cache + OpenConfig OmO patch
+# Optional raw upstream/schema debug:
+oc plugin doctor --upstream
 ```
 
 Idempotency: re-running install / setup / heal / fix on a healthy box must not clobber `.env`, rewrite correct symlinks, or bump clean config mtimes.

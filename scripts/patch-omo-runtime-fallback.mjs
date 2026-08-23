@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const MARKER = "OpenConfig runtime-fallback primary retry patch v1";
+const MARKER = "OpenConfig runtime-fallback primary retry patch v2";
+const LEGACY_MARKER = "OpenConfig runtime-fallback primary retry patch v1";
 const EXPECTED_OMO_VERSION = "4.19.4";
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
 function usage() {
   console.log(`Usage: node scripts/patch-omo-runtime-fallback.mjs [--check|--apply] [--repo PATH]
 
 Applies OpenConfig's small runtime-fallback patch to the pinned OmO package cache.
 The patch adds same-primary retries before model fallback and makes the first
-subagent prompt watchdog configurable from runtime_fallback.first_prompt_timeout_seconds.`);
+subagent prompt watchdog configurable from OpenConfig-owned environment knobs.`);
 }
 
 function parseArgs(argv) {
-  const args = { mode: "check", repo: resolve(import.meta.dirname, "..") };
+  const args = { mode: "check", repo: resolve(SCRIPT_DIR, "..") };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--check") args.mode = "check";
@@ -54,8 +57,64 @@ function replaceOnce(text, search, replacement, label) {
   return text.replace(search, replacement);
 }
 
+function applyEnvironmentRuntimeKnobs(original) {
+  let text = original;
+
+  if (!text.includes("function openConfigRuntimeFallbackInteger")) {
+    text = replaceOnce(
+      text,
+      `function shouldRetryPrimaryBeforeFallback(state3, config3, options = {}) {
+  const maxPrimaryRetries = Number(config3.same_model_retries_before_fallback ?? 0);`,
+      `function openConfigRuntimeFallbackInteger(name, fallback) {
+  const raw = typeof process !== "undefined" ? process.env?.[name] : undefined;
+  if (raw === undefined || raw === "")
+    return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed))
+    return fallback;
+  return Math.max(0, Math.trunc(parsed));
+}
+function configuredPrimaryRetryLimit(config3) {
+  if (Number.isFinite(Number(config3.same_model_retries_before_fallback)))
+    return Math.max(0, Math.trunc(Number(config3.same_model_retries_before_fallback)));
+  return openConfigRuntimeFallbackInteger("OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK", 0);
+}
+function configuredFirstPromptWatchdogMs(config3) {
+  const configured = Number(config3.first_prompt_timeout_seconds);
+  const seconds = Number.isFinite(configured) ? configured : openConfigRuntimeFallbackInteger("OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS", DEFAULT_FIRST_PROMPT_WATCHDOG_MS / 1000);
+  return Math.max(1000, seconds * 1000);
+}
+function shouldRetryPrimaryBeforeFallback(state3, config3, options = {}) {
+  const maxPrimaryRetries = configuredPrimaryRetryLimit(config3);`,
+      "environment runtime knobs",
+    );
+  }
+
+  text = replaceOnce(
+    text,
+    `      maxPrimaryRetries: config3.same_model_retries_before_fallback,`,
+    `      maxPrimaryRetries,`,
+    "same-model retry log limit",
+  );
+
+  text = replaceOnce(
+    text,
+    `  const firstPromptWatchdogMs = Math.max(1000, Number(config3.first_prompt_timeout_seconds ?? DEFAULT_FIRST_PROMPT_WATCHDOG_MS / 1000) * 1000);
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs);`,
+    `  const firstPromptWatchdogMs = configuredFirstPromptWatchdogMs(config3);
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs);`,
+    "firstPromptWatchdog.environment",
+  );
+
+  return text;
+}
+
 function patchDist(original) {
   if (original.includes(MARKER)) return { text: original, changed: false };
+  if (original.includes(LEGACY_MARKER)) {
+    const text = `${applyEnvironmentRuntimeKnobs(original)}\n/* ${MARKER} */\n`;
+    return { text, changed: true };
+  }
   let text = original;
 
   text = replaceOnce(
@@ -316,6 +375,7 @@ function prepareFallback(sessionID, state3, fallbackModels, config3, options = {
     "firstPromptWatchdog.config",
   );
 
+  text = applyEnvironmentRuntimeKnobs(text);
   text = `${text}\n/* ${MARKER} */\n`;
   return { text, changed: true };
 }
@@ -326,6 +386,8 @@ function assertPatched(text) {
     "same_model_retries_before_fallback",
     "first_prompt_timeout_seconds",
     "function shouldRetryPrimaryBeforeFallback",
+    "OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK",
+    "OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS",
     "primaryRetryCount",
     "allowPrimaryRetry",
     "firstPromptWatchdogMs",

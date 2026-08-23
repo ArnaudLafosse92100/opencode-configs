@@ -107,18 +107,21 @@ models=oc["provider"]["openrouter"]["models"]
 flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
 runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
 rf=omo.get("runtime_fallback") or {}
+common=(repo/"lib/common.sh").read_text()
 ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
     and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
     and "reasoningEffort" not in runtime
-    and rf.get("same_model_retries_before_fallback")==3
     and rf.get("timeout_seconds")==20
-    and rf.get("first_prompt_timeout_seconds")==20
+    and "same_model_retries_before_fallback" not in rf
+    and "first_prompt_timeout_seconds" not in rf
+    and "OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK" in common
+    and "OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS" in common
     and (repo/"scripts/patch-omo-runtime-fallback.mjs").is_file())
 sys.exit(0 if ok else 1)
 ' "$REPO"; then
-  ok "exact DeepSeek 0731 route + OmO 4.19.4 reasoning schema + primary retry policy"
+  ok "exact DeepSeek 0731 route + OmO schema-clean runtime fallback + OpenConfig retry policy"
 else
-  bad "DeepSeek version, OmO reasoning schema, or runtime fallback retry policy drift"
+  bad "DeepSeek version, OmO reasoning schema, or OpenConfig runtime fallback retry policy drift"
 fi
 
 # Fast OpenRouter lanes, bounded subscription gateway, expensive models capped.

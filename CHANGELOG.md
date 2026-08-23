@@ -4,6 +4,11 @@ All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented
 
 ## Unreleased — 2026-08-09
 
+### Schema-clean runtime fallback retries
+- Keep native OmO `runtime_fallback` upstream-compatible and move custom same-primary retry knobs to OpenConfig-owned `OPENCONFIG_OMO_*` environment exports
+- Make the pinned OmO runtime patch upgradeable from v1 to v2 and compatible with the advertised Node 20 runtime floor
+- Change `oc plugin doctor` / `oc doctor` to report OpenConfig-managed pin/cache/patch health by default; raw upstream OmO doctor remains available with `oc plugin doctor --upstream`
+
 ### DeepSeek 0731 route correction + runtime refresh
 - Pin the exact OpenRouter model `deepseek/deepseek-v4-flash-0731`; the unversioned slug still resolves to the April 0423 release on OpenRouter
 - Make the validator reject the legacy Flash slug and require the exact 0731 Nitro model definition

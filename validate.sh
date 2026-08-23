@@ -393,6 +393,19 @@ if omo:
     else:
         ok("~/.omo/omo.jsonc absent (oh-my-openagent.json is canonical)")
 
+    rf = omo.get("runtime_fallback") if isinstance(omo.get("runtime_fallback"), dict) else {}
+    custom_runtime_keys = {"same_model_retries_before_fallback", "first_prompt_timeout_seconds"}
+    leaked = sorted(custom_runtime_keys & set(rf))
+    if leaked:
+        err(
+            "oh-my-openagent.json: custom OpenConfig retry knobs must not live in runtime_fallback "
+            f"(found {leaked}); use lib/common.sh OPENCONFIG_OMO_* env exports."
+        )
+    elif rf.get("timeout_seconds") != 20:
+        err("oh-my-openagent.json: runtime_fallback.timeout_seconds must stay 20 for fast provider-glitch recovery")
+    else:
+        ok("runtime_fallback stays upstream-schema compatible; OpenConfig retry knobs are env-owned")
+
     # OmO injects security-* via a loopback skills.urls server; OpenCode can
     # deadlock fetching that index during `opencode run` bootstrap. Keep them disabled.
     disabled_skills = {str(s).lower() for s in (omo.get("disabled_skills") or [])}

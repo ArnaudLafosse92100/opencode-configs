@@ -123,7 +123,7 @@ fi
 sec "Runtimes"
 for c in node bun python3 git curl; do
   if command -v "$c" >/dev/null 2>&1; then ok "$c ($("$c" --version 2>/dev/null | head -1 | tr -d '\n'))"; else
-    [[ "$c" == "bun" ]] && opt "$c not found (needed for plugin doctor)" || bad "$c not found"
+    [[ "$c" == "bun" ]] && opt "$c not found (needed for plugin cache install / upstream doctor)" || bad "$c not found"
   fi
 done
 
@@ -178,36 +178,19 @@ PY
     tip "prune: oc cleanup --yes   # keeps only $pin"
   fi
 fi
-# bunx doctor: trust System OK; interpret "outdated" against pin cache + registry (not npm CLI cache)
-if command -v bunx >/dev/null 2>&1 && [[ -n "$pin" ]]; then
-  dout="$(bunx "$pin" doctor 2>/dev/null)"
-  if printf '%s' "$dout" | grep -q "System OK"; then
-    ok "plugin doctor: $(printf '%s' "$dout" | grep -iE 'System OK' | head -1 | sed 's/^[^A-Za-z]*//')"
-  elif printf '%s' "$dout" | grep -qi "outdated\|Loaded plugin is outdated"; then
-    _loaded="$(printf '%s' "$dout" | sed -nE 's/.*Loaded ([0-9][0-9.]*).*/\1/p' | head -1)"
-    _latest="$(printf '%s' "$dout" | sed -nE 's/.*[Ll]atest ([0-9][0-9.]*).*/\1/p' | head -1)"
-    if [[ -n "$_cache_ver" && -n "$pin_ver" && "$_cache_ver" == "$pin_ver" ]]; then
-      if [[ -n "$_latest" && "$_latest" != "$pin_ver" ]]; then
-        soft "plugin pin $pin_ver behind npm latest ${_latest} — bump versions.json + opencode.json together"
-        tip "after bump: oc setup && oc cleanup --yes && oc versions"
-      elif [[ -n "$_stale_caches" ]]; then
-        info "plugin doctor 'outdated' is stale-cache noise (pin cache is v$pin_ver; bunx saw ${_loaded:-old})"
-      else
-        info "plugin doctor reported outdated but pin cache is v$pin_ver — ignore or re-run after oc cleanup"
-      fi
-    elif [[ -n "$_loaded" && -n "$pin_ver" && "$_loaded" != "$pin_ver" ]]; then
-      opt "plugin doctor loaded v$_loaded but pin is $pin_ver — refresh cache: oc setup · oc cleanup --yes"
+if [[ -n "$pin" ]]; then
+  if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+    if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+      ok "runtime-fallback primary retry patch present"
     else
-      soft "plugin doctor: outdated report (pin=$pin_ver cache=${_cache_ver:-?} loaded=${_loaded:-?})"
+      opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
     fi
-    unset _loaded _latest
   else
-    opt "plugin doctor: $(printf '%s' "$dout" | grep -iE 'issue' | head -1 | cut -c1-100)"
+    opt "runtime-fallback patch check unavailable — missing node or patch script"
   fi
+  info "raw upstream OmO doctor is opt-in: oc plugin doctor --upstream"
 elif [[ -z "$pin" ]]; then
   bad "no oh-my-openagent@… pin in opencode.json"
-else
-  opt "bun missing — cannot verify plugin version"
 fi
 # OpenCode background-installs @opencode-ai/plugin@$CLI into the config dir.
 # When npm lags the CLI by a patch → WARN spam, not fatal. Align with: oc versions --fix

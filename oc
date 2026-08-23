@@ -23,7 +23,7 @@
 #   profile [show|normal|pentest]        Switch runtime routing profile
 #   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
-#   plugin [doctor|cache]                 OmO plugin doctor / cache status
+#   plugin [doctor|cache]                 OmO pin cache + OpenConfig patch health
 #   run "<msg>" [-a agent] [-d dir]       Headless runner (run to completion)
 #   admin [status|health|ratelimit|...]   OpenRouter account admin
 #   launch [dir]                          Launch OpenCode (terminal-safe)
@@ -109,7 +109,7 @@ ${c_bold}Models & Admin:${c_0}
   ${c_g}eval${c_0}      [--execute|--run-budget N]    Bounded model-routing canary (plan-only by default)
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]
                                          Package pins vs npm + GitHub (+ other repos)
-  ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO plugin doctor / pin cache
+  ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO pin cache + OpenConfig patch health
   ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + subscription gateway admin
 
 ${c_bold}Run & Launch:${c_0}
@@ -158,7 +158,7 @@ ${c_bold}Examples:${c_0}
   oc versions --fix               Align ~/.opencode @opencode-ai/plugin to CLI
   oc eval                         Show zero-cost DeepSeek/Kimi/Sonnet canary plan
   oc eval --execute               Run the first bounded comparison (default cap: \$1)
-  oc plugin doctor               Upstream OmO plugin doctor (pin cache)
+  oc plugin doctor               OmO pin cache + OpenConfig patch health
   oc fix                         Restore agent colors + footguns
   oc validate                    Structural / footgun checks
   oc run "Fix the failing tests" Headless: run to completion
@@ -179,23 +179,26 @@ HELP
 
 # ── OmO plugin doctor / cache (oc plugin doctor) ──
 do_plugin() {
-  local sub="${1:-doctor}" do_fix=0 pin pin_ver cdir ver dout loaded latest cache_ver a
+  local sub="${1:-doctor}" do_fix=0 run_upstream=0 plugin_ok=0 pin pin_ver cdir ver dout loaded latest cache_ver a
   [[ $# -gt 0 ]] && shift
   for a in "$sub" "$@"; do
     [[ "$a" == "--fix" || "$a" == "fix" ]] && do_fix=1
+    [[ "$a" == "--upstream" || "$a" == "upstream" ]] && run_upstream=1
   done
   case "$sub" in
     --fix|fix) sub=doctor ;;
+    upstream|upstream-doctor) sub=doctor; run_upstream=1 ;;
   esac
 
   case "$sub" in
     -h|--help|help)
       cat <<PLUGINHELP
-${c_bold}oc plugin${c_0} — OmO (oh-my-openagent) pin cache + upstream doctor
+${c_bold}oc plugin${c_0} — OmO (oh-my-openagent) pin cache + OpenConfig patch health
 
 ${c_bold}Usage:${c_0}
-  ${c_g}oc plugin doctor${c_0} [--fix]   bunx oh-my-openagent@pin doctor
-  ${c_g}oc plugin cache${c_0}            pin path + installed version
+  ${c_g}oc plugin doctor${c_0} [--fix]              pin path + installed version + OpenConfig patch
+  ${c_g}oc plugin doctor --upstream${c_0}           raw upstream OmO doctor (schema/debug)
+  ${c_g}oc plugin cache${c_0}                       pin path + installed version
   ${c_g}oc plugin --fix${c_0}              prune stale caches + ensure pin
 
 ${c_dim}Full stack:${c_0} ${c_g}oc doctor${c_0}   ${c_dim}Pins:${c_0} ${c_g}oc versions${c_0}
@@ -258,12 +261,44 @@ PLUGINHELP
     fi
   fi
 
+  if [[ $run_upstream -eq 0 ]]; then
+    printf "\n${c_b}${c_bold}== OmO plugin doctor ==${c_0} ${c_dim}$pin${c_0}\n"
+    cdir="$(oc_omo_plugin_cache_dir "$pin" 2>/dev/null || true)"
+    if [[ -f "${cdir:-}/node_modules/oh-my-openagent/package.json" ]]; then
+      ver="$(python3 -c "import json;print(json.load(open('${cdir}/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
+      if [[ "$ver" == "$pin_ver" ]]; then
+        ok "cache → v${ver:-?}"
+      else
+        plugin_ok=1
+        opt "cache version ${ver:-?} differs from pin $pin_ver — run: oc plugin --fix"
+      fi
+    else
+      plugin_ok=1
+      bad "pin cache missing — run: oc plugin --fix"
+    fi
+    if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+      if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+        ok "runtime-fallback primary retry patch present"
+      else
+        plugin_ok=1
+        opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
+      fi
+    else
+      plugin_ok=1
+      opt "runtime-fallback patch check unavailable — missing node or patch script"
+    fi
+    printf '\n'
+    tip "raw upstream OmO doctor: oc plugin doctor --upstream"
+    tip "stack health: oc doctor · pins: oc versions"
+    return "$plugin_ok"
+  fi
+
   if ! command -v bunx >/dev/null 2>&1; then
     bad "bun/bunx required for plugin doctor"
     exit 1
   fi
 
-  printf "\n${c_b}${c_bold}== OmO plugin doctor ==${c_0} ${c_dim}$pin${c_0}\n"
+  printf "\n${c_b}${c_bold}== OmO upstream doctor ==${c_0} ${c_dim}$pin${c_0}\n"
   cdir="$(oc_omo_plugin_cache_dir "$pin" 2>/dev/null || true)"
   if [[ -f "${cdir:-}/node_modules/oh-my-openagent/package.json" ]]; then
     ver="$(python3 -c "import json;print(json.load(open('${cdir}/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
