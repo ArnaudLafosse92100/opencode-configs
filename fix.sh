@@ -14,7 +14,7 @@
 #   • Claude family: require_parameters=false, model temperature=false
 #   • permission: drop bogus "write"; drop "doom_loop" inside the bash pattern map
 #   • normalize the oh-my-* plugin pin
-#   • lock skills.paths to repo-local ./skills (drop external ~/.claude, ~/.agents dirs)
+#   • lock skills.paths to canonical OpenConfig skills (drop duplicate/external imports)
 # Repairs (oh-my-openagent.json):
 #   • reasoningEffort -> reasoning; agent color -> hex (or removed)
 #   • strip hidden/steps/thinking/providerOptions
@@ -164,15 +164,18 @@ for pat, val in BASH_DENY.items():
         bash[pat] = val
         changes.append(f"permission.bash[{pat!r}] -> {val}")
 
-# Skills: global OpenConfig skills (any cwd — orca, Projects, …) + project-local ./skills.
-# Drop ~/.claude / ~/.agents imports; keep ~/.config/opencode/skills (the config symlink).
-ALLOWED_SKILL_PATHS = ["~/.config/opencode/skills", "./skills"]
+# Skills: canonical OpenConfig skills only. ~/.config/opencode is itself the
+# OpenConfig symlink, while ./skills resolves to the same directory when the
+# bridge runs from its private XDG overlay; keeping both makes OpenCode load
+# duplicate skills. Project-specific skills should be configured by the project,
+# not globally.
+ALLOWED_SKILL_PATHS = ["~/.config/opencode/skills"]
 sk = oc.setdefault("skills", {})
 paths = [str(p) for p in (sk.get("paths") or [])]
 bad = [p for p in paths if p not in ALLOWED_SKILL_PATHS and (".claude" in p or ".agents" in p or (p.startswith(("~", "/")) and "opencode/skills" not in p))]
 if bad or paths != ALLOWED_SKILL_PATHS:
     sk["paths"] = list(ALLOWED_SKILL_PATHS)
-    changes.append("skills.paths -> %s (global OpenConfig + project ./skills)" % ALLOWED_SKILL_PATHS)
+    changes.append("skills.paths -> %s (canonical OpenConfig skills only)" % ALLOWED_SKILL_PATHS)
 
 # Goal footgun doc must load every session
 instr = oc.get("instructions")

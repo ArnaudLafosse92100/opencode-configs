@@ -1569,11 +1569,11 @@ if [[ ${#ext_cfg[@]} -gt 0 ]]; then
   bad "external config loads alongside repo: ${ext_cfg[*]} — move/remove it (repo is the single source)"
 else ok "no external opencode.json outside the repo"; fi
 
-# 4. Skills fence — global OpenConfig skills + project ./skills (no ~/.claude / ~/.agents)
+# 4. Skills fence — canonical OpenConfig skills only (no duplicates, no ~/.claude / ~/.agents)
 ext_skills="$(python3 - "$REPO" <<'PY' 2>/dev/null || true
 import json, os, sys
 repo=sys.argv[1]; ext=[]
-ALLOWED={ "~/.config/opencode/skills", "./skills" }
+ALLOWED={ "~/.config/opencode/skills" }
 def outside(p):
     p=str(p)
     if p in ALLOWED: return False
@@ -1589,7 +1589,7 @@ PY
 )"
 if [[ -n "$ext_skills" ]]; then
   opt "skills load from OUTSIDE OpenConfig: ${ext_skills//|/, } — run: oc fix"
-else ok "skills: ~/.config/opencode/skills + ./skills (any project cwd)"; fi
+else ok "skills: ~/.config/opencode/skills only (canonical OpenConfig skills, no duplicate ./skills load)"; fi
 
 # 5. Claude Code bridge — imports external MCP/commands/skills/hooks
 cc_on="$(python3 -c "

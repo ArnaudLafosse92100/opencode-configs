@@ -28,8 +28,7 @@
   ],
   "skills": {
     "paths": [
-      "~/.config/opencode/skills",
-      "./skills"
+      "~/.config/opencode/skills"
     ]
   },
   "agent": {
