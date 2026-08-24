@@ -564,6 +564,27 @@ if [[ -d "$INSTALL_DIR/.git" ]] && ! git -C "$INSTALL_DIR" remote get-url upstre
   git -C "$INSTALL_DIR" remote add upstream "$UPSTREAM_REPO_URL"
 fi
 
+# Materialize the signed comparison snapshot even though the canonical branch
+# selectively ports it and therefore does not contain it in its own ancestry.
+if [[ -d "$INSTALL_DIR/.git" && -f "$INSTALL_DIR/signature.json" ]]; then
+  upstream_reference="$(python3 - "$INSTALL_DIR/signature.json" 2>/dev/null <<'PY' || true
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("upstream_reference_commit") or "")
+PY
+)"
+  if [[ -z "$upstream_reference" ]]; then
+    upstream_reference="$(sed -n 's/.*"upstream_reference_commit"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' "$INSTALL_DIR/signature.json" | head -1)"
+  fi
+  if [[ "$upstream_reference" =~ ^[0-9a-f]{40}$ ]] \
+    && ! git -C "$INSTALL_DIR" cat-file -e "${upstream_reference}^{commit}" 2>/dev/null; then
+    if git -C "$INSTALL_DIR" fetch --depth 1 upstream "$upstream_reference" 2>/dev/null; then
+      ok "Fetched signed upstream comparison ${upstream_reference:0:12}…"
+    else
+      opt "signed upstream comparison could not be fetched now — oc doctor will report it until online"
+    fi
+  fi
+fi
+
 [[ -f "$INSTALL_DIR/opencode.json" ]] || die "missing opencode.json in $INSTALL_DIR — aborting"
 [[ -f "$INSTALL_DIR/lib/common.sh" ]] || die "missing lib/common.sh in $INSTALL_DIR — aborting"
 [[ -x "$INSTALL_DIR/setup.sh" ]] || chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR/oc" 2>/dev/null || true

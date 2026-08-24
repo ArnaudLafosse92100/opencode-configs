@@ -93,6 +93,8 @@ required = (
     "remote add origin",
     "checkout -b",
     "pull --ff-only origin",
+    "upstream_reference_commit",
+    "fetch --depth 1 upstream",
 )
 missing = [value for value in required if value not in installer]
 if missing:
