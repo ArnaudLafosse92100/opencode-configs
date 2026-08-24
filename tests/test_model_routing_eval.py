@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import pathlib
@@ -18,6 +19,12 @@ SPEC = importlib.util.spec_from_file_location("model_routing_eval", RUNNER)
 assert SPEC and SPEC.loader
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
+PROFILE_SPEC = importlib.util.spec_from_file_location(
+    "runtime_profile", REPO / "scripts/runtime-profile.py"
+)
+assert PROFILE_SPEC and PROFILE_SPEC.loader
+runtime_profile = importlib.util.module_from_spec(PROFILE_SPEC)
+PROFILE_SPEC.loader.exec_module(runtime_profile)
 
 
 def response(**overrides: object) -> str:
@@ -121,6 +128,54 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 bad = [model for model in models if model not in allowed]
                 self.assertEqual(bad, [], f"{section}.{name}")
 
+    def test_pentest_routes_remain_unchanged(self) -> None:
+        canonical = json.dumps(
+            self.profile_data["pentest"], sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        self.assertEqual(
+            hashlib.sha256(canonical).hexdigest(),
+            "94151e94f3b9fa1d108b82b2aac11ff12fc65001832e9d36a1b3f5f79b08a939",
+        )
+
+    def test_removed_models_are_absent_from_active_config(self) -> None:
+        removed = (
+            "poolside/laguna-s-2.1",
+            "meituan/longcat-2.0",
+            "qwen/qwen3.8-max",
+        )
+        active_files = (
+            "runtime-profile.json",
+            "oh-my-openagent.json",
+            "opencode.json",
+            "profiles/writing.json",
+            "fix.sh",
+        )
+        for file_name in active_files:
+            content = (REPO / file_name).read_text(encoding="utf-8")
+            for model in removed:
+                with self.subTest(file=file_name, model=model):
+                    self.assertNotIn(model, content)
+
+    def test_normal_quick_and_unspecified_low_use_flash_with_ordered_fallbacks(self) -> None:
+        expected = {
+            "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "fallback_models": [
+                "openrouter/minimax/minimax-m3",
+                "openrouter/z-ai/glm-5.3",
+            ],
+        }
+        normal = self.profile_data["normal"]["categories"]
+        for name in ("quick", "unspecified-low"):
+            with self.subTest(name=name):
+                self.assertEqual(normal[name], expected)
+                self.assertEqual(
+                    self.config["categories"][name]["model"], expected["model"]
+                )
+                self.assertEqual(
+                    self.config["categories"][name]["fallback_models"],
+                    expected["fallback_models"],
+                )
+
     def test_pentest_profile_separates_fast_deep_and_ultrabrain_lanes(self) -> None:
         selected = self.profile_data["pentest"]
         pro = "openrouter/deepseek/deepseek-v4-pro-0813"
@@ -196,11 +251,37 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 env=env,
             )
             state_path = pathlib.Path(state)
-            runtime = state_path / "runtime/profiles/pentest"
+            runtime = (state_path / "runtime/current").resolve()
             rendered = json.loads((runtime / "opencode.json").read_text(encoding="utf-8"))
             self.assertEqual(rendered["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
             self.assertEqual((state_path / "active-profile").read_text().strip(), "pentest")
             self.assertEqual((state_path / "runtime/current").resolve(), runtime.resolve())
+            legacy_omo = json.loads((runtime / "oh-my-openagent.json").read_text(encoding="utf-8"))
+            native_text = (state_path / "compat/current/.omo.jsonc").read_text(encoding="utf-8")
+            native = json.loads(native_text.removeprefix("// OMO configuration\n"))
+            self.assertTrue(
+                {
+                    "2026-07-opencode-config-unification",
+                    "2026-08-reasoning-unification",
+                }.issubset(native["_migrations"])
+            )
+            for section in ("agents", "categories"):
+                for name, legacy_route in legacy_omo[section].items():
+                    with self.subTest(native_section=section, route=name):
+                        native_route = native["[opencode]"][section][name]
+                        self.assertNotIn("model", native_route)
+                        self.assertNotIn("fallback_models", native_route)
+                        self.assertNotIn("reasoning", native_route)
+                        self.assertNotIn("variant", native_route)
+                        models = native_route["models"]
+                        self.assertIsInstance(models, list)
+                        self.assertGreater(len(models), 0)
+                        primary = models[0]
+                        self.assertEqual(
+                            primary["model"] if isinstance(primary, dict) else primary,
+                            legacy_route["model"],
+                        )
+                        self.assertEqual(models[1:], legacy_route["fallback_models"])
             xdg_result = subprocess.run(
                 [
                     "python3",
@@ -216,10 +297,53 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 text=True,
             )
             xdg = pathlib.Path(xdg_result.stdout.strip())
-            self.assertEqual((xdg / "opencode").resolve(), runtime.resolve())
+            self.assertEqual(
+                (xdg / "opencode").resolve(),
+                (state_path / "compat/current").resolve(),
+            )
             self.assertEqual((xdg / "gh").resolve(), (pathlib.Path(source_xdg) / "gh").resolve())
         after = {name: (REPO / name).read_bytes() for name in tracked}
         self.assertEqual(after, before)
+
+
+class NativeOmoMigrationTests(unittest.TestCase):
+    def test_native_models_preserve_route_settings_and_normalize_matching_aliases(self) -> None:
+        route = {
+            "model": "openrouter/example/primary",
+            "fallback_models": ["openrouter/example/fallback"],
+            "reasoning": " HIGH ",
+            "reasoningEffort": "high",
+            "variant": "HIGH",
+            "maxTokens": 8192,
+            "temperature": 0.2,
+            "ultrawork": {"model": "openrouter/example/ultra", "variant": "max"},
+        }
+        migrated = runtime_profile._native_models(route, "agents")
+        self.assertEqual(
+            migrated["models"],
+            [{"model": "openrouter/example/primary", "reasoning": "high"}, "openrouter/example/fallback"],
+        )
+        self.assertEqual(migrated["maxTokens"], 8192)
+        self.assertEqual(migrated["temperature"], 0.2)
+        self.assertEqual(
+            migrated["ultrawork"],
+            {"model": "openrouter/example/ultra", "variant": "max"},
+        )
+        for legacy in ("model", "fallback_models", "reasoning", "reasoningEffort", "variant"):
+            self.assertNotIn(legacy, migrated)
+
+    def test_native_models_reject_conflicts_and_preexisting_models(self) -> None:
+        base = {
+            "model": "openrouter/example/primary",
+            "fallback_models": ["openrouter/example/fallback"],
+        }
+        for extra in (
+            {"reasoning": "low", "variant": "high"},
+            {"reasoning": "low", "reasoningEffort": "high"},
+            {"models": ["openrouter/example/old"]},
+        ):
+            with self.subTest(extra=extra), self.assertRaises(SystemExit):
+                runtime_profile._native_models({**base, **extra}, "agents")
 
 
 class CampaignLedgerTests(unittest.TestCase):

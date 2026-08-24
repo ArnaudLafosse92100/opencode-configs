@@ -24,6 +24,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$REPO/lib/common.sh"
 OC_BIN="$(command -v opencode 2>/dev/null || echo "$OC_CLI_BIN")"
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
 
 DO_QUICK=0 DO_FIX=0 DO_HARDEN=0 DO_AI=0 DO_JSON=0
 while [[ $# -gt 0 ]]; do
@@ -76,15 +77,57 @@ else
   tip "or: bash \"$REPO/install.sh\"   # installs CLI + this config stack"
 fi
 
+NATIVE_OMO_PATH="${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"
+NATIVE_MIGRATION_JOURNAL="$(dirname "$NATIVE_OMO_PATH")/.migration-journal.json"
+if [[ -e "$NATIVE_MIGRATION_JOURNAL" || -L "$NATIVE_MIGRATION_JOURNAL" ]]; then
+  bad "pending OmO migration journal at $NATIVE_MIGRATION_JOURNAL — native/profile writes are blocked"
+  tip "inspect and explicitly resolve the OmO migration; do not resume it against this OpenConfig checkout blindly"
+fi
+native_alias_state="$(oc_native_omo_alias_state)"
+if [[ "$native_alias_state" == "alias" ]]; then
+  ok "native OmO is an OpenConfig-governed read-only alias through compat/current/.omo.jsonc"
+else
+  bad "native OmO governance drift (state=$native_alias_state): setup must install the stable compat/current alias"
+  tip "run oc setup after reviewing its recoverable native-OmO backup; direct OmO writers must not replace this alias"
+fi
+profile_snapshot="$($REPO/runtime-profile.sh snapshot 2>/dev/null || true)"
+if ! printf '%s' "$profile_snapshot" | python3 -c '
+import json, sys
+body = json.load(sys.stdin)
+assert body.get("schema_version") == 1
+assert body.get("desiredProfile") in {"normal", "pentest"}
+assert set(body) == {"schema_version", "desiredProfile", "applied", "runtimePath", "compatPath", "expectedIdentity"}
+' >/dev/null 2>&1; then
+  desired_profile="unknown"
+  applied_profile="null"
+  expected_applied_identity="null"
+  bad "profile snapshot is unavailable or malformed; runtime/applied state cannot be proven atomically"
+else
+  desired_profile="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.load(sys.stdin)["desiredProfile"])')"
+  applied_profile="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["applied"], separators=(",", ":")))')"
+  expected_applied_identity="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["expectedIdentity"], separators=(",", ":")))')"
+fi
+if [[ "$desired_profile" != "unknown" && "$applied_profile" == "null" ]]; then
+  opt "profile desired=$desired_profile but not applied to a verified bridge (desired-only or restart pending)"
+elif [[ "$desired_profile" != "unknown" && "$expected_applied_identity" != "null" ]] \
+  && oc_applied_identity_matches "$applied_profile" "$expected_applied_identity" >/dev/null 2>&1
+then
+  ok "profile desired=$desired_profile matches the complete verified bridge-applied runtime/compat identity"
+elif [[ "$desired_profile" != "unknown" ]]; then
+  bad "profile desired=$desired_profile differs from the complete applied runtime/compat marker; rerun oc profile $desired_profile"
+fi
+
 # ─── Config link ─────────────────────────────────────────────────────
 sec "Config location (single source of truth)"
-if [[ -L "$LINK" ]]; then
+if oc_link_points_to "$LINK" "$COMPAT_CURRENT" 2>/dev/null; then
+  ok "$LINK -> generated compatibility view ($COMPAT_CURRENT)"
+elif [[ -L "$LINK" ]]; then
   tgt="$(readlink "$LINK")"
-  [[ "$tgt" == "$REPO" ]] && ok "$LINK -> $REPO" || opt "$LINK -> $tgt (expected $REPO; run: ln -sfn \"$REPO\" \"$LINK\")"
+  opt "$LINK -> $tgt (expected $COMPAT_CURRENT; run: oc setup)"
 elif [[ -e "$LINK" ]]; then
-  opt "$LINK is a real dir, not a symlink to this repo (run: ln -sfn \"$REPO\" \"$LINK\")"
+  opt "$LINK is a real dir, not a compatibility symlink (run: oc setup)"
 else
-  bad "$LINK does not exist (run: ln -sfn \"$REPO\" \"$LINK\")"
+  bad "$LINK does not exist (run: oc setup)"
 fi
 # Leftover copies (exclude ~/.opencode CLI install dir)
 for d in "$HOME/.opencode" "$HOME/opencode-configs" /usr/local/opencode; do
@@ -95,7 +138,7 @@ for d in "$HOME/.opencode" "$HOME/opencode-configs" /usr/local/opencode; do
   fi
   opt "leftover config copy at $d (safe to remove after verifying backups in ~/.opencode-backups)"
 done
-# This repo must stay config-only — OpenCode may drop install artifacts when ~/.config/opencode → here
+# This source repo must stay config-only; raw OpenCode uses the writable compat view.
 _strays=()
 for s in "${OC_CONFIG_STRAYS[@]}"; do
   [[ -e "$REPO/$s" || -L "$REPO/$s" ]] && _strays+=("$s")

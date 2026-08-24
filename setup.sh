@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup.sh — Idempotent OpenConfig setup (repo: opencode-configs)
 #
-# Gets this repo working as ~/.config/opencode.
+# Gets the generated compatibility view working as ~/.config/opencode.
 # Safe to run multiple times. Won't clobber existing .env or working symlinks.
 #
 # Usage:
@@ -15,6 +15,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib/common.sh
 source "$REPO/lib/common.sh"
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
 OMO_TEAMS="$HOME/.omo/teams"
 OC_VERSION="$(oc_versions_get opencode_configs 2>/dev/null || echo "1.5.0")"
 
@@ -31,6 +32,17 @@ for arg in "$@"; do
 done
 
 SYNC_ENV="${SYNC_ENV:-false}"
+
+# OmO can leave a migration journal that still references this canonical
+# checkout. Never render/sync native state around it: a resumed migration could
+# move source files. Resolution is an explicit operator action, not setup work.
+NATIVE_OMO_PATH="${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"
+NATIVE_MIGRATION_JOURNAL="$(dirname "$NATIVE_OMO_PATH")/.migration-journal.json"
+if [[ -e "$NATIVE_MIGRATION_JOURNAL" || -L "$NATIVE_MIGRATION_JOURNAL" ]]; then
+  echo "✗ Pending OmO migration journal: $NATIVE_MIGRATION_JOURNAL" >&2
+  echo "  Refusing setup before it can write native/runtime state. Inspect and explicitly resolve the OmO migration first." >&2
+  exit 1
+fi
 
 fix(){ $CHECK_ONLY && return 0; "$@"; }
 
@@ -62,26 +74,39 @@ else
 fi
 echo ""
 
-# ─── 2. Config symlink ────────────────────────────────────────────
-echo "Step 2: Config symlink (~/.config/opencode → this repo)"
+# ─── 2. Config compatibility symlink ──────────────────────────────
+echo "Step 2: Config compatibility symlink (~/.config/opencode → generated profile)"
 mkdir -p "$(dirname "$LINK")"
-if oc_link_points_to "$LINK" "$REPO" 2>/dev/null; then
+if ! $CHECK_ONLY; then
+  "$REPO/runtime-profile.sh" prepare-native-alias >/dev/null
+fi
+if oc_link_points_to "$LINK" "$COMPAT_CURRENT" 2>/dev/null; then
   ok "symlink correct"
 elif [ -L "$LINK" ]; then
   tgt="$(oc_readlink_abs "$LINK" 2>/dev/null || readlink "$LINK" || true)"
-  opt "symlink points to $tgt (expected $REPO)"
-  $FORCE && { fix ln -sfn "$REPO" "$LINK"; ok "symlink updated"; } || echo "  Run with --force to fix"
+  if oc_link_points_to "$LINK" "$REPO" 2>/dev/null; then
+    opt "migrating legacy source symlink to generated compatibility view"
+    if $CHECK_ONLY; then
+      opt "would migrate legacy source symlink to generated compatibility view"
+    else
+      fix ln -sfn "$COMPAT_CURRENT" "$LINK"
+      ok "symlink migrated (source checkout remains immutable)"
+    fi
+  else
+    opt "symlink points to $tgt (expected $COMPAT_CURRENT)"
+    $FORCE && { fix ln -sfn "$COMPAT_CURRENT" "$LINK"; ok "symlink updated"; } || echo "  Run with --force to fix"
+  fi
 elif [ -d "$LINK" ]; then
   opt "$LINK is a real directory, not a symlink"
   if $FORCE; then
     oc_backup_path "$LINK" "config" >/dev/null
-    fix ln -sfn "$REPO" "$LINK"
+    fix ln -sfn "$COMPAT_CURRENT" "$LINK"
     ok "backed up to ${OC_BACKUP_PATH:-} and symlinked (sessions untouched at $OC_SESSIONS_DIR)"
   else
     echo "  Run with --force to replace (backs up first; never deletes sessions)"
   fi
 elif [ ! -e "$LINK" ]; then
-  fix ln -sfn "$REPO" "$LINK"
+  fix ln -sfn "$COMPAT_CURRENT" "$LINK"
   ok "symlink created"
 fi
 # Explicit: never touch session store
@@ -121,6 +146,37 @@ else
   fi
 fi
 echo ""
+
+# A first install may create .env after the compatibility view was rendered.
+# Re-render once so raw OpenCode sees the linked allowlisted env immediately.
+if ! $CHECK_ONLY; then
+  "$REPO/runtime-profile.sh" prepare-native-alias >/dev/null
+fi
+
+# ─── 3b. Native OmO single-commit alias ────────────────────────────
+echo "Step 3b: Native OmO compatibility alias"
+if $CHECK_ONLY; then
+  native_alias_state="$(oc_native_omo_alias_state)"
+  if [[ "$native_alias_state" == "alias" ]]; then
+    ok "native OmO is OpenConfig-governed via compat/current/.omo.jsonc"
+  else
+    bad "native OmO must be the governed compat/current alias (state=$native_alias_state); run oc setup after reviewing the recoverable backup"
+    exit 1
+  fi
+else
+  if oc_provision_native_omo_alias "$REPO"; then
+    ok "native OmO is OpenConfig-governed via compat/current/.omo.jsonc"
+  else
+    bad "native OmO alias was not provisioned; refusing to continue with mixed profile state"
+    exit 1
+  fi
+fi
+echo ""
+# Only after the original native bytes were backed up and replaced by the
+# stable alias may normal ensure/sync run.
+if ! $CHECK_ONLY; then
+  "$REPO/runtime-profile.sh" ensure --quiet >/dev/null
+fi
 
 # ─── 4. Team specs ────────────────────────────────────────────────
 echo "Step 4: Team mode specs"

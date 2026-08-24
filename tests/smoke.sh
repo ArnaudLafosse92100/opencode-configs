@@ -113,18 +113,46 @@ run_step "setup --check" "$REPO/setup.sh" --check
 run_step "doctor --quick" "$REPO/doctor.sh" --quick
 run_step "versions --local" "$REPO/versions.sh" --local
 
-# A broken migrated OmO config must be detected without touching the real HOME.
+# OmO 4.19.4 native `models` arrays are valid only inside the [opencode]
+# envelope. fix.sh must leave both a regular generated file and the governed
+# alias untouched, while quarantining only the old flat top-level migration.
 test_home="$(mktemp -d)"
-mkdir -p "$test_home/.omo"
-printf '%s\n' '{"[opencode]":{},"agents":{"sisyphus":{"models":["bad"]}}}' > "$test_home/.omo/omo.jsonc"
-quarantine_out="$(HOME="$test_home" "$REPO/fix.sh" --dry-run 2>&1)"
-if grep -q 'quarantined ~/.omo/omo.jsonc' <<< "$quarantine_out"; then
-  ok "broken migrated omo.jsonc is quarantined"
+test_state="$test_home/state"; test_native="$test_home/.omo/omo.jsonc"
+mkdir -p "$(dirname "$test_native")"
+env OC_RUNTIME_STATE_DIR="$test_state" OC_NATIVE_OMO_PATH="$test_native" \
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" env normal >/dev/null
+generated_native="$test_state/compat/current/.omo.jsonc"
+cp "$generated_native" "$test_native"
+generated_before="$(shasum -a 256 "$test_native" | awk '{print $1}')"
+generated_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" --dry-run 2>&1)"
+generated_after="$(shasum -a 256 "$test_native" | awk '{print $1}')"
+if ! grep -q 'quarantined regular' <<< "$generated_out" && [[ "$generated_before" == "$generated_after" ]]; then
+  ok "generated OmO models envelope is a fix.sh no-op"
 else
-  bad "broken migrated omo.jsonc quarantine missing"
+  bad "generated OmO models envelope was misclassified"
 fi
-rm "$test_home/.omo/omo.jsonc"
-rmdir "$test_home/.omo" "$test_home"
+rm -f "$test_native"; ln -s "$generated_native" "$test_native"
+alias_link_before="$(readlink "$test_native")"
+alias_target_before="$(shasum -a 256 "$generated_native" | awk '{print $1}')"
+alias_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" --dry-run 2>&1)"
+alias_target_after="$(shasum -a 256 "$generated_native" | awk '{print $1}')"
+if ! grep -q 'quarantined regular' <<< "$alias_out" && [[ "$(readlink "$test_native")" == "$alias_link_before" ]] \
+  && [[ "$alias_target_before" == "$alias_target_after" ]]; then
+  ok "governed native alias and target stay unchanged by fix.sh"
+else
+  bad "governed native alias was touched by fix.sh"
+fi
+rm -f "$test_native"
+printf '%s\n' '{"agents":{"sisyphus":{"models":["bad"]}},"categories":{"quick":{"models":["bad"]}}}' > "$test_native"
+broken_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" 2>&1)"
+broken_backup="$(find "$test_home/.opencode-backups" -name omo.jsonc -type f | head -1)"
+if grep -q 'quarantined regular' <<< "$broken_out" && [[ ! -e "$test_native" && -f "$broken_backup" ]] \
+  && grep -q '"agents"' "$broken_backup"; then
+  ok "only broken flat regular native migration is quarantined"
+else
+  bad "broken flat regular native migration quarantine"
+fi
+rm -rf "$test_home"
 
 # Exact model/version and OmO reasoning schema guard.
 if python3 -c '

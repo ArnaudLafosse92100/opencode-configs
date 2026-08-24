@@ -371,8 +371,6 @@ if omo:
     if os.path.isfile(omo_jsonc):
         with open(omo_jsonc, encoding="utf-8") as f:
             migrated = f.read()
-        if '"[opencode]"' in migrated and re.search(r'"models"\s*:\s*\[', migrated):
-            err("~/.omo/omo.jsonc has invalid migrated agents.models — run: oc fix")
         def _parse_jsonc(text):
             out = []
             index = 0
@@ -1088,6 +1086,18 @@ if present:
     err(f"config-only violation — remove install/runtime strays: {present} (run ./cleanup.sh or ./fix.sh)")
 else:
     ok("config dir clean (no node_modules/package.json/.omo/.sisyphus/command/plugins)")
+
+# Structural questions need a clear CodeGraph-first route without forcing the
+# graph for a trivial direct read.  Keep the marker testable across overlays.
+core_prompt = os.path.join(repo, "prompts", "core.md")
+try:
+    core_text = open(core_prompt, encoding="utf-8").read()
+    if "use `codegraph_explore` first" in core_text and "trivial known-file read" in core_text:
+        ok("CodeGraph structural-routing marker is present")
+    else:
+        err("prompts/core.md missing CodeGraph structural-routing marker")
+except OSError as exc:
+    err(f"cannot read prompts/core.md for CodeGraph routing marker: {exc}")
 
 # git must ignore the common install paths (even when absent)
 ignore_targets = [

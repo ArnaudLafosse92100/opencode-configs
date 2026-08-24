@@ -19,7 +19,7 @@ source ~/.zshrc && oc doctor && oc launch
 | **Pins** | OpenConfig `1.5.60` · OpenCode `1.18.17+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.17` |
 | **Default lead** | `sisyphus` (runtime-profile routed; normal GLM 5.3, pentest DeepSeek) |
 | **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
-| **Config path** | `~/.config/opencode` → this repo (symlink) |
+| **Public config path** | `~/.config/opencode` → `~/.local/state/openconfig/compat/current` (generated compatibility view) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
 | **Health** | `oc doctor` · `oc versions` · `oc test` |
 
@@ -253,18 +253,18 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `categories.content-aware-deep` | `openrouter/deepseek/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-pro-0813` |
 | `categories.content-aware-fast` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `categories.deep` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-pro-0813` |
-| `categories.quick` | `openrouter/poolside/laguna-s-2.1` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `categories.quick` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `categories.refactor-safe` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `categories.ultrabrain` | `subscription-gateway/gpt-5.6-sol` | `openrouter/z-ai/glm-5.3` |
 | `categories.unspecified-high` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-pro-0813` |
-| `categories.unspecified-low` | `openrouter/poolside/laguna-s-2.1` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `categories.unspecified-low` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `categories.visual-engineering` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `categories.writing` | `openrouter/google/gemini-3.7-flash` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 
 Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|pentest> <agents|categories> <name>`.
 <!-- END GENERATED: runtime-routing -->
 
-OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Qwen, Laguna, Hermes, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
+OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
 package cache so transient primary-provider glitches retry the same primary
@@ -279,7 +279,7 @@ missing-key, model-not-found, abort, and
 context-overflow failures skip same-model retries. Reapply/verify the patch
 with `oc plugin --fix`; `oc doctor` reports whether it is present.
 
-Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|pentest` records only machine-local state and renders effective configs under `~/.local/state/openconfig/runtime/profiles`; `oc profile path` exposes the selected overlay and `oc profile resolve <profile> <agents|categories> <name>` is the stable consumer API. `pentest` uses Flash 0731 for ordinary/fast routes and Pro 0813 for Hephaestus, Oracle, Momus, content-aware-research, `deep`, `unspecified-high`, `arch-review`, and `content-aware-deep`; each falls back to GLM 5.3. `ultrabrain` stays GLM-primary with Pro fallback. Thus every route remains inside the exact DeepSeek/GLM allowlist without making the expensive Pro snapshot the daily default or dirtying Git during a switch.
+Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|pentest` renders a complete machine-local generation under `~/.local/state/openconfig/{runtime,compat}/generations`; **`oc profile path` remains the stable runtime-overlay API** for integrations, while `oc profile compat-path` exposes the writable compatibility home and `oc profile env` returns the paired active config/XDG snapshot. `oc profile resolve <profile> <agents|categories> <name>` remains the stable route API. `pentest` uses Flash 0731 for ordinary/fast routes and Pro 0813 for Hephaestus, Oracle, Momus, content-aware-research, `deep`, `unspecified-high`, `arch-review`, and `content-aware-deep`; each falls back to GLM 5.3. `ultrabrain` stays GLM-primary with Pro fallback. Thus every route remains inside the exact DeepSeek/GLM allowlist without making the expensive Pro snapshot the daily default or dirtying Git during a switch.
 
 ### Bounded model-routing eval
 
@@ -293,9 +293,9 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | --- | --- |
 | `background_task.defaultConcurrency` | **6** |
 | OpenRouter / subscription gateway / Anthropic | **8 / 4 / 2** |
-| DeepSeek Flash / Gemini Flash / Laguna | **10 / 10 / 10** |
-| GLM / MiniMax / LongCat | **8 / 8 / 8** |
-| DeepSeek Pro / Qwen / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 5 / 3** |
+| DeepSeek Flash / Gemini Flash | **10 / 10** |
+| GLM / MiniMax | **8 / 8** |
+| DeepSeek Pro / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 3** |
 | Hermes / Opus 5 / Fable | **2 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |
@@ -352,7 +352,7 @@ oc projects --list
 | `fast` | `hephaestus` | `subscription-gateway/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `research` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `debug` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
-| `writing` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/poolside/laguna-s-2.1` |
+| `writing` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `content-aware` | `content-aware-research` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 <!-- END GENERATED: scaffold-profiles -->
 
@@ -393,7 +393,7 @@ opencode-configs/
 ├── .env.example
 └── zshrc.snippet · ghostty.conf · tmux.conf
 
-~/.config/opencode  →  this repo
+~/.config/opencode  →  ~/.local/state/openconfig/compat/current
 ~/Projects/         →  oc new home
 ~/.omo/teams/       →  team specs
 ~/.opencode-backups/→  backups + heal/install logs
@@ -458,3 +458,70 @@ Installer pulls OpenCode from `https://opencode.ai/install` and OmO from npm `oh
 - Cloudflare AI Gateway / Claude Code bridge imports
 - Packaging as npm / shipping `node_modules` into the config dir
 - Turning this repo into an application
+# Compatibility config home
+
+`/Volumes/PERSO/OpenConfig` is immutable source. Setup renders each profile to
+immutable runtime and writable compatibility generations at
+`~/.local/state/openconfig/{runtime,compat}/generations/<generation-id>`.
+`~/.config/opencode` points atomically to `compat/current`, not to the Git
+checkout. The view contains effective profile config plus wrappers back to the
+source `oc`/launch/admin scripts and a linked `.env`; sessions remain in
+OpenCode's normal data directory. `oc profile env --shell` resolves the paired
+`OPENCODE_CONFIG_DIR` and `XDG_CONFIG_HOME` from one selected profile.
+For diagnostics, `oc profile snapshot` returns one lock-consistent JSON
+observation (`desiredProfile`, raw applied marker, paired current paths, and
+expected v3 identity); it never renders, activates, repairs, or switches.
+`runtime/current` and `active-profile` are stable aliases through that same
+commit pointer. The XDG snapshot (`compat/current/xdg`) is rendered inside the
+same compatibility generation. Staging occurs under unreferenced `.staging`
+directories; only a complete, validated generation is published by replacing
+`compat/current`. Its fingerprint covers the generator, copied configuration,
+and every source-side component reached by the compat view (`oc`, profile and
+launch wrappers, the zsh snippet, and `lib/`) by path, type, mode, and bytes;
+it never hashes `.env`: secrets remain a dynamic linked input. Compatibility identity records only whether `.env` exists and
+its resolved path, so setup can expose a newly created `.env` without making
+secret-value edits regenerate a profile. Runtime and compatibility manifests detect drift in managed
+payloads and generated links (including the source/lib/snippet/runtime links).
+The compatibility identity also inventories immediate non-OpenCode XDG
+siblings by name/type/resolved target, never their contents or secrets. Raw
+OpenCode package artifacts are intentionally outside these manifests and do
+not force needless regeneration. A future operator-approved native alias may likewise target
+`compat/current/.omo.jsonc`, a complete `[opencode]` envelope that preserves
+unmanaged root keys. Its generated native routes use OmO 4.19.4 `models`
+priority arrays (not legacy `model` + `fallback_models`) and carry both
+`2026-07-opencode-config-unification` and `2026-08-reasoning-unification`
+markers, so OmO startup has no native migration to write. `runtime-profile.json`
+remains the routing SSoT and retains its profile-oriented route representation.
+Runtime-profile never creates that native symlink itself:
+`oc setup`/install do so only after profile/envelope/source consensus and make
+a recoverable backup carrying the original mode and SHA-256. Until setup has
+done that, regular native OmO config remains journal-protected and a later
+`oc profile` reader rolls an interrupted switch back before reporting.
+
+`oc profile normal|pentest` commits the desired profile immediately. When a
+LaunchAgent is present it writes `applied-profile.json` only after a fresh
+launchd-owned bridge `/healthz` identity (schema, PID/listener, upstream and
+new instance ID), OpenCode health, and the expected `codex-router` model all verify.
+The pre-restart instance ID is captured from the exact health schema even when
+the bridge is legitimately returning 503 while its upstream recovers, so that
+an ineffective restart cannot reuse that process as fresh proof. A
+v3 marker binds that proof to the selected profile, runtime fingerprint and
+generation, compatibility generation/identities/manifest, and model. A
+restart failure exits non-zero and leaves the marker absent; without a
+LaunchAgent the command succeeds as explicitly **desired-only** and asks for
+`oc launch`.
+OpenConfig treats `~/.omo/omo.jsonc` as an OpenConfig-owned generated alias;
+direct OmO writers are unsupported because they may reject or replace that
+symlink. If
+`~/.omo/.migration-journal.json` exists, `oc profile` and setup fail closed;
+inspect and explicitly resolve that OmO migration before permitting any native
+write, especially where its journal names a source-checkout file.
+
+The one-time native migration accepts no `[opencode]` semantic drift except
+the known Sisyphus `prompt_append` relocation from the managed legacy profile
+path to `file://~/.config/opencode/prompts/agents/sisyphus.md`. OmO rejects a
+direct absolute prompt path below the immutable `~/.local/state` generation;
+the allowed stable config-home alias resolves through `compat/current` to the
+same selected generation and is covered by its applied identity. Both paths
+and the selected profile are checked exactly; every other difference blocks
+before backup.

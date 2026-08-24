@@ -3,7 +3,7 @@
 #
 # Knows exactly what SHOULD be here and checks each item closely:
 #   • required files present in the repo (the manifest below)
-#   • ~/.config/opencode symlinked to this repo
+#   • ~/.config/opencode symlinked to generated compatibility state
 #   • plugin pinned to a version that actually loads (fixes broken pins)
 #   • stale plugin caches pruned (keep only the pinned version)
 #   • leftover config copies removed (backup kept)
@@ -23,6 +23,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$REPO/lib/common.sh"
 CONFIG_HOME="${XDG_CONFIG_HOME}"
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
 CACHE="${XDG_CACHE_HOME}/opencode/packages"
 BACKUP_ROOT="${OC_BACKUP_ROOT}"
 KEEP_BACKUPS=5
@@ -90,8 +91,9 @@ for s in "$REPO"/*.sh "$REPO"/oc; do [[ -x "$s" ]] || { act "chmod +x \"$s\""; f
 
 # ─── 2. Config symlink ───────────────────────────────────────────────
 sec "Config symlink"
-if oc_link_points_to "$LINK" "$REPO" 2>/dev/null; then
-  ok "$LINK -> $REPO"
+if [[ $DRY -eq 0 ]]; then "$REPO/runtime-profile.sh" ensure --quiet >/dev/null; fi
+if oc_link_points_to "$LINK" "$COMPAT_CURRENT" 2>/dev/null; then
+  ok "$LINK -> $COMPAT_CURRENT"
 else
   drift=$((drift+1))
   if [[ -e "$LINK" && ! -L "$LINK" ]]; then
@@ -103,8 +105,8 @@ else
     fix "removed wrong symlink (was → ${_old:-?})"
     unset _old
   fi
-  act "ln -sfn \"$REPO\" \"$LINK\""
-  fix "symlink -> $REPO"
+  act "ln -sfn \"$COMPAT_CURRENT\" \"$LINK\""
+  fix "symlink -> $COMPAT_CURRENT"
 fi
 
 # ─── 3. Plugin pin sanity (must load, not just parse) ────────────────

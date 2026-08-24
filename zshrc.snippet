@@ -19,7 +19,7 @@
 _oc_resolve_start_dir() {
   local dir="${1:-}"
   local cfg="$HOME/.config/opencode"
-  local real_cfg="" real_dir=""
+  local real_cfg="" real_source_cfg="" real_dir=""
   local projects_home="${OC_PROJECTS_DIR:-}"
   local workspace_name="${OC_DEFAULT_WORKSPACE:-}"
 
@@ -47,9 +47,13 @@ _oc_resolve_start_dir() {
     real_dir="$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")"
   fi
   [[ -e "$cfg" ]] && real_cfg="$(cd "$cfg" 2>/dev/null && pwd -P || true)"
+  if [[ -L "$cfg/.openconfig-source" || -d "$cfg/.openconfig-source" ]]; then
+    real_source_cfg="$(cd "$cfg/.openconfig-source" 2>/dev/null && pwd -P || true)"
+  fi
 
   local need_workspace=0
-  if [[ -n "$real_cfg" && ( "$real_dir" == "$real_cfg" || "$real_dir" == "$real_cfg"/* ) ]]; then
+  if [[ -n "$real_cfg" && ( "$real_dir" == "$real_cfg" || "$real_dir" == "$real_cfg"/* ) ]] \
+    || [[ -n "$real_source_cfg" && ( "$real_dir" == "$real_source_cfg" || "$real_dir" == "$real_source_cfg"/* ) ]]; then
     need_workspace=1
   fi
   # Bare projects home is not a project
@@ -83,7 +87,7 @@ _oc_resolve_start_dir() {
 
 opencode() {
   local _oc_env_file="$HOME/.config/opencode/.env"
-  local OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
+  local _oc_runtime_snapshot
   # Always kill upstream telemetry before any OpenCode / OmO process starts
   export DO_NOT_TRACK=1
   export OMO_DISABLE_POSTHOG=1
@@ -115,9 +119,21 @@ opencode() {
   export DO_NOT_TRACK=1 OMO_DISABLE_POSTHOG=1 OMO_SEND_ANONYMOUS_TELEMETRY=0
   export OMO_CODEX_DISABLE_POSTHOG=1 OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
   export CODEGRAPH_TELEMETRY=0 OTEL_SDK_DISABLED=true
-  OPENCODE_CONFIG_DIR="$("$HOME/.config/opencode/oc" profile path)" || return 1
-  XDG_CONFIG_HOME="$("$HOME/.config/opencode/oc" profile xdg-path)" || return 1
-  export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
+  # Capture the producer before eval. `eval "$(...)"` masks an `oc` failure
+  # and would let inherited stale paths reach OpenCode.
+  unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+  if ! _oc_runtime_snapshot="$("$HOME/.config/opencode/oc" profile env --shell 2>/dev/null)"; then
+    print -u2 "OpenConfig runtime profile snapshot unavailable"
+    return 1
+  fi
+  if ! eval "$_oc_runtime_snapshot" \
+    || [[ "${OPENCODE_CONFIG_DIR:-}" != /* || "${XDG_CONFIG_HOME:-}" != /* \
+      || ( "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ) ]]; then
+    unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+    print -u2 "OpenConfig runtime profile snapshot is invalid"
+    return 1
+  fi
+  export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
 
   # Resolve start directory — never the config repo (unless --here)
   local -a _oc_args=("$@")
@@ -162,18 +178,6 @@ opencode() {
   printf '\033[?2004l\033[?1006l\033[?1015l\033[?1003l\033[?1002l\033[?1000l'
   stty sane 2>/dev/null
   command -v tput >/dev/null && tput cnorm 2>/dev/null
-
-  # OpenCode may drop package.json/node_modules into the disposable runtime
-  # overlay. Never mutate the OpenConfig Git checkout during launch/teardown.
-  local _oc_cfg="$OPENCODE_CONFIG_DIR"
-  if [[ -e "$_oc_cfg" ]]; then
-    local _oc_real
-    _oc_real="$(cd "$_oc_cfg" 2>/dev/null && pwd -P || true)"
-    if [[ -n "$_oc_real" ]]; then
-      rm -rf "$_oc_real/node_modules" "$_oc_real/package.json" "$_oc_real/package-lock.json" \
-             "$_oc_real/bun.lock" "$_oc_real/bun.lockb" 2>/dev/null || true
-    fi
-  fi
 
   TERM="$_oc_saved_term"
   return $_oc_rc

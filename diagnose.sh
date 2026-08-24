@@ -325,7 +325,7 @@ if [[ $AGENTFIX -eq 1 ]]; then
     # agent would otherwise use). Prefer a cheap healthy one; fall back to flash.
     healthy="$(head -1 "$HEALTHYFILE" 2>/dev/null)"
     fixmodel="openrouter/${healthy:-deepseek/deepseek-v4-flash-0731}"
-    prompt="You are working in the OpenCode config repo at ${REPO} (this IS ~/.config/opencode). These issues were detected by ./diagnose.sh:
+    prompt="You are working in the immutable OpenConfig source checkout at ${REPO}; ~/.config/opencode is a generated compatibility view. These issues were detected by ./diagnose.sh:
 ${issues}
 
 Fix them by editing opencode.json / oh-my-openagent.json. Rules: keep it cheap+agentic; the plugin pin must be oh-my-openagent@4.19.4; every model's max_price cap must admit at least one non-ignored provider (raise the cap if routing fails). After editing, run ./fix.sh then ./validate.sh then ./doctor.sh, and report exactly what you changed plus the final doctor summary."

@@ -90,7 +90,7 @@
     "doctor.sh",
     "versions.sh"
   ],
-  "fingerprint": "a55340371048f8c513aa55fe451cb3f159b1ed904c5807a7cb7147f0a9331081",
+  "fingerprint": "e9b3e5dd1ceab1e2bf83aecf9dde36e749b3cc9270d062a1fb50635099a8d8dc",
   "github_b64": "aHR0cHM6Ly9naXRodWIuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdz",
   "github_ref": "codex/buzz-openconfig-routing",
   "upstream_github_b64": "aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M=",

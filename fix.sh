@@ -50,7 +50,7 @@ export OC_FIX_STAMP="$STAMP"
 c_g=$'\033[32m'; c_y=$'\033[33m'; c_b=$'\033[36m'; c_0=$'\033[0m'
 
 DRY=$DRY python3 - "$REPO" ${SETS[@]+"${SETS[@]}"} <<'PY'
-import base64, json, sys, os, re, copy, shutil
+import base64, importlib.util, json, sys, os, re, copy, shutil
 
 repo = sys.argv[1]
 sets = sys.argv[2:]
@@ -58,6 +58,18 @@ dry = os.environ.get("DRY") == "1"
 changes = []
 stamp = os.environ.get("OC_FIX_STAMP") or ""
 backup_root = os.environ.get("OC_BACKUP_ROOT") or os.path.expanduser("~/.opencode-backups")
+
+# Native OmO JSONC has one canonical parser/classifier in the generation
+# runtime. Loading it here prevents a second, subtly different migration
+# detector from ever treating OmO 4.19.4's valid `[opencode].*.models` form as
+# broken.
+runtime_profile_path = os.path.join(repo, "scripts", "runtime-profile.py")
+runtime_spec = importlib.util.spec_from_file_location("openconfig_runtime_profile", runtime_profile_path)
+if runtime_spec is None or runtime_spec.loader is None:
+    raise SystemExit("unable to load canonical native OmO parser")
+runtime_profile = importlib.util.module_from_spec(runtime_spec)
+sys.modules[runtime_spec.name] = runtime_profile
+runtime_spec.loader.exec_module(runtime_profile)
 
 def load(p): return json.load(open(os.path.join(repo, p)))
 def dump(p, d):
@@ -375,12 +387,9 @@ if isinstance(bt, dict):
     if isinstance(mc, dict):
         pinned_model_concurrency = {
             "openrouter/z-ai/glm-5.3": 8,
-            "openrouter/poolside/laguna-s-2.1": 10,
-            "openrouter/meituan/longcat-2.0": 8,
             "openrouter/minimax/minimax-m3": 8,
             "openrouter/google/gemini-3.1-pro-preview": 5,
             "openrouter/google/gemini-3.7-flash": 10,
-            "openrouter/qwen/qwen3.8-max": 5,
             "openrouter/moonshotai/kimi-k2.7-code": 5,
             "openrouter/deepseek/deepseek-v4-pro-0813": 5,
             "openrouter/deepseek/deepseek-v4-flash-0731": 10,
@@ -575,19 +584,28 @@ if "hyperplan" in (kd.get("enabled_expansions") or []):
         del oc["agent"]["plan"]
         changes.append("removed agent.plan.disable (OmO demotes plan for hyperplan)")
 
-# A partial OmO migration can leave an agents.models array that 4.19 rejects,
-# preventing Sisyphus from loading. The repo config remains the canonical source.
-omo_jsonc_path = os.path.expanduser("~/.omo/omo.jsonc")
-if os.path.isfile(omo_jsonc_path):
-    with open(omo_jsonc_path, encoding="utf-8") as f:
-        omo_jsonc_raw = f.read()
-    if '"[opencode]"' in omo_jsonc_raw and re.search(r'"models"\s*:\s*\[', omo_jsonc_raw):
+# A historical partial OmO migration put 4.19's `models` routes at the *root*
+# of a regular native file. Only that provably invalid flat shape is
+# quarantined. A governed alias is always hands-off: following it would mutate
+# the generated compatibility target and can never be a repair action.
+omo_jsonc_path = os.environ.get("OC_NATIVE_OMO_PATH") or os.path.expanduser("~/.omo/omo.jsonc")
+if os.path.islink(omo_jsonc_path):
+    # Intentionally no validation or target traversal here. Alias governance
+    # belongs to runtime-profile/doctor; fix.sh must never unlink or alter it.
+    pass
+elif os.path.isfile(omo_jsonc_path):
+    try:
+        with open(omo_jsonc_path, encoding="utf-8") as f:
+            native_document = runtime_profile.parse_jsonc(f.read())
+    except (OSError, ValueError, json.JSONDecodeError, SystemExit):
+        native_document = None
+    if runtime_profile.is_broken_legacy_native_migration(native_document):
         if not dry:
             bdir = os.path.join(backup_root, f"fix-{stamp or 'manual'}")
             os.makedirs(bdir, exist_ok=True)
             shutil.copy2(omo_jsonc_path, os.path.join(bdir, "omo.jsonc"))
             os.remove(omo_jsonc_path)
-        changes.append("quarantined ~/.omo/omo.jsonc (invalid migrated agents.models)")
+        changes.append("quarantined regular ~/.omo/omo.jsonc (broken flat legacy models migration)")
 
 # ─── config-only: scrub install/runtime strays OpenCode may drop here ─────────
 STRAYS = (

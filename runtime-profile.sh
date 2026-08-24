@@ -11,11 +11,17 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   oc profile show
+  oc profile applied
+  oc profile identity
+  oc profile snapshot
   oc profile normal|pentest
   oc profile path [normal|pentest]
+  oc profile compat-path [normal|pentest]
   oc profile xdg-path [normal|pentest]
+  oc profile env [normal|pentest] [--shell]
   oc profile resolve <normal|pentest> <agents|categories> <name>
   oc profile ensure [--quiet]
+  oc profile prepare-native-alias
 EOF
   exit 2
 }
@@ -24,8 +30,24 @@ case "$MODE" in
   show)
     exec python3 "$PYTHON_TOOL" --repo "$REPO" show
     ;;
-  path|xdg-path)
+  applied)
+    [[ $# -eq 1 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" applied
+    ;;
+  identity)
+    [[ $# -eq 1 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" identity
+    ;;
+  snapshot)
+    [[ $# -eq 1 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" snapshot
+    ;;
+  path|compat-path|xdg-path|env)
     shift
+    if [[ "$MODE" == "env" ]]; then
+      [[ $# -le 2 ]] || usage
+      exec python3 "$PYTHON_TOOL" --repo "$REPO" env "$@"
+    fi
     [[ $# -le 1 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" "$MODE" "$@"
     ;;
@@ -38,6 +60,10 @@ case "$MODE" in
     shift
     [[ $# -le 1 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" ensure "$@"
+    ;;
+  prepare-native-alias)
+    [[ $# -eq 1 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" prepare-native-alias
     ;;
   normal|pentest)
     [[ $# -eq 1 ]] || usage
@@ -75,7 +101,117 @@ bridge_label="com.arnaud.opencode-codex-bridge"
 bridge_domain="gui/$(id -u)"
 bridge_target="$bridge_domain/$bridge_label"
 bridge_plist="$HOME/Library/LaunchAgents/$bridge_label.plist"
+bridge_health_attempts="${OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS:-80}"
+[[ "$bridge_health_attempts" =~ ^[1-9][0-9]*$ ]] || { echo "invalid OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS" >&2; exit 2; }
+
+# A successful kickstart is not proof that the responding bridge is the new
+# process.  Bind the health response to launchd and the listener before a
+# profile is marked applied.  This intentionally fails closed when `lsof` is
+# unavailable: desired routing has committed, but no restart proof exists.
+bridge_launchd_pid() {
+  local launchd_state pid
+  launchd_state="$(launchctl print "$bridge_target" 2>/dev/null)" || return 1
+  pid="$(printf '%s\n' "$launchd_state" | sed -nE 's/^[[:space:]]*pid = ([0-9]+);?[[:space:]]*$/\1/p' | head -n 1)"
+  printf '%s\n' "$launchd_state" | grep -Eq '^[[:space:]]*state[[:space:]]*=[[:space:]]*running;?[[:space:]]*$' \
+    && [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null || return 1
+  printf '%s\n' "$pid"
+}
+
+bridge_listener_matches_pid() {
+  local expected_pid="$1" listener_pids
+  command -v lsof >/dev/null 2>&1 || return 1
+  listener_pids="$(lsof -tiTCP:10101 -sTCP:LISTEN 2>/dev/null | awk 'NF { print }')"
+  [[ "$listener_pids" == "$expected_pid" ]]
+}
+
+# Read the process identity independently from readiness.  curl deliberately
+# does not use -f here: the bridge exposes the same exact identity schema in a
+# legitimate 503 while its OpenCode upstream is recovering.  A restart must
+# still prove that this observed process was replaced.
+bridge_observed_instance() {
+  local expected_pid payload
+  expected_pid="$(bridge_launchd_pid)"
+  [[ "$expected_pid" =~ ^[0-9]+$ ]] || return 1
+  bridge_listener_matches_pid "$expected_pid" || return 1
+  payload="$(curl -sS --max-time 2 http://127.0.0.1:10101/healthz 2>/dev/null)" || return 1
+  printf '%s' "$payload" | python3 -c '
+import datetime, json, sys, uuid
+expected_pid = int(sys.argv[1])
+try:
+    body = json.load(sys.stdin)
+    instance = uuid.UUID(body.get("instance_id", ""))
+    started = datetime.datetime.fromisoformat(body.get("started_at", "").replace("Z", "+00:00"))
+except Exception:
+    raise SystemExit(1)
+identity_ok = (
+    isinstance(body, dict)
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error"}
+    and body.get("schema_version") == 1
+    and body.get("service") == "opencode-codex-bridge"
+    and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
+    and instance.version == 4
+    and started.tzinfo is not None
+    and body.get("pid") == expected_pid
+    and body.get("model") == "opencode/router"
+)
+ready_contract = (
+    body.get("ok") is True
+    and isinstance(body.get("opencode"), dict)
+    and body["opencode"].get("healthy") is True
+    and body.get("error") is None
+)
+unready_contract = (
+    body.get("ok") is False
+    and body.get("opencode") is None
+    and isinstance(body.get("error"), str)
+    and bool(body["error"])
+)
+if not identity_ok or not (ready_contract or unready_contract):
+    raise SystemExit(1)
+print(instance)
+' "$expected_pid"
+}
+
+bridge_valid_instance() {
+  local previous_instance="${1:-}" expected_pid payload
+  expected_pid="$(bridge_launchd_pid)"
+  [[ "$expected_pid" =~ ^[0-9]+$ ]] || return 1
+  bridge_listener_matches_pid "$expected_pid" || return 1
+  payload="$(curl -fsS --max-time 2 http://127.0.0.1:10101/healthz 2>/dev/null)" || return 1
+  printf '%s' "$payload" | python3 -c '
+import datetime, json, sys, uuid
+expected_pid = int(sys.argv[1])
+previous = sys.argv[2]
+try:
+    body = json.load(sys.stdin)
+    instance = uuid.UUID(body.get("instance_id", ""))
+    started = datetime.datetime.fromisoformat(body.get("started_at", "").replace("Z", "+00:00"))
+except Exception:
+    raise SystemExit(1)
+healthy = (
+    isinstance(body, dict)
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error"}
+    and body.get("schema_version") == 1
+    and body.get("service") == "opencode-codex-bridge"
+    and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
+    and instance.version == 4
+    and started.tzinfo is not None
+    and body.get("pid") == expected_pid
+    and body.get("ok") is True
+    and body.get("model") == "opencode/router"
+    and isinstance(body.get("opencode"), dict)
+    and body["opencode"].get("healthy") is True
+    and body.get("error") is None
+    and (not previous or str(instance) != previous)
+)
+if not healthy:
+    raise SystemExit(1)
+print(instance)
+' "$expected_pid" "$previous_instance"
+}
+
 if launchctl print "$bridge_target" >/dev/null 2>&1 || launchctl list | grep -q "$bridge_label" || [[ -f "$bridge_plist" ]]; then
+  previous_instance="$(bridge_observed_instance 2>/dev/null || true)"
   if ! launchctl print "$bridge_target" >/dev/null 2>&1 && [[ -f "$bridge_plist" ]]; then
     launchctl bootstrap "$bridge_domain" "$bridge_plist" 2>/dev/null || true
   fi
@@ -91,8 +227,8 @@ if launchctl print "$bridge_target" >/dev/null 2>&1 || launchctl list | grep -q 
     }
     expected_model="$(python3 "$PYTHON_TOOL" --repo "$REPO" resolve "$MODE" agents codex-router \
       | python3 -c 'import json,sys; print(json.load(sys.stdin)["model"].split("/", 1)[1])')"
-    for _ in $(seq 1 80); do
-      if curl -fsS http://127.0.0.1:10101/healthz >/dev/null 2>&1 \
+    for _ in $(seq 1 "$bridge_health_attempts"); do
+      if bridge_valid_instance "$previous_instance" >/dev/null \
         && oc_curl http://127.0.0.1:4097/global/health >/dev/null 2>&1 \
         && oc_curl http://127.0.0.1:4097/agent 2>/dev/null | python3 -c 'import json, sys
 expected = sys.argv[1]
@@ -114,14 +250,16 @@ raise SystemExit(1)' "$expected_model"
       sleep 0.25
     done
     if [[ $ready -eq 1 ]]; then
+      python3 "$PYTHON_TOOL" --repo "$REPO" mark-applied "$MODE" "$expected_model"
       echo "✅ Profile switched to $MODE — bridge restarted, new routing is live."
     else
-      echo "⚠️ Profile switched to $MODE and the bridge restart was requested, but health did not recover within 20s. Check 'oc doctor'." >&2
+      echo "⚠️ Profile switched to $MODE and the bridge restart was requested, but a new launchd-owned bridge health proof did not recover within ${bridge_health_attempts} attempts. Check 'oc doctor'." >&2
       exit 1
     fi
   else
-    echo "⚠️ Profile switched to $MODE, but the bridge restart failed. Run 'oc launch' to load the new profile." >&2
+    echo "⚠️ Profile desired state is $MODE, but the bridge restart failed; no applied-profile marker was written." >&2
+    exit 1
   fi
 else
-  echo "✅ Profile switched to $MODE — run 'oc launch' to start OpenCode with the new profile."
+  echo "✅ Profile desired state is $MODE — no LaunchAgent is installed, so this is desired-only; run 'oc launch' to apply it."
 fi

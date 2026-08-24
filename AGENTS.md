@@ -20,7 +20,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | --- | --- | --- |
 | Runtime | [OpenCode](https://opencode.ai) | Provider-agnostic coding agent TUI/CLI; config-as-code; LSP; MCP |
 | Orchestration | [oh-my-openagent (OmO)](https://omo.vibetip.help/docs) | Multi-model agents, categories, team mode, ultrawork, hyperplan — docs on VibeTip |
-| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Flash/Pro, Gemini, Qwen, Kimi, Laguna, Hermes, MiniMax |
+| Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Flash/Pro, Gemini, Kimi, Hermes, MiniMax |
 | GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; GPT is not routed through OpenRouter |
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
@@ -35,12 +35,12 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 
 - **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
 - **Orchestration / tool loops** → normal uses GLM 5.3 (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) for tool-call quality; pentest overrides these routes to DeepSeek Flash 0731 primary with GLM fallback.
-- **Economy / recon routes** → `runtime-profile.json` decides each agent/category primary. In normal mode this deliberately distinguishes GLM exploration, Flash delegation and Laguna quick work; pentest consolidates economical routes on Flash 0731.
+- **Economy / recon routes** → `runtime-profile.json` decides each agent/category primary. In normal mode this deliberately distinguishes GLM exploration and Flash delegation/quick work; pentest consolidates economical routes on Flash 0731.
 - **Deep implement / critique** → normal uses subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review), with DeepSeek Pro 0813 as the first OpenRouter depth fallback. Pentest uses Pro 0813 for those depth roles and keeps `ultrabrain` as the sole GLM-primary route.
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash); pentest overrides these lanes to DeepSeek Flash 0731 primary.
 - **Hard ceiling** → subscription-gateway Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
-- **Content-aware research** → normal uses Hermes 4 405B with Pro 0813 / Flash 0731 / GLM / MiniMax / Qwen fallbacks; pentest uses Pro 0813 with GLM fallback. `content-aware-deep` uses Pro 0813 first and stays tool-capable end-to-end; it must not fall back to Hermes.
+- **Content-aware research** → normal uses Hermes 4 405B with Pro 0813 / Flash 0731 / GLM / MiniMax fallbacks; pentest uses Pro 0813 with GLM fallback. `content-aware-deep` uses Pro 0813 first and stays tool-capable end-to-end; it must not fall back to Hermes.
 - **Runtime profile override** → `runtime-profile.json` is the routing SSoT; do not duplicate an exact route table in this file. Use `oc profile resolve <normal|pentest> <agents|categories> <name>` or the generated README matrix. `oc profile pentest` keeps every agent/category available, using Flash 0731 for economical work, Pro 0813 for depth roles and GLM 5.3 as the `ultrabrain` primary. Profile state and generated configs live under `~/.local/state/openconfig`; switching must never rewrite tracked source files.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/GLM canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 - **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
@@ -51,7 +51,7 @@ OmO team mailbox **hard-rejects** explore/librarian/oracle/metis/momus/multimoda
 
 ### Headless runs (why `oc run`)
 
-Raw `opencode run` can stall (skill URL self-fetch, init). `oc run` → `run.sh` → OmO CLI against local server `127.0.0.1:4097`, scrubbing `package.json`/`node_modules` pollution from the config dir.
+Raw `opencode run` can stall (skill URL self-fetch, init). `oc run` → `run.sh` → OmO CLI against local server `127.0.0.1:4097`. Raw OpenCode sees the generated writable compatibility home, never the canonical checkout; session paths are not scrubbed on teardown.
 
 ### Config-only repo (why)
 
@@ -109,7 +109,7 @@ is never proof of the active profile, provider, model, deployment or success.
 
 | Path | Role |
 | --- | --- |
-| `~/.config/opencode/` | Global stack (this repo via symlink) |
+| `~/.config/opencode/` | Generated compatibility view for the active profile; wrappers point back to the immutable source checkout |
 | `~/Projects/` (or `OC_PROJECTS_DIR`) | `oc new` default parent — keeps cwd / config repo clean |
 | `<project>/opencode.json` | Project overrides (OpenCode merges over global) |
 | `<project>/AGENTS.md` | Project context loaded via project `instructions` |
@@ -130,7 +130,7 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Keep `$schema` on working asset basename `oh-my-opencode.schema.json` (the `oh-my-openagent.schema.json` path 404s on current tags).
 - No Cloudflare AI Gateway / OpenAI-compatible env hacks.
 - No `\033[?1049l` in teardown.
-- No `package.json` / `node_modules` / `.omo` / `.sisyphus` / `command/` / `plugins/` in this config repo — scrub with `./cleanup.sh`.
+- No `package.json` / `node_modules` / `.omo` / `.sisyphus` / `command/` / `plugins/` in the immutable config source repo — clean explicitly with `./cleanup.sh`; those may legitimately exist in generated compatibility state.
 - Do not scaffold app projects into this config repo — use `oc new` (projects home).
 - Do not commit `.env` or secrets.
 - Do not delete failing tests to make them pass.

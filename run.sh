@@ -69,9 +69,7 @@ esac
 
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
-OPENCODE_CONFIG_DIR="$("$REPO/runtime-profile.sh" path)"
-XDG_CONFIG_HOME="$("$REPO/runtime-profile.sh" xdg-path)"
-export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
+oc_load_runtime_profile_env "$REPO/runtime-profile.sh" || exit 1
 
 # `bunx oh-my-openagent run` launches the OpenCode binary by name. Desktop
 # shells normally add this directory through zshrc, but a headless run (or the
@@ -96,15 +94,8 @@ run_cli() {
   fi
 }
 
-# OpenCode may still drop package.json/node_modules into its generated runtime
-# overlay. Clean only that disposable state; the Git checkout is immutable.
-scrub() { oc_scrub_config_strays "$OPENCODE_CONFIG_DIR" >/dev/null; }
-scrub
-
 # ── Allowlisted .env keys only (never Infisical/Doppler process wrap). ──
 RC=0
 [[ -z "${OPENROUTER_API_KEY:-}" ]] && echo "run.sh: warning — OPENROUTER_API_KEY not set" >&2
 run_cli || RC=$?
-
-scrub
 exit "$RC"

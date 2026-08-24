@@ -31,6 +31,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 LINK="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+COMPAT_CURRENT="$(oc_compat_current_path)"
 SESSIONS="${XDG_DATA_HOME:-$HOME/.local/share}/opencode"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/opencode"
 BACKUP="${OC_BACKUP_ROOT:-$HOME/.opencode-backups}"
@@ -67,7 +68,7 @@ LINK_STATE="missing"
 LINK_TGT=""
 if [[ -L "$LINK" ]]; then
   LINK_TGT="$(oc_readlink_abs "$LINK" 2>/dev/null || readlink "$LINK" || true)"
-  if oc_link_points_to "$LINK" "$REPO"; then
+  if oc_link_points_to "$LINK" "$COMPAT_CURRENT"; then
     LINK_STATE="ok"
   else
     LINK_STATE="wrong"
@@ -242,8 +243,8 @@ printf "\n${c_b}OpenConfig locate${c_0} ${c_dim}(read-only — nothing written)$
 sec "Config repo"
 ok "repo: $REPO"
 case "$LINK_STATE" in
-  ok) ok "link: $LINK → $REPO" ;;
-  wrong) warn "link: $LINK → ${LINK_TGT:-?} (expected $REPO)" ;;
+  ok) ok "link: $LINK → generated compatibility view" ;;
+  wrong) warn "link: $LINK → ${LINK_TGT:-?} (expected $COMPAT_CURRENT)" ;;
   real_dir) warn "link: $LINK is a real directory (not a symlink)" ;;
   missing) bad "link: $LINK missing" ;;
   *) warn "link: $LINK state=$LINK_STATE" ;;

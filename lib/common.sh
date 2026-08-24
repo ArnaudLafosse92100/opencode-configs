@@ -235,7 +235,9 @@ OC_ENV_ALLOWLIST=(
   OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS
 )
 
-# Install/runtime junk OpenCode may drop into the config repo.
+# Install/runtime junk OpenCode may drop into the immutable source repository.
+# Compatibility profile homes are intentionally writable and must never be
+# scrubbed by session launch paths.
 OC_CONFIG_STRAYS=(
   node_modules
   package.json
@@ -251,6 +253,154 @@ OC_CONFIG_STRAYS=(
   .opencode
   plugins
 )
+
+oc_compat_current_path() {
+  if [[ -n "${OC_RUNTIME_STATE_DIR:-}" ]]; then
+    printf '%s/compat/current\n' "${OC_RUNTIME_STATE_DIR%/}"
+  else
+    printf '%s/openconfig/compat/current\n' "${XDG_STATE_HOME}"
+  fi
+}
+
+# Native OmO is an OpenConfig-governed generated endpoint.  Its regular-file
+# to stable-alias migration is explicit (setup/install only), recoverable, and
+# blocked whenever OmO has its own unfinished migration journal.
+oc_native_omo_path() { printf '%s\n' "${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"; }
+oc_native_omo_journal_path() { printf '%s/.migration-journal.json\n' "$(dirname "$(oc_native_omo_path)")"; }
+
+oc_native_omo_envelope_valid() {
+  local file="${1:?file}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" validate-native "$file" --require-envelope >/dev/null 2>&1
+}
+
+oc_native_omo_regular_valid() {
+  local file="${1:?file}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" validate-native "$file" >/dev/null 2>&1
+}
+
+oc_native_omo_opencode_digest() {
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" native-opencode-digest "${1:?file}"
+}
+
+oc_native_omo_migration_equivalent() {
+  local source="${1:?source}" target="${2:?target}" profile="${3:?profile}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" native-opencode-equivalent "$source" "$target" "$profile" >/dev/null 2>&1
+}
+
+# Prints alias|regular|missing|wrong-symlink|broken-alias|invalid-alias|invalid.
+# This does not follow
+# the leaf symlink while identifying the governed native path.
+oc_native_omo_alias_state() {
+  local native target state active resolved expected
+  native="$(oc_native_omo_path)"
+  target="$(oc_compat_current_path)/.omo.jsonc"
+  if [[ -L "$native" ]]; then
+    resolved="$(oc_readlink_abs "$native" 2>/dev/null || true)"
+    if [[ "$resolved" == "$target" ]]; then
+      [[ -f "$target" ]] || { printf 'broken-alias\n'; return; }
+      oc_native_omo_envelope_valid "$target" && { printf 'alias\n'; return; }
+      printf 'invalid-alias\n'; return
+    fi
+    printf 'wrong-symlink\n'; return
+  fi
+  [[ -e "$native" ]] || { printf 'missing\n'; return; }
+  oc_native_omo_regular_valid "$native" && printf 'regular\n' || printf 'invalid\n'
+}
+
+# Requires a rendered compat current view with matching profile marker, then
+# copies a valid regular native file into the governed backup root and installs
+# only the stable compat/current alias after every recovery proof is durable.
+# Never call from runtime activation.
+oc_provision_native_omo_alias() {
+  local repo="${1:?repo}" native journal target state active target_real marker_real repo_real sha mode backup_sha backup_mode metadata source_digest target_digest state_root profile_marker alias_tmp
+  native="$(oc_native_omo_path)"
+  journal="$(oc_native_omo_journal_path)"
+  target="$(oc_compat_current_path)/.omo.jsonc"
+  state="$(oc_native_omo_alias_state)"
+  [[ ! -e "$journal" && ! -L "$journal" ]] || { echo "pending OmO migration journal: $journal" >&2; return 2; }
+  [[ -f "$target" ]] && oc_native_omo_envelope_valid "$target" || { echo "invalid or missing generated OmO envelope: $target" >&2; return 2; }
+  state_root="${OC_RUNTIME_STATE_DIR:-${XDG_STATE_HOME}/openconfig}"
+  active="$(cat "${state_root}/active-profile" 2>/dev/null || true)"
+  target_real="$(realpath "$target" 2>/dev/null || true)"
+  marker_real="$(realpath "$(dirname "$target")/.openconfig-source" 2>/dev/null || true)"
+  repo_real="$(realpath "$repo" 2>/dev/null || true)"
+  profile_marker="$(cat "$(dirname "$target")/.active-profile" 2>/dev/null || true)"
+  [[ "$active" =~ ^(normal|pentest)$ && "$target_real" && "$profile_marker" == "$active" && "$marker_real" == "$repo_real" ]] \
+    || { echo "compat profile/envelope/source consensus failed (active=${active:-missing}, envelope=$target_real, source=$marker_real)" >&2; return 2; }
+  case "$state" in
+    alias) return 0 ;;
+    regular)
+      source_digest="$(oc_native_omo_opencode_digest "$native")" || return 2
+      target_digest="$(oc_native_omo_opencode_digest "$target")" || return 2
+      if [[ "$source_digest" == "missing" || "$source_digest" == "$target_digest" ]] \
+        || oc_native_omo_migration_equivalent "$native" "$target" "$active"; then
+        :
+      else
+        echo "existing native [opencode] diverges from rendered compatibility envelope" >&2
+        return 2
+      fi
+      sha="$(shasum -a 256 "$native" | awk '{print $1}')"
+      mode="$(stat -f '%Lp' "$native" 2>/dev/null || stat -c '%a' "$native" 2>/dev/null || echo unknown)"
+      # Copy first: a metadata failure must leave the valid regular native
+      # config usable and retryable. We replace it only after every proof is
+      # durable and re-validated.
+      oc_backup_copy "$native" "omo-native" || return 2
+      backup_sha="$(shasum -a 256 "$OC_BACKUP_PATH" | awk '{print $1}')"
+      backup_mode="$(stat -f '%Lp' "$OC_BACKUP_PATH" 2>/dev/null || stat -c '%a' "$OC_BACKUP_PATH" 2>/dev/null || echo unknown)"
+      [[ "$backup_sha" == "$sha" && "$backup_mode" == "$mode" ]] || { echo "native OmO backup hash/mode mismatch; refusing alias" >&2; return 2; }
+      metadata="$(dirname "$OC_BACKUP_PATH")/openconfig-native-omo-migration.json"
+      if [[ "${OC_NATIVE_OMO_METADATA_FAIL:-0}" == 1 ]]; then
+        echo "native OmO migration metadata write was injected to fail; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      fi
+      python3 - "$metadata" "$native" "$sha" "$mode" "$target" <<'PY' || {
+import json, os, sys
+destination, source, digest, mode, target = sys.argv[1:]
+temporary = f"{destination}.tmp-{os.getpid()}"
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"schema_version": 1, "source": source, "sha256": digest, "mode": mode, "alias_target": target}, handle, sort_keys=True)
+    handle.write("\n")
+os.chmod(temporary, 0o600)
+os.replace(temporary, destination)
+PY
+        echo "native OmO migration metadata write failed; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      }
+      # Re-read every proof immediately before publishing the alias. A failed
+      # metadata write leaves the regular native file intact; a later external
+      # mutation is never reported as a successful migration.
+      [[ -f "$native" && ! -L "$native" && -f "$OC_BACKUP_PATH" ]] || { echo "native OmO source/backup state changed after backup; refusing alias" >&2; return 2; }
+      [[ "$(shasum -a 256 "$native" | awk '{print $1}')" == "$sha" ]] || { echo "native OmO source changed after backup; refusing alias" >&2; return 2; }
+      [[ "$(stat -f '%Lp' "$native" 2>/dev/null || stat -c '%a' "$native" 2>/dev/null || echo unknown)" == "$mode" ]] || { echo "native OmO source mode changed after backup; refusing alias" >&2; return 2; }
+      backup_sha="$(shasum -a 256 "$OC_BACKUP_PATH" | awk '{print $1}')"
+      backup_mode="$(stat -f '%Lp' "$OC_BACKUP_PATH" 2>/dev/null || stat -c '%a' "$OC_BACKUP_PATH" 2>/dev/null || echo unknown)"
+      [[ "$backup_sha" == "$sha" && "$backup_mode" == "$mode" ]] || { echo "native OmO backup changed after metadata write; refusing alias" >&2; return 2; }
+      python3 - "$metadata" "$native" "$sha" "$mode" "$target" <<'PY' || {
+import json, os, sys
+metadata, source, digest, mode, target = sys.argv[1:]
+with open(metadata, encoding="utf-8") as handle:
+    payload = json.load(handle)
+if payload != {"schema_version": 1, "source": source, "sha256": digest, "mode": mode, "alias_target": target}:
+    raise SystemExit(1)
+if os.stat(metadata).st_mode & 0o777 != 0o600:
+    raise SystemExit(1)
+PY
+        echo "native OmO migration metadata validation failed; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      }
+      alias_tmp="${native}.openconfig-alias.$$"
+      rm -f "$alias_tmp"
+      ln -s "$target" "$alias_tmp" || { echo "native OmO alias staging failed; backup retained at $OC_BACKUP_PATH" >&2; return 2; }
+      mv -f "$alias_tmp" "$native" || { rm -f "$alias_tmp"; echo "native OmO alias publish failed; regular native and backup retained" >&2; return 2; }
+      ;;
+    missing)
+      mkdir -p "$(dirname "$native")"
+      ln -s "$target" "$native"
+      ;;
+    *) echo "refusing native OmO alias migration: state=$state ($native)" >&2; return 2 ;;
+  esac
+  [[ "$(oc_native_omo_alias_state)" == alias ]] || { echo "native OmO alias verification failed" >&2; return 2; }
+}
 
 # ── Branding (OpenConfig — `oc`) ─────────────────────────────────────
 # Shared banner for install / setup / oc help. Product name is OpenConfig;
@@ -379,6 +529,46 @@ oc_telemetry_off() {
   export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS="${OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:-1}"
   export OPENCODE_DISABLE_LSP_DOWNLOAD="${OPENCODE_DISABLE_LSP_DOWNLOAD:-1}"
   export OPENCODE_FAST_BOOT="${OPENCODE_FAST_BOOT:-1}"
+}
+
+# Read the paired config/XDG/profile snapshot as one producer result.  Do not
+# use `eval "$(...)"`: command-substitution failure is otherwise masked and a
+# caller can continue with inherited (possibly stale) runtime paths.  The
+# runtime-profile producer emits shell-escaped assignments from our pinned
+# generator; after evaluating them, still validate the small fixed contract.
+oc_load_runtime_profile_env() {
+  local runtime_profile_bin="${1:?runtime-profile command}" runtime_snapshot
+
+  # These must never survive a failed producer invocation.
+  unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+  if ! runtime_snapshot="$("$runtime_profile_bin" env --shell 2>/dev/null)"; then
+    echo "OpenConfig runtime profile snapshot unavailable" >&2
+    return 1
+  fi
+  if ! eval "$runtime_snapshot"; then
+    unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+    echo "OpenConfig runtime profile snapshot is invalid" >&2
+    return 1
+  fi
+  if [[ "${OPENCODE_CONFIG_DIR:-}" != /* || "${XDG_CONFIG_HOME:-}" != /* \
+    || "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ]]; then
+    unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+    echo "OpenConfig runtime profile snapshot is invalid" >&2
+    return 1
+  fi
+  export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+}
+
+# Applied markers are bridge health evidence only when they bind the complete
+# immutable runtime+compat identity selected by compat/current.
+oc_applied_identity_matches() {
+  local marker="${1:?applied marker JSON}" expected="${2:?expected identity JSON}"
+  python3 - "$marker" "$expected" <<'PY'
+import json, sys
+marker, expected = (json.loads(value) for value in sys.argv[1:])
+fields = ("schema_version", "profile", "fingerprint", "generation", "compat_generation", "xdg_identity", "compat_identity", "compat_manifest_sha256", "model")
+raise SystemExit(0 if all(marker.get(field) == expected.get(field) for field in fields) else 1)
+PY
 }
 
 # Remove install/runtime strays from the config repo. Prints removed names on stdout.

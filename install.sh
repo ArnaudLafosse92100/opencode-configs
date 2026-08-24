@@ -597,6 +597,11 @@ INSTALL_DIR="$(oc_harden_install_dir "$INSTALL_DIR")"
 REPO="$INSTALL_DIR"
 export REPO INSTALL_DIR
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
+NATIVE_OMO_PATH="${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"
+NATIVE_MIGRATION_JOURNAL="$(dirname "$NATIVE_OMO_PATH")/.migration-journal.json"
+[[ ! -e "$NATIVE_MIGRATION_JOURNAL" && ! -L "$NATIVE_MIGRATION_JOURNAL" ]] \
+  || die "pending OmO migration journal at $NATIVE_MIGRATION_JOURNAL; refusing runtime/profile writes until explicit operator recovery"
 echo ""
 
 # ─── Sessions: never touch ────────────────────────────────────────
@@ -608,23 +613,29 @@ else
   info "No existing sessions dir yet (will be created by OpenCode on first run)"
 fi
 
-# ─── 3. Config symlink (backup real dirs; never rm sessions) ──────
+# ─── 3. Config compatibility symlink (backup real dirs; never rm sessions) ──
 _log_section "3. config symlink"
 mkdir -p "$(dirname "$LINK")"
+"$INSTALL_DIR/runtime-profile.sh" prepare-native-alias >/dev/null
 CONFIG_ENV_BACKUP=""
 if [[ -L "$LINK" ]]; then
   cur="$(oc_readlink_abs "$LINK" 2>/dev/null || readlink "$LINK")"
-  if oc_same_path "$cur" "$INSTALL_DIR"; then
+  if oc_same_path "$cur" "$COMPAT_CURRENT"; then
     ok "Config symlink correct"
   else
     # Previous link target may hold a .env — migrate allowlisted keys after we create ours
     if [[ -f "$cur/.env" ]]; then
       CONFIG_ENV_BACKUP="$cur/.env"
     fi
-    oc_backup_path "$LINK" "config-link" >/dev/null
-    ln -sfn "$INSTALL_DIR" "$LINK"
-    ok "Config symlink updated (old link backed up → ${OC_BACKUP_PATH:-})"
-    _log "INFO" "backup=${OC_BACKUP_PATH:-}"
+    if oc_same_path "$cur" "$INSTALL_DIR"; then
+      ln -sfn "$COMPAT_CURRENT" "$LINK"
+      ok "Legacy source symlink migrated to generated compatibility view"
+    else
+      oc_backup_path "$LINK" "config-link" >/dev/null
+      ln -sfn "$COMPAT_CURRENT" "$LINK"
+      ok "Config symlink updated (old link backed up → ${OC_BACKUP_PATH:-})"
+      _log "INFO" "backup=${OC_BACKUP_PATH:-}"
+    fi
   fi
 elif [[ -e "$LINK" ]]; then
   if [[ -f "$LINK/.env" ]]; then
@@ -635,11 +646,11 @@ elif [[ -e "$LINK" ]]; then
   if [[ -n "${OC_BACKUP_PATH:-}" && -f "${OC_BACKUP_PATH}/.env" ]]; then
     CONFIG_ENV_BACKUP="${OC_BACKUP_PATH}/.env"
   fi
-  ln -sfn "$INSTALL_DIR" "$LINK"
+  ln -sfn "$COMPAT_CURRENT" "$LINK"
   ok "Existing config dir backed up → ${OC_BACKUP_PATH:-}; symlink created"
   _log "INFO" "backup=${OC_BACKUP_PATH:-}"
 else
-  ln -sfn "$INSTALL_DIR" "$LINK"
+  ln -sfn "$COMPAT_CURRENT" "$LINK"
   ok "Config symlink created"
 fi
 echo ""
@@ -676,6 +687,16 @@ if [[ -n "$CONFIG_ENV_BACKUP" ]]; then
     _log "INFO" "env_keys_migrated=$migrated"
   fi
 fi
+
+# The compatibility view is rendered before env migration above; rerender so a
+# newly created/migrated .env is visible immediately through config/current.
+"$INSTALL_DIR/runtime-profile.sh" prepare-native-alias >/dev/null
+if oc_provision_native_omo_alias "$INSTALL_DIR"; then
+  ok "Native OmO is OpenConfig-governed via compat/current/.omo.jsonc"
+else
+  die "native OmO alias provisioning failed; refusing mixed profile state"
+fi
+"$INSTALL_DIR/runtime-profile.sh" ensure --quiet
 
 prompt_api_key() {
   local key="$1" label="$2" url="$3" required="${4:-false}"

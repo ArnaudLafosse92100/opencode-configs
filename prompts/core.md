@@ -52,7 +52,7 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 ### grep_app + codegraph
 
 - grep_app: how real projects call an API when Context7 examples are sparse.
-- codegraph: symbols, callers, structure in the **local** workspace (init when the graph is cold).
+- codegraph: symbols, callers, structure in the **local** workspace (init when the graph is cold). **For a structural question, call-chain, or impact analysis in an existing index, use `codegraph_explore` first, then verify the material result in current source.** Do not pay this overhead for a trivial known-file read.
 
 ## Output
 
