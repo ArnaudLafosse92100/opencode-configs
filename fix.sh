@@ -50,7 +50,7 @@ export OC_FIX_STAMP="$STAMP"
 c_g=$'\033[32m'; c_y=$'\033[33m'; c_b=$'\033[36m'; c_0=$'\033[0m'
 
 DRY=$DRY python3 - "$REPO" ${SETS[@]+"${SETS[@]}"} <<'PY'
-import json, sys, os, re, copy, shutil
+import base64, json, sys, os, re, copy, shutil
 
 repo = sys.argv[1]
 sets = sys.argv[2:]
@@ -72,6 +72,8 @@ THEME_HEX = {"primary":"#00F0FF","accent":"#B967FF","info":"#00FFD1",
 
 # ─── opencode.json ────────────────────────────────────────────────────────────
 oc = load("opencode.json"); before = copy.deepcopy(oc)
+signature = load("signature.json")
+canonical_github = base64.b64decode(signature["github_b64"]).decode("ascii").rstrip("/")
 
 exp = oc.get("experimental", {})
 if "primary_tools" in exp:
@@ -279,7 +281,7 @@ if isinstance(or_opts, dict):
     hdrs = or_opts.setdefault("headers", {})
     if isinstance(hdrs, dict):
         want_hdrs = {
-            "HTTP-Referer": "https://github.com/jesseoue/opencode-configs",
+            "HTTP-Referer": canonical_github,
             "X-Title": "OpenConfig",
             "X-OpenRouter-Title": "OpenConfig",
             "X-OpenRouter-Categories": "cli,agent",
@@ -481,8 +483,8 @@ for must in ("posthog:posthog", "sentry:sentry", "axiom:axiom"):
     if must not in dmcps:
         dmcps.append(must); changes.append(f"disabled_mcps += {must}")
 
-# Wild but clean neon palette for TUI tabs (valid #RRGGBB only — OmO drops non-hex).
-# High-chroma, role-distinct, dark-UI readable. oc fix enforces these.
+# Wild but clean neon palette for agent TUI tabs. OmO 4.19.4 accepts colors on
+# agents, not categories; category color keys are stripped at runtime.
 AGENT_COLORS = {
     "sisyphus": "#00F0FF",
     "hephaestus": "#FF5C00",
@@ -497,23 +499,6 @@ AGENT_COLORS = {
     "sisyphus-junior": "#7A8BFF",
     "content-aware-research": "#FF1744",
 }
-CATEGORY_COLORS = {
-    "visual-engineering": "#FF2D95",
-    "ultrabrain": "#B967FF",
-    "deep": "#00F0FF",
-    "agentic-deep-kimi": "#7C4DFF",
-    "artistry": "#FF5C00",
-    "quick": "#39FF14",
-    "unspecified-low": "#6B7A99",
-    "unspecified-high": "#9DFFFF",
-    "writing": "#00FFD1",
-    "bug-hunt": "#FFD400",
-    "refactor-safe": "#3DDC97",
-    "arch-review": "#6C63FF",
-    "content-aware-fast": "#FF1744",
-    "content-aware-deep": "#C51162",
-}
-
 for n, a in omo.get("agents", {}).items():
     c = a.get("color")
     want = AGENT_COLORS.get(n)
@@ -532,24 +517,13 @@ for n, a in omo.get("agents", {}).items():
             del a[bad]
             changes.append(f"agent {n}: stripped '{bad}'")
 
-for n, a in omo.get("categories", {}).items():
-    if not isinstance(a, dict):
-        continue
-    c = a.get("color")
-    want = CATEGORY_COLORS.get(n)
-    if want is not None and str(c).upper() != want.upper():
-        a["color"] = want
-        changes.append(f"category {n}: color -> {want}")
-    elif c is not None and not HEX.match(str(c)):
-        if str(c) in THEME_HEX:
-            a["color"] = THEME_HEX[str(c)]
-            changes.append(f"category {n}: color '{c}' -> {a['color']}")
-        else:
-            del a["color"]
-            changes.append(f"category {n}: removed non-hex color '{c}'")
+for n, category in omo.get("categories", {}).items():
+    if isinstance(category, dict) and "color" in category:
+        del category["color"]
+        changes.append(f"category {n}: removed unsupported color")
 
-    # OmO skills sources — keep a single canonical global skill source.
-    ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills"]
+# OmO skills sources — keep a single canonical global skill source.
+ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills"]
 osk = omo.setdefault("skills", {})
 srcs = []
 for s in (osk.get("sources") or []):

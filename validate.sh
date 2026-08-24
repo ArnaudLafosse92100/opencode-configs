@@ -325,6 +325,11 @@ if omo:
     for n, category in (omo.get("categories") or {}).items():
         if not isinstance(category, dict):
             continue
+        if "color" in category:
+            err(
+                f"oh-my-openagent.json[categories.{n}]: color is unsupported by the "
+                "pinned OmO category schema and is stripped at runtime"
+            )
         if "reasoningEffort" in category:
             err(f"oh-my-openagent.json[categories.{n}]: reasoningEffort is obsolete on OmO 4.19.4 — use reasoning.")
         if category.get("reasoning") is not None and category.get("reasoning") not in valid_effort:
@@ -1482,6 +1487,22 @@ if "# OpenConfig" not in readme and "OpenConfig" not in readme[:500]:
 else:
     ok("README.md branded OpenConfig")
 
+routing_docs = os.path.join(repo, "scripts", "render-routing-docs.py")
+if not os.path.isfile(routing_docs):
+    err("scripts/render-routing-docs.py missing — README routing SSOT cannot be checked")
+else:
+    import subprocess
+    rendered = subprocess.run(
+        [sys.executable, routing_docs, "--repo", repo, "--check"],
+        capture_output=True,
+        text=True,
+    )
+    if rendered.returncode == 0:
+        ok("README routing/profile tables match canonical JSON sources")
+    else:
+        reason = (rendered.stderr or rendered.stdout or "generated block mismatch").strip()
+        err(f"README routing/profile tables drifted: {reason}")
+
 # ---- 4c8. teams + profiles completeness ----
 teams_dir = os.path.join(repo, "teams")
 if not os.path.isdir(teams_dir):
@@ -1589,7 +1610,55 @@ else:
         elif not (sig.get("fingerprint") or "").strip():
             err("signature.json fingerprint empty — run: oc signature --refresh")
         else:
-            import subprocess
+            import base64
+            import re
+
+            def decode_repo(field):
+                value = str(sig.get(field) or "").strip()
+                if not value:
+                    return ""
+                try:
+                    return base64.b64decode(value, validate=True).decode("ascii").rstrip("/")
+                except Exception:
+                    return ""
+
+            canonical_url = decode_repo("github_b64")
+            upstream_url = decode_repo("upstream_github_b64")
+            canonical_ref = str(sig.get("github_ref") or "").strip()
+            upstream_reference = str(sig.get("upstream_reference_commit") or "").strip()
+            install_body = open(os.path.join(repo, "install.sh"), encoding="utf-8").read()
+
+            def shell_constant(name):
+                match = re.search(rf"^{re.escape(name)}='([^']+)'$", install_body, re.MULTILINE)
+                return match.group(1) if match else ""
+
+            if not canonical_url.startswith("https://github.com/"):
+                err("signature.json github_b64 must decode to the canonical GitHub repository")
+            elif canonical_url == upstream_url:
+                err("canonical distribution and upstream source must be distinct repositories")
+            elif not upstream_url.startswith("https://github.com/"):
+                err("signature.json upstream_github_b64 must decode to the upstream GitHub repository")
+            elif not canonical_ref or canonical_ref.startswith("-") or any(ch.isspace() for ch in canonical_ref):
+                err("signature.json github_ref is missing or unsafe")
+            elif not re.fullmatch(r"[0-9a-f]{40}", upstream_reference):
+                err("signature.json upstream_reference_commit must be a full lowercase commit SHA")
+            elif shell_constant("_OC_GH_B64") != sig.get("github_b64"):
+                err("install.sh canonical repository drifted from signature.json github_b64")
+            elif shell_constant("_OC_UPSTREAM_GH_B64") != sig.get("upstream_github_b64"):
+                err("install.sh upstream repository drifted from signature.json upstream_github_b64")
+            elif shell_constant("_OC_GIT_REF") != canonical_ref:
+                err("install.sh distribution ref drifted from signature.json github_ref")
+            elif canonical_url not in readme or canonical_ref not in readme:
+                err("README bootstrap does not name the canonical repository and ref from signature.json")
+            else:
+                ok(f"canonical distribution {canonical_url}@{canonical_ref} references upstream {upstream_reference[:12]}…")
+
+            referer = (((oc.get("provider") or {}).get("openrouter") or {}).get("options") or {}).get("headers", {}).get("HTTP-Referer")
+            if referer != canonical_url:
+                err(f"opencode.json OpenRouter HTTP-Referer must match canonical distribution ({referer!r} != {canonical_url!r})")
+            else:
+                ok("OpenRouter attribution matches canonical distribution")
+
             r = subprocess.run(
                 [sig_sh, "--json"],
                 capture_output=True, text=True, cwd=repo,

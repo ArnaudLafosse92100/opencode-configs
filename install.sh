@@ -7,7 +7,7 @@
 #   ./install.sh [--dir PATH] [--skip-cli] [--yes] [--lazy|--full]
 #
 # Fresh machine (distribution URL is base64 — keeps tree free of host-owner literals):
-#   curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3MvbWFpbi9pbnN0YWxsLnNo' | base64 -d)" | bash
+#   curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
 #
 # Safety:
 #   • Refuses root; umask 077 for secret files
@@ -59,7 +59,7 @@ install.sh — OpenConfig (oc) installer
   ./install.sh [--dir PATH] [--log PATH] [--skip-cli] [--yes] [--lazy|--full]
 
   # Fresh machine (decode distribution raw URL, then pipe):
-  curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3MvbWFpbi9pbnN0YWxsLnNo' | base64 -d)" | bash
+  curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
 
 Flags:
   --dir PATH   install/clone location (default: repo dir if local, else ~/opencode-configs)
@@ -286,25 +286,33 @@ seed_key_from_env() {
   _log "INFO" "$key seeded_from_env"
 }
 
-# Distribution host encoded (no owner literals in source). Decode at runtime.
-_OC_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M='
-_oc_gh_url() {
+# Canonical distribution + upstream source, encoded to keep bootstrap portable.
+_OC_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdz'
+_OC_GIT_REF='codex/buzz-openconfig-routing'
+_OC_UPSTREAM_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M='
+_oc_decode_b64() {
+  local encoded="$1"
   if command -v base64 >/dev/null 2>&1; then
     local out
-    out="$(printf '%s' "$_OC_GH_B64" | base64 -D 2>/dev/null || printf '%s' "$_OC_GH_B64" | base64 -d 2>/dev/null || true)"
+    out="$(printf '%s' "$encoded" | base64 -D 2>/dev/null || printf '%s' "$encoded" | base64 -d 2>/dev/null || true)"
     if [[ -n "$out" ]]; then
       printf '%s\n' "$out"
       return 0
     fi
   fi
-  python3 -c "import base64; print(base64.b64decode('${_OC_GH_B64}').decode())"
+  python3 -c "import base64,sys; print(base64.b64decode(sys.argv[1]).decode())" "$encoded"
 }
-REPO_URL="$(_oc_gh_url).git"
+REPO_URL="$(_oc_decode_b64 "$_OC_GH_B64").git"
+UPSTREAM_REPO_URL="$(_oc_decode_b64 "$_OC_UPSTREAM_GH_B64").git"
 # Path after github.com/ — used to validate origin remotes
-_OC_GH_PATH="$(_oc_gh_url)"
+_OC_GH_PATH="$(_oc_decode_b64 "$_OC_GH_B64")"
 _OC_GH_PATH="${_OC_GH_PATH#*github.com/}"
 _OC_GH_PATH="${_OC_GH_PATH#/}"
 _OC_GH_PATH="${_OC_GH_PATH%.git}"
+_OC_UPSTREAM_GH_PATH="$(_oc_decode_b64 "$_OC_UPSTREAM_GH_B64")"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH#*github.com/}"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH#/}"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH%.git}"
 OPENCODE_CLI_INSTALL_URL="https://opencode.ai/install"
 
 # In-place when running ./install.sh from a checkout; otherwise ~/opencode-configs
@@ -468,26 +476,70 @@ _log_section "2. clone/update repo"
 clone_or_update() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating existing repo at $INSTALL_DIR..."
-    local remote
+    local remote upstream_remote current_branch target_available=0
     remote="$(git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
     _log "INFO" "git origin=$remote"
     case "$remote" in
       *"$_OC_GH_PATH"*) ;;
+      *"$_OC_UPSTREAM_GH_PATH"*)
+        upstream_remote="$(git -C "$INSTALL_DIR" remote get-url upstream 2>/dev/null || true)"
+        case "$upstream_remote" in
+          "")
+            git -C "$INSTALL_DIR" remote rename origin upstream
+            git -C "$INSTALL_DIR" remote add origin "$REPO_URL"
+            ;;
+          *"$_OC_UPSTREAM_GH_PATH"*)
+            git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
+            ;;
+          *)
+            die "refusing remote migration: upstream is '$upstream_remote' (expected …/${_OC_UPSTREAM_GH_PATH})"
+            ;;
+        esac
+        ok "Migrated legacy remotes: origin=canonical fork, upstream=comparison source"
+        ;;
       "")
-        opt "no git remote 'origin' — skipping pull"
+        git -C "$INSTALL_DIR" remote add origin "$REPO_URL"
+        ok "Added canonical origin"
         ;;
       *)
-        die "refusing to pull: origin is '$remote' (expected …/${_OC_GH_PATH})"
+        die "refusing to pull: origin is '$remote' (expected canonical …/${_OC_GH_PATH} or upstream …/${_OC_UPSTREAM_GH_PATH})"
         ;;
     esac
-    if [[ -n "$remote" ]]; then
-      if git -C "$INSTALL_DIR" pull --ff-only 2>/dev/null; then
-        ok "Repo updated (ff-only)"
-      else
-        opt "git pull skipped (local changes or offline) — using existing tree"
+
+    upstream_remote="$(git -C "$INSTALL_DIR" remote get-url upstream 2>/dev/null || true)"
+    case "$upstream_remote" in
+      "") git -C "$INSTALL_DIR" remote add upstream "$UPSTREAM_REPO_URL" ;;
+      *"$_OC_UPSTREAM_GH_PATH"*) ;;
+      *) die "refusing update: upstream is '$upstream_remote' (expected …/${_OC_UPSTREAM_GH_PATH})" ;;
+    esac
+
+    if git -C "$INSTALL_DIR" fetch origin "$_OC_GIT_REF" 2>/dev/null; then
+      target_available=1
+    elif git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/heads/$_OC_GIT_REF" \
+      || git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/remotes/origin/$_OC_GIT_REF"; then
+      target_available=1
+      opt "canonical fetch unavailable — using the existing local ref"
+    fi
+
+    current_branch="$(git -C "$INSTALL_DIR" symbolic-ref --short HEAD 2>/dev/null || true)"
+    if [[ "$current_branch" != "$_OC_GIT_REF" ]]; then
+      [[ $target_available -eq 1 ]] \
+        || die "canonical ref '$_OC_GIT_REF' is unavailable; retry online or install into a new --dir"
+      if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]]; then
+        die "cannot switch '$current_branch' to canonical ref '$_OC_GIT_REF' with local changes; commit them or use a new --dir"
       fi
+      if git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/heads/$_OC_GIT_REF"; then
+        git -C "$INSTALL_DIR" checkout "$_OC_GIT_REF" >/dev/null
+      else
+        git -C "$INSTALL_DIR" checkout -b "$_OC_GIT_REF" --track "origin/$_OC_GIT_REF" >/dev/null
+      fi
+      ok "Checked out canonical ref $_OC_GIT_REF"
+    fi
+
+    if [[ $target_available -eq 1 ]] && git -C "$INSTALL_DIR" pull --ff-only origin "$_OC_GIT_REF" 2>/dev/null; then
+      ok "Repo updated from canonical ref (ff-only)"
     else
-      ok "Repo ready"
+      opt "canonical pull skipped (local changes or offline) — using existing canonical tree"
     fi
   elif [[ -f "$INSTALL_DIR/opencode.json" ]]; then
     ok "Using existing checkout at $INSTALL_DIR (no .git)"
@@ -496,16 +548,21 @@ clone_or_update() {
       die "$INSTALL_DIR exists and is not an opencode-configs checkout — move it aside or set --dir"
     fi
     info "Cloning into empty directory $INSTALL_DIR..."
-    git clone --depth 1 --branch main "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 --branch "$_OC_GIT_REF" "$REPO_URL" "$INSTALL_DIR"
     ok "Repo cloned"
   else
     info "Cloning to $INSTALL_DIR..."
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone --depth 1 --branch main "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 --branch "$_OC_GIT_REF" "$REPO_URL" "$INSTALL_DIR"
     ok "Repo cloned"
   fi
 }
 clone_or_update
+
+# Fresh canonical clones keep the original project as a comparison source.
+if [[ -d "$INSTALL_DIR/.git" ]] && ! git -C "$INSTALL_DIR" remote get-url upstream >/dev/null 2>&1; then
+  git -C "$INSTALL_DIR" remote add upstream "$UPSTREAM_REPO_URL"
+fi
 
 [[ -f "$INSTALL_DIR/opencode.json" ]] || die "missing opencode.json in $INSTALL_DIR — aborting"
 [[ -f "$INSTALL_DIR/lib/common.sh" ]] || die "missing lib/common.sh in $INSTALL_DIR — aborting"

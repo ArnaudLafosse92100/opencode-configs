@@ -71,6 +71,33 @@ run_step "bash -n lib/common.sh" bash -n "$REPO/lib/common.sh"
 run_step "compile model-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/model-routing/run.py"
 run_step "model-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_model_routing_eval.py"
 run_step "compile orchestration-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/orchestration-routing/run.py"
+run_step "routing docs SSOT" python3 "$REPO/scripts/render-routing-docs.py" --repo "$REPO" --check
+run_step "installer distribution migration contract" python3 - "$REPO" <<'PY'
+import json, pathlib, re, sys
+
+repo = pathlib.Path(sys.argv[1])
+signature = json.loads((repo / "signature.json").read_text(encoding="utf-8"))
+installer = (repo / "install.sh").read_text(encoding="utf-8")
+def constant(name):
+    match = re.search(rf"^{re.escape(name)}='([^']+)'$", installer, re.MULTILINE)
+    return match.group(1) if match else None
+
+if constant("_OC_GH_B64") != signature["github_b64"]:
+    raise SystemExit("installer canonical repository differs from signature.json")
+if constant("_OC_UPSTREAM_GH_B64") != signature["upstream_github_b64"]:
+    raise SystemExit("installer upstream repository differs from signature.json")
+if constant("_OC_GIT_REF") != signature["github_ref"]:
+    raise SystemExit("installer canonical ref differs from signature.json")
+required = (
+    "remote rename origin upstream",
+    "remote add origin",
+    "checkout -b",
+    "pull --ff-only origin",
+)
+missing = [value for value in required if value not in installer]
+if missing:
+    raise SystemExit(f"installer distribution migration contract missing: {missing}")
+PY
 run_step "orchestration-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_orchestration_routing_eval.py"
 run_step "model-routing eval plan" "$REPO/eval-models.sh"
 run_step "model-routing targeted plan" "$REPO/eval-models.sh" --models deepseek --cases bounded-architecture-plan

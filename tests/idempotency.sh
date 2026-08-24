@@ -168,6 +168,52 @@ else
   bad "live signature failed — run: oc signature --refresh ($out)"
 fi
 
+# Distribution helpers must resolve the canonical fork and install ref from the
+# signed manifest rather than a hard-coded upstream default.
+dist_url="$(oc_github_url "$REPO/signature.json" 2>/dev/null || true)"
+dist_ref="$(oc_github_ref "$REPO/signature.json" 2>/dev/null || true)"
+if [[ "$dist_url" == "https://github.com/ArnaudLafosse92100/opencode-configs" \
+  && "$dist_ref" == "codex/buzz-openconfig-routing" ]]; then
+  ok "distribution helpers resolve canonical repository + ref"
+else
+  bad "distribution helper drift (url=$dist_url ref=$dist_ref)"
+fi
+
+# A scratch workspace generated from an old temporary audit checkout is safe to
+# repair; a user project with the same stale-looking path is not.
+STALE_WS="$TMP/stale-generated-workspace"
+mkdir -p "$STALE_WS"
+cat >"$STALE_WS/AGENTS.md" <<'EOF'
+# workspace
+
+Scratch workspace for `oc launch` (OpenConfig). Edit freely — this is not the config repo.
+EOF
+cat >"$STALE_WS/opencode.json" <<'EOF'
+{"instructions":["AGENTS.md","/private/tmp/opencode-configs-audit.example/prompts/core.md"]}
+EOF
+if OC_BACKUP_ROOT="$TMP/backups" oc_refresh_generated_workspace_config "$STALE_WS" high \
+  && grep -qF "$REPO/prompts/core.md" "$STALE_WS/opencode.json" \
+  && find "$TMP/backups" -type f -name opencode.json -print -quit | grep -q .; then
+  ok "stale generated launch config is backed up and refreshed"
+else
+  bad "stale generated launch config was not safely refreshed"
+fi
+
+USER_WS="$TMP/user-workspace"
+mkdir -p "$USER_WS"
+printf '%s\n' '# User project' >"$USER_WS/AGENTS.md"
+cat >"$USER_WS/opencode.json" <<'EOF'
+{"instructions":["/private/tmp/opencode-configs-audit.example/prompts/core.md"]}
+EOF
+before_user="$(cksum "$USER_WS/opencode.json" | awk '{print $1}')"
+OC_BACKUP_ROOT="$TMP/backups" oc_refresh_generated_workspace_config "$USER_WS" high
+after_user="$(cksum "$USER_WS/opencode.json" | awk '{print $1}')"
+if [[ "$before_user" == "$after_user" ]]; then
+  ok "user project config is never rewritten by scratch repair"
+else
+  bad "scratch repair rewrote a user project config"
+fi
+
 # ── 7. Launch dir never defaults to the config repo or bare projects home ──
 cd "$REPO" >/dev/null
 got="$(oc_resolve_launch_dir 2>/dev/null | tail -1)"

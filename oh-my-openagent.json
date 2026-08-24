@@ -258,8 +258,7 @@
         "openrouter/google/gemini-3.7-flash",
         "openrouter/qwen/qwen3.8-max",
         "openrouter/minimax/minimax-m3"
-      ],
-      "color": "#FF2D95"
+      ]
     },
     "ultrabrain": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
@@ -274,8 +273,7 @@
         "openrouter/deepseek/deepseek-v4-flash-0731",
         "openrouter/qwen/qwen3.8-max",
         "openrouter/moonshotai/kimi-k2.7-code"
-      ],
-      "color": "#B967FF"
+      ]
     },
     "deep": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/deep.md",
@@ -290,8 +288,7 @@
         "openrouter/qwen/qwen3.8-max",
         "openrouter/moonshotai/kimi-k2.7-code",
         "openrouter/z-ai/glm-5.3"
-      ],
-      "color": "#00F0FF"
+      ]
     },
     "artistry": {
       "is_unstable_agent": true,
@@ -303,8 +300,7 @@
         "openrouter/google/gemini-3.7-flash",
         "openrouter/qwen/qwen3.8-max",
         "openrouter/minimax/minimax-m3"
-      ],
-      "color": "#FF5C00"
+      ]
     },
     "quick": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/quick.md",
@@ -315,8 +311,7 @@
         "openrouter/deepseek/deepseek-v4-flash-0731",
         "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.3"
-      ],
-      "color": "#39FF14"
+      ]
     },
     "unspecified-low": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
@@ -327,8 +322,7 @@
         "openrouter/deepseek/deepseek-v4-flash-0731",
         "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.3"
-      ],
-      "color": "#6B7A99"
+      ]
     },
     "unspecified-high": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
@@ -341,8 +335,7 @@
         "openrouter/moonshotai/kimi-k2.7-code",
         "openrouter/deepseek/deepseek-v4-flash-0731",
         "subscription-gateway/gpt-5.6-terra"
-      ],
-      "color": "#9DFFFF"
+      ]
     },
     "writing": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/writing.md",
@@ -353,8 +346,7 @@
         "openrouter/poolside/laguna-s-2.1",
         "openrouter/qwen/qwen3.8-max",
         "openrouter/deepseek/deepseek-v4-flash-0731"
-      ],
-      "color": "#00FFD1"
+      ]
     },
     "bug-hunt": {
       "description": "Reproduce → root cause → minimal fix → verify. Cite file:line.",
@@ -366,8 +358,7 @@
         "openrouter/qwen/qwen3.8-max",
         "openrouter/moonshotai/kimi-k2.7-code",
         "openrouter/minimax/minimax-m3"
-      ],
-      "color": "#FFD400"
+      ]
     },
     "refactor-safe": {
       "description": "Tests-first, behavior-preserving refactors. Small steps only.",
@@ -380,8 +371,7 @@
         "openrouter/moonshotai/kimi-k2.7-code",
         "openrouter/poolside/laguna-s-2.1",
         "openrouter/minimax/minimax-m3"
-      ],
-      "color": "#3DDC97"
+      ]
     },
     "arch-review": {
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
@@ -396,8 +386,7 @@
         "openrouter/z-ai/glm-5.3",
         "openrouter/qwen/qwen3.8-max",
         "openrouter/moonshotai/kimi-k2.7-code"
-      ],
-      "color": "#6C63FF"
+      ]
     },
     "content-aware-fast": {
       "description": "Fast attack-surface recon: endpoints, misconfigs, deps.",
@@ -410,8 +399,7 @@
         "openrouter/minimax/minimax-m3",
         "openrouter/z-ai/glm-5.3",
         "openrouter/poolside/laguna-s-2.1"
-      ],
-      "color": "#FF1744"
+      ]
     },
     "content-aware-deep": {
       "description": "Deep vuln research. Each finding: CVSS, evidence, repro, fix.",
@@ -425,8 +413,7 @@
         "openrouter/qwen/qwen3.8-max",
         "openrouter/minimax/minimax-m3",
         "openrouter/poolside/laguna-s-2.1"
-      ],
-      "color": "#C51162"
+      ]
     },
     "agentic-deep-kimi": {
       "description": "Explicit Kimi K2.7 escalation for difficult long-horizon coding, research, and tool use.",
@@ -440,8 +427,7 @@
       ],
       "reasoning": "high",
       "maxTokens": 24576,
-      "prompt_append": "file://~/.config/opencode/prompts/categories/agentic-deep-kimi.md",
-      "color": "#7C4DFF"
+      "prompt_append": "file://~/.config/opencode/prompts/categories/agentic-deep-kimi.md"
     }
   },
   "background_task": {

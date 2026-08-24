@@ -1309,8 +1309,46 @@ oc_default_workspace_name() {
   printf '%s\n' "$name"
 }
 
+# True only for the scratch workspace that OpenConfig generated and whose
+# prompt paths point outside the current canonical checkout. Arbitrary project
+# configs are never classified as generated and are therefore never rewritten.
+oc_generated_workspace_config_stale() {
+  local dest="${1:-}" repo="${REPO:-}"
+  [[ -n "$dest" && -n "$repo" && -f "$dest/AGENTS.md" && -f "$dest/opencode.json" ]] || return 1
+  grep -qF 'Scratch workspace for `oc launch` (OpenConfig).' "$dest/AGENTS.md" 2>/dev/null || return 1
+  python3 - "$dest/opencode.json" "$repo" <<'PY'
+import json, os, sys
+
+config_path, repo = sys.argv[1:3]
+try:
+    data = json.load(open(config_path, encoding="utf-8"))
+except Exception:
+    sys.exit(1)
+
+repo = os.path.realpath(repo)
+for value in data.get("instructions") or []:
+    if not isinstance(value, str) or not os.path.isabs(value):
+        continue
+    normalized = os.path.realpath(value)
+    is_openconfig_prompt = normalized.endswith("/prompts/core.md") or "/prompts/profiles/" in normalized
+    if is_openconfig_prompt and not normalized.startswith(repo + os.sep):
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+# Refresh only a provably generated scratch config. A copy is kept in the
+# normal OpenConfig backup tree before the canonical profile is rendered.
+oc_refresh_generated_workspace_config() {
+  local dest="${1:-}" profile="${2:-$(oc_default_profile)}"
+  oc_generated_workspace_config_stale "$dest" || return 0
+  oc_backup_copy "$dest/opencode.json" "launch-workspace-config" >/dev/null || return 1
+  oc_write_project_opencode_json "$profile" "$dest/opencode.json"
+}
+
 # Ensure a clean launch workspace subdirectory under the projects home.
-# Creates AGENTS.md + project opencode.json when missing; scrubs install strays.
+# Creates AGENTS.md + project opencode.json when missing, repairs only stale
+# generated configs, and scrubs install strays.
 # Prints absolute path. Never returns the bare projects home.
 oc_ensure_launch_workspace() {
   local home name dest profile
@@ -1355,6 +1393,11 @@ EOF
         '  "instructions": ["AGENTS.md"]' \
         '}' >"$dest/opencode.json"
     fi
+  fi
+  if [[ -n "${REPO:-}" && -f "${REPO}/profiles/${profile}.json" ]]; then
+    oc_refresh_generated_workspace_config "$dest" "$profile" || return 1
+    mkdir -p "$dest/.opencode"
+    ln -sfn "$REPO/profiles/$profile.json" "$dest/.opencode/profile.json"
   fi
   if [[ ! -f "$dest/.gitignore" ]]; then
     printf '%s\n' \
@@ -1481,8 +1524,7 @@ PY
 
 
 # ── Distribution host (encoded) ──────────────────────────────────────
-# signature.json github_b64 holds the clone base URL. Kept encoded so the
-# tree has no distribution-host owner literals; decode only at runtime.
+# signature.json github_b64 + github_ref identify the canonical distribution.
 oc_github_url() {
   local sig="${1:-${REPO:?}/signature.json}"
   python3 - "$sig" <<'PY'
@@ -1493,6 +1535,19 @@ if not b64:
     sys.stderr.write("oc: signature.json missing github_b64\n")
     sys.exit(2)
 print(base64.b64decode(b64).decode("ascii").rstrip("/"))
+PY
+}
+
+oc_github_ref() {
+  local sig="${1:-${REPO:?}/signature.json}"
+  python3 - "$sig" <<'PY'
+import json, sys
+sig = json.load(open(sys.argv[1], encoding="utf-8"))
+ref = str(sig.get("github_ref") or "").strip()
+if not ref or ref.startswith("-") or any(ch.isspace() for ch in ref):
+    sys.stderr.write("oc: signature.json missing/invalid github_ref\n")
+    sys.exit(2)
+print(ref)
 PY
 }
 

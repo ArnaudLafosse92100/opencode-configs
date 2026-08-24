@@ -85,7 +85,7 @@
         "chunkTimeout": 60000,
         "setCacheKey": true,
         "headers": {
-          "HTTP-Referer": "https://github.com/jesseoue/opencode-configs",
+          "HTTP-Referer": "https://github.com/ArnaudLafosse92100/opencode-configs",
           "X-Title": "OpenConfig",
           "X-OpenRouter-Title": "OpenConfig",
           "X-OpenRouter-Categories": "cli,agent"

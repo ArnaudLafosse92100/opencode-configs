@@ -54,6 +54,7 @@ REQUIRED=(
 # Add locate.sh to required list
   opencode.sh run.sh openrouter-admin.sh oc locate.sh signature.sh
   lib/common.sh
+  scripts/render-routing-docs.py
   agents/content-aware-research.md
   prompts/core.md prompts/goal.md
   prompts/agents/sisyphus.md prompts/agents/hephaestus.md prompts/agents/prometheus.md prompts/agents/atlas.md

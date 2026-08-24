@@ -186,7 +186,11 @@ def github_referer():
             return base64.b64decode(b64).decode("ascii").rstrip("/")
     except Exception:
         pass
-    return "https://github.com/jesseoue/opencode-configs"
+    try:
+        config = json.load(open(os.path.join(repo, "opencode.json"), encoding="utf-8"))
+        return config["provider"]["openrouter"]["options"]["headers"]["HTTP-Referer"]
+    except Exception:
+        return ""
 
 referer = github_referer()
 oc = json.load(open(os.path.join(repo, "opencode.json"), encoding="utf-8"))
