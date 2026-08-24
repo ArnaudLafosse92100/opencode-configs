@@ -74,6 +74,15 @@ Re-running install / setup / heal / fix on a healthy box must **not** clobber `.
 
 Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 
+## Graphify
+
+Graphify is a local derived code-navigation index, not proof of the active
+profile, provider, model, runtime, deployment, or a successful request. Follow
+`docs/graphify-workflow.md`; use the directed AST-only graph for orientation and
+verify material claims in current configuration plus a fresh runtime request.
+Do not enable semantic extraction, MCP, a global graph, URL ingestion, or
+in-repository memory.
+
 ## Terminal
 
 - Ghostty + zsh. `TERM=xterm-256color` for OpenCode (Ghostty's `xterm-ghostty` redraws slowly).

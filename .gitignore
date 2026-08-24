@@ -9,6 +9,7 @@
 
 # ── Allowlist: identity / docs ──────────────────────────────────────
 !.gitignore
+!.graphifyignore
 !.env.example
 !AGENTS.md
 !CHANGELOG.md
@@ -25,6 +26,8 @@
 !opencode.json
 !oh-my-openagent.json
 !oc
+!docs/
+!docs/graphify-workflow.md
 
 # ── Allowlist: scripts ──────────────────────────────────────────────
 !*.sh
