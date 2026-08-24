@@ -83,6 +83,7 @@ _oc_resolve_start_dir() {
 
 opencode() {
   local _oc_env_file="$HOME/.config/opencode/.env"
+  local OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
   # Always kill upstream telemetry before any OpenCode / OmO process starts
   export DO_NOT_TRACK=1
   export OMO_DISABLE_POSTHOG=1
@@ -114,6 +115,9 @@ opencode() {
   export DO_NOT_TRACK=1 OMO_DISABLE_POSTHOG=1 OMO_SEND_ANONYMOUS_TELEMETRY=0
   export OMO_CODEX_DISABLE_POSTHOG=1 OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
   export CODEGRAPH_TELEMETRY=0 OTEL_SDK_DISABLED=true
+  OPENCODE_CONFIG_DIR="$("$HOME/.config/opencode/oc" profile path)" || return 1
+  XDG_CONFIG_HOME="$("$HOME/.config/opencode/oc" profile xdg-path)" || return 1
+  export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
 
   # Resolve start directory — never the config repo (unless --here)
   local -a _oc_args=("$@")
@@ -159,9 +163,9 @@ opencode() {
   stty sane 2>/dev/null
   command -v tput >/dev/null && tput cnorm 2>/dev/null
 
-  # OpenCode may drop package.json/node_modules into the config repo when
-  # launched from there — scrub so the next validate/doctor stays clean.
-  local _oc_cfg="$HOME/.config/opencode"
+  # OpenCode may drop package.json/node_modules into the disposable runtime
+  # overlay. Never mutate the OpenConfig Git checkout during launch/teardown.
+  local _oc_cfg="$OPENCODE_CONFIG_DIR"
   if [[ -e "$_oc_cfg" ]]; then
     local _oc_real
     _oc_real="$(cd "$_oc_cfg" 2>/dev/null && pwd -P || true)"

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import pathlib
+import subprocess
 import tempfile
 import unittest
 
@@ -72,7 +74,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
         cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
-        cls.profile = cls.profile_data["active"]
+        cls.profile = cls.profile_data["default_profile"]
 
     def _selected_profile(self) -> dict:
         selected = self.profile_data[self.profile]
@@ -102,14 +104,12 @@ class ContentAwareFallbackTests(unittest.TestCase):
                     self.assertEqual(actual["fallback_models"], expected["fallback_models"], name)
 
     def test_pentest_profile_declared_routes_are_glm_deepseek_only(self) -> None:
-        if self.profile != "pentest":
-            self.skipTest("only applies to pentest runtime profile")
         allowed = {
             "openrouter/z-ai/glm-5.3",
             "openrouter/deepseek/deepseek-v4-flash-0731",
             "openrouter/deepseek/deepseek-v4-pro-0813",
         }
-        selected = self._selected_profile()
+        selected = self.profile_data["pentest"]
         for section in ("agents", "categories"):
             self.assertEqual(
                 set(selected.get(section, {})),
@@ -146,21 +146,80 @@ class ContentAwareFallbackTests(unittest.TestCase):
                     else:
                         self.assertEqual(route, {"model": flash, "fallback_models": [glm]})
 
-    def test_native_content_aware_surfaces_match_active_profile(self) -> None:
+    def test_native_content_aware_surfaces_match_default_profile(self) -> None:
         expected = self._selected_profile()["agents"]["content-aware-research"]["model"]
         definition = (REPO / "agents/content-aware-research.md").read_text(encoding="utf-8")
         profile = json.loads((REPO / "profiles/content-aware.json").read_text(encoding="utf-8"))
         self.assertIn(f"model: {expected}", definition)
         self.assertEqual(profile["model"], expected)
 
-    def test_sisyphus_runtime_profile_guard_matches_active_profile(self) -> None:
+    def test_sisyphus_runtime_profile_guard_matches_default_profile(self) -> None:
         prompt = (REPO / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
-        selected = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["active"]
+        selected = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["default_profile"]
         self.assertIn(f"Runtime profile `{selected}`", prompt)
         if selected == "pentest":
             self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway", prompt)
         else:
             self.assertNotIn("Runtime profile `pentest`", prompt)
+
+    def test_profile_activation_renders_external_state_without_mutating_sources(self) -> None:
+        tracked = (
+            "opencode.json",
+            "oh-my-openagent.json",
+            "agents/codex-router.md",
+            "agents/content-aware-research.md",
+            "profiles/content-aware.json",
+            "prompts/agents/sisyphus.md",
+            "runtime-profile.json",
+        )
+        before = {name: (REPO / name).read_bytes() for name in tracked}
+        with (
+            tempfile.TemporaryDirectory() as state,
+            tempfile.TemporaryDirectory() as native,
+            tempfile.TemporaryDirectory() as source_xdg,
+        ):
+            env = os.environ.copy()
+            env["OC_RUNTIME_STATE_DIR"] = state
+            env["OC_NATIVE_OMO_PATH"] = str(pathlib.Path(native) / "omo.jsonc")
+            env["OC_SOURCE_XDG_CONFIG_HOME"] = source_xdg
+            (pathlib.Path(source_xdg) / "gh").mkdir()
+            subprocess.run(
+                [
+                    "python3",
+                    str(REPO / "scripts/runtime-profile.py"),
+                    "--repo",
+                    str(REPO),
+                    "activate",
+                    "pentest",
+                ],
+                check=True,
+                env=env,
+            )
+            state_path = pathlib.Path(state)
+            runtime = state_path / "runtime/profiles/pentest"
+            rendered = json.loads((runtime / "opencode.json").read_text(encoding="utf-8"))
+            self.assertEqual(rendered["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
+            self.assertEqual((state_path / "active-profile").read_text().strip(), "pentest")
+            self.assertEqual((state_path / "runtime/current").resolve(), runtime.resolve())
+            xdg_result = subprocess.run(
+                [
+                    "python3",
+                    str(REPO / "scripts/runtime-profile.py"),
+                    "--repo",
+                    str(REPO),
+                    "xdg-path",
+                    "pentest",
+                ],
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            xdg = pathlib.Path(xdg_result.stdout.strip())
+            self.assertEqual((xdg / "opencode").resolve(), runtime.resolve())
+            self.assertEqual((xdg / "gh").resolve(), (pathlib.Path(source_xdg) / "gh").resolve())
+        after = {name: (REPO / name).read_bytes() for name in tracked}
+        self.assertEqual(after, before)
 
 
 class CampaignLedgerTests(unittest.TestCase):

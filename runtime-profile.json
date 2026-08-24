@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "active": "pentest",
+  "schema_version": 3,
+  "default_profile": "normal",
   "normal": {
     "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
     "helper_model": "openrouter/deepseek/deepseek-v4-flash-0731",

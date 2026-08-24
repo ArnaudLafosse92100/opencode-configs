@@ -90,7 +90,16 @@ def opencode_auth_headers() -> dict[str, str]:
 def load_cases() -> dict:
     suite = json.loads((HERE / "cases.json").read_text(encoding="utf-8"))
     profiles = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
-    active = profiles.get("active", "normal")
+    state_root = pathlib.Path(
+        os.environ.get(
+            "OC_RUNTIME_STATE_DIR",
+            str(pathlib.Path(os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state")) / "openconfig"),
+        )
+    ).expanduser()
+    active_path = state_root / "active-profile"
+    active = active_path.read_text(encoding="utf-8").strip() if active_path.is_file() else profiles.get("default_profile", "normal")
+    if active not in ("normal", "pentest"):
+        raise ValueError(f"invalid active profile state: {active!r}")
     selected = profiles.get(active) or {}
     categories = selected.get("categories") or {}
     for case in suite["cases"]:

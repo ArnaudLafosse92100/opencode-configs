@@ -496,16 +496,16 @@ if omo:
     ok("agent/category fallback lists have no primary duplicates")
 
     runtime_profile_path = os.path.join(repo, "runtime-profile.json")
-    runtime_profile = "normal"
+    default_profile = "normal"
     if os.path.isfile(runtime_profile_path):
         try:
-            runtime_profile = (json.load(open(runtime_profile_path)).get("active") or "normal").strip()
+            default_profile = (json.load(open(runtime_profile_path)).get("default_profile") or "normal").strip()
         except Exception:
-            runtime_profile = "invalid"
-    if runtime_profile not in ("normal", "pentest"):
-        err(f"runtime-profile.json active must be normal or pentest (got {runtime_profile!r})")
+            default_profile = "invalid"
+    if default_profile not in ("normal", "pentest"):
+        err(f"runtime-profile.json default_profile must be normal or pentest (got {default_profile!r})")
     else:
-        ok(f"runtime profile {runtime_profile!r}")
+        ok(f"source defaults to runtime profile {default_profile!r}")
 
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
     # subscription gateway only. Runtime profiles are the authority for routes
@@ -521,7 +521,7 @@ if omo:
             runtime_profile_data = json.load(open(runtime_profile_path))
         except Exception:
             runtime_profile_data = {}
-    selected_profile = runtime_profile_data.get(runtime_profile) if isinstance(runtime_profile_data, dict) else {}
+    selected_profile = runtime_profile_data.get(default_profile) if isinstance(runtime_profile_data, dict) else {}
     if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
         # Backward-compatible schema v1: category map at profile root.
         selected_profile = {"categories": selected_profile}
@@ -606,9 +606,7 @@ if omo:
     ok("normal profile vision chains stay attachment-capable")
     # Tool-using routes must not fall back to a no-tools model. Hermes is allowed
     # only for content-aware-research, where edit/tools are intentionally denied.
-    capability_profiles = [(runtime_profile, selected_profile)]
-    if normal_profile and runtime_profile != "normal":
-        capability_profiles.append(("normal", normal_profile))
+    capability_profiles = [("normal", normal_profile), ("pentest", pentest_profile)]
     for profile_name, profile in capability_profiles:
         for section in ("agents", "categories"):
             for name, cfg in ((profile or {}).get(section) or {}).items():
@@ -625,11 +623,11 @@ if omo:
     if codex_router_expected:
         if (oc or {}).get("model") != codex_router_expected:
             err(
-                "opencode.json: top-level model must match the active runtime profile "
+                "opencode.json: top-level model must match the default source profile "
                 f"codex-router route ({(oc or {}).get('model')!r} != {codex_router_expected!r})"
             )
         else:
-            ok("opencode.json top-level model matches active codex-router profile")
+            ok("opencode.json top-level model matches default codex-router profile")
         if (oc or {}).get("small_model") != "openrouter/deepseek/deepseek-v4-flash-0731":
             err("opencode.json: small_model must stay on DeepSeek Flash 0731")
         else:
@@ -651,36 +649,34 @@ if omo:
                     str(expected.get("model") or ""),
                     [str(x) for x in (expected.get("fallback_models") or [])],
                 )
-    if runtime_profile == "pentest":
-        actual_routes = {
-            (section, name)
-            for section in ("agents", "categories")
-            for name, cfg in (omo.get(section) or {}).items()
-            if isinstance(cfg, dict)
-        }
-        missing_from_profile = sorted(
-            f"{section}.{name}"
-            for section, name in (actual_routes - set(profile_expected))
-        )
-        extra_in_profile = sorted(
-            f"{section}.{name}"
-            for section, name in (set(profile_expected) - actual_routes)
-        )
-        if missing_from_profile:
-            err(
-                "runtime-profile.json[pentest]: every real agent/category must be explicitly pinned; "
-                f"missing {missing_from_profile}"
-            )
-        if extra_in_profile:
-            err(
-                "runtime-profile.json[pentest]: profile contains routes absent from oh-my-openagent.json: "
-                f"{extra_in_profile}"
-            )
-    pentest_safe_models = {
-        "openrouter/z-ai/glm-5.3",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
-        "openrouter/deepseek/deepseek-v4-pro-0813",
+    actual_routes = {
+        (section, name)
+        for section in ("agents", "categories")
+        for name, cfg in (omo.get(section) or {}).items()
+        if isinstance(cfg, dict)
     }
+    pentest_routes = {
+        (section, name)
+        for section in ("agents", "categories")
+        for name, cfg in ((pentest_profile or {}).get(section) or {}).items()
+        if isinstance(cfg, dict)
+    }
+    missing_from_profile = sorted(
+        f"{section}.{name}" for section, name in (actual_routes - pentest_routes)
+    )
+    extra_in_profile = sorted(
+        f"{section}.{name}" for section, name in (pentest_routes - actual_routes)
+    )
+    if missing_from_profile:
+        err(
+            "runtime-profile.json[pentest]: every real agent/category must be explicitly pinned; "
+            f"missing {missing_from_profile}"
+        )
+    if extra_in_profile:
+        err(
+            "runtime-profile.json[pentest]: profile contains routes absent from oh-my-openagent.json: "
+            f"{extra_in_profile}"
+        )
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
             if not isinstance(cfg, dict):
@@ -698,15 +694,6 @@ if omo:
                         f"oh-my-openagent.json[{section}.{name}]: runtime profile route must be "
                         f"{expected_primary} with fallbacks {expected_fallbacks}"
                     )
-                if runtime_profile == "pentest":
-                    bad_models = [
-                        model for model in [primary, *fallbacks]
-                        if model not in pentest_safe_models
-                    ]
-                    if bad_models:
-                        err(
-                            f"oh-my-openagent.json[{section}.{name}]: pentest profile route has non GLM/DeepSeek models: {bad_models}"
-                        )
                 continue
             if primary.startswith("openrouter/") and (
                 not fallbacks or not fallbacks[0].startswith("subscription-gateway/")
@@ -1230,11 +1217,11 @@ else:
     actual_ca_model = model_match.group(1) if model_match else None
     if expected_ca_model and actual_ca_model != expected_ca_model:
         err(
-            "agents/content-aware-research.md model must match active runtime profile "
+            "agents/content-aware-research.md model must match default source profile "
             f"({actual_ca_model!r} != {expected_ca_model!r})"
         )
     elif expected_ca_model:
-        ok("agents/content-aware-research.md model matches active runtime profile")
+        ok("agents/content-aware-research.md model matches default source profile")
 if not os.path.isfile(ca_prof):
     err("profiles/content-aware.json missing")
 else:
@@ -1245,29 +1232,22 @@ else:
         elif (gp.get("permission") or {}).get("edit") != "deny":
             err("profiles/content-aware.json permission.edit must be deny")
         elif expected_ca_model and gp.get("model") != expected_ca_model:
-            err("profiles/content-aware.json model must match active content-aware-research route")
+            err("profiles/content-aware.json model must match default content-aware-research route")
         elif selected_profile and gp.get("small_model") != selected_profile.get("small_model"):
-            err("profiles/content-aware.json small_model must match active runtime profile")
+            err("profiles/content-aware.json small_model must match default source profile")
         else:
-            ok("profiles/content-aware.json → active content-aware-research route (edit deny)")
+            ok("profiles/content-aware.json → default content-aware-research route (edit deny)")
     except Exception as e:
         err(f"profiles/content-aware.json: invalid JSON ({e})")
 
 # ---- 4c1b. Kimi must remain an explicit, evaluated escalation lane ----
 cats = omo.get("categories") or {}
 kimi_lane = cats.get("agentic-deep-kimi")
-pentest_safe_models = {
-    "openrouter/z-ai/glm-5.3",
-    "openrouter/deepseek/deepseek-v4-flash-0731",
-    "openrouter/deepseek/deepseek-v4-pro-0813",
-}
 if not isinstance(kimi_lane, dict):
     err("categories.agentic-deep-kimi missing (explicit Kimi escalation lane)")
-elif runtime_profile == "pentest" and str(kimi_lane.get("model") or "") in pentest_safe_models:
-    ok("agentic-deep-kimi is overridden by pentest strict GLM/DeepSeek overlay")
-elif runtime_profile != "pentest" and kimi_lane.get("model") != "openrouter/moonshotai/kimi-k2.7-code":
+elif kimi_lane.get("model") != "openrouter/moonshotai/kimi-k2.7-code":
     err("categories.agentic-deep-kimi must route to openrouter/moonshotai/kimi-k2.7-code")
-elif runtime_profile != "pentest":
+else:
     ok("agentic-deep-kimi is the explicit Kimi primary lane")
 
 kimi_primary = []
@@ -1275,11 +1255,9 @@ for section, blob in (("agent", omo.get("agents") or {}), ("category", cats)):
     for name, cfg in blob.items():
         if isinstance(cfg, dict) and cfg.get("model") == "openrouter/moonshotai/kimi-k2.7-code":
             kimi_primary.append(f"{section}:{name}")
-if runtime_profile == "pentest" and kimi_primary == []:
-    ok("Kimi has no primary route in pentest strict profile")
-elif runtime_profile != "pentest" and kimi_primary != ["category:agentic-deep-kimi"]:
+if kimi_primary != ["category:agentic-deep-kimi"]:
     err(f"Kimi primary routing must stay explicit-only (got {kimi_primary})")
-elif runtime_profile != "pentest":
+else:
     ok("Kimi is not a global/daily primary")
 
 eval_required = (

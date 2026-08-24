@@ -20,7 +20,7 @@
 #   cleanup [--dry-run|--yes]             Reconcile to known-good state
 #   maintain [--check|--clean|--plans]    Clean sessions, caches, logs
 #   models [--catalog|--providers|--json|--upgrade]  OpenRouter catalog / providers
-#   profile [show|normal|pentest]        Switch runtime routing profile
+#   profile [show|normal|pentest|path|xdg-path|resolve] Runtime routing profile
 #   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
 #   plugin [doctor|cache]                 OmO pin cache + OpenConfig patch health
@@ -105,7 +105,8 @@ ${c_bold}Repair & Clean:${c_0}
 
 ${c_bold}Models & Admin:${c_0}
   ${c_g}models${c_0}    [--catalog|--providers|--json|--upgrade]
-  ${c_g}profile${c_0}   [show|normal|pentest]         Runtime routing profile
+  ${c_g}profile${c_0}   [show|normal|pentest|path|xdg-path|resolve]
+                                         Runtime profile state and route lookup
                                          OpenRouter catalog / live provider health
   ${c_g}eval${c_0}      [--execute|--run-budget N]    Bounded model-routing canary (plan-only by default)
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]

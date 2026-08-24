@@ -1,7 +1,7 @@
 ---
 description: Strict Codex entry orchestrator — delegates every workspace action through an OmO category and skill contract
 mode: primary
-model: openrouter/deepseek/deepseek-v4-flash-0731
+model: openrouter/z-ai/glm-5.3
 temperature: 0.2
 permission:
   "*": deny

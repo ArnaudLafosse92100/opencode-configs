@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Make `runtime-profile.json` the model-routing SSoT while keeping tracked configs as the immutable `normal` baseline.
+- Store active profile state and rendered OpenCode/OmO overlays under `~/.local/state/openconfig`; `oc profile` no longer rewrites tracked files.
+- Add `oc profile path` and `oc profile resolve` for bridges and project consumers such as Buzz.
+
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
 ## Unreleased — 2026-08-24

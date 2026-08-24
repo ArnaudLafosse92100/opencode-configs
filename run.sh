@@ -69,13 +69,17 @@ esac
 
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
+OPENCODE_CONFIG_DIR="$("$REPO/runtime-profile.sh" path)"
+XDG_CONFIG_HOME="$("$REPO/runtime-profile.sh" xdg-path)"
+export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
 
 # `bunx oh-my-openagent run` launches the OpenCode binary by name. Desktop
 # shells normally add this directory through zshrc, but a headless run (or the
 # Buzz harness) may not inherit an interactive PATH.
 opencode_bin="${OPENCODE_BIN:-$HOME/.opencode/bin/opencode}"
 if [[ -x "$opencode_bin" ]]; then
-  export PATH="$(dirname "$opencode_bin"):$PATH"
+  opencode_bin_dir="$(dirname "$opencode_bin")"
+  export PATH="$opencode_bin_dir:$PATH"
 fi
 
 # bunx writes package.json/node_modules into cwd — never run it from the
@@ -92,9 +96,9 @@ run_cli() {
   fi
 }
 
-# OpenCode may still drop package.json/node_modules into the config dir while
-# loading plugins — scrub before and after so the repo stays config-only.
-scrub() { oc_scrub_config_strays "$REPO" >/dev/null; }
+# OpenCode may still drop package.json/node_modules into its generated runtime
+# overlay. Clean only that disposable state; the Git checkout is immutable.
+scrub() { oc_scrub_config_strays "$OPENCODE_CONFIG_DIR" >/dev/null; }
 scrub
 
 # ── Allowlisted .env keys only (never Infisical/Doppler process wrap). ──

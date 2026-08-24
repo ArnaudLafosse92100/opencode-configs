@@ -158,7 +158,7 @@ if python3 -c '
 import json, sys
 omo=json.load(open(sys.argv[1]))
 profile=json.load(open(sys.argv[2]))
-prof=profile.get("active", "normal")
+prof=profile.get("default_profile", "normal")
 selected=profile.get(prof, {})
 if selected and "agents" not in selected and "categories" not in selected:
     selected={"categories": selected}
