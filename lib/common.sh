@@ -247,7 +247,6 @@ OC_CONFIG_STRAYS=(
   bun.lockb
   .omo
   .sisyphus
-  .codegraph
   command
   .opencode
   plugins

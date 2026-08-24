@@ -593,7 +593,7 @@ if os.path.isfile(omo_jsonc_path):
 STRAYS = (
     "node_modules", "package.json", "package-lock.json", "npm-shrinkwrap.json",
     "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", ".omo", ".sisyphus",
-    ".codegraph", "command",
+    "command",
 )
 for name in STRAYS:
     path = os.path.join(repo, name)

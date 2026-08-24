@@ -215,12 +215,16 @@ if bad and ("/.cache/opencode/codegraph" in str(bad) or str(bad).startswith("~/.
     print(f"  ⚠ codegraph.install_dir={bad!r} is wrong — OmO default is ~/.omo/codegraph")
 elif cg.get("enabled") is False:
     print("  ⚠ codegraph.enabled is false")
+elif cg.get("auto_init") is not False:
+    print("  ⚠ codegraph.auto_init must be false (managed projects are initialized explicitly)")
 elif cg.get("auto_provision") is not True:
     print("  ⚠ codegraph.auto_provision must be true")
+elif cg.get("telemetry") is not False:
+    print("  ⚠ codegraph.telemetry must be false")
 elif cg.get("daemon") is not True:
     print("  ⚠ codegraph.daemon must be true")
 else:
-    print("  ✓ codegraph config OK (managed daemon, default ~/.omo/codegraph)")
+    print("  ✓ codegraph config OK (explicit project init, managed daemon, telemetry off)")
 PY
 echo ""
 

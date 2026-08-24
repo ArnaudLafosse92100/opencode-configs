@@ -74,14 +74,14 @@ Re-running install / setup / heal / fix on a healthy box must **not** clobber `.
 
 Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 
-## Graphify
+## CodeGraph
 
-Graphify is a local derived code-navigation index, not proof of the active
-profile, provider, model, runtime, deployment, or a successful request. Follow
-`docs/graphify-workflow.md`; use the directed AST-only graph for orientation and
-verify material claims in current configuration plus a fresh runtime request.
-Do not enable semantic extraction, MCP, a global graph, URL ingestion, or
-in-repository memory.
+CodeGraph is the sole local code-navigation and impact-analysis engine. OmO
+owns its pinned provisioning, MCP bridge, daemon and privacy environment. Do
+not run CodeGraph's native agent installer or upgrader, and do not add a second
+project watcher. Use the managed graph for orientation, then verify material
+claims in current configuration and a fresh runtime request. The derived index
+is never proof of the active profile, provider, model, deployment or success.
 
 ## Terminal
 
@@ -135,7 +135,7 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Do not commit `.env` or secrets.
 - Do not delete failing tests to make them pass.
 - Do not use `as any`, `@ts-ignore`, or `@ts-expect-error`.
-- Do not re-enable OmO/OpenCode telemetry (`telemetry`, PostHog, `share`, OTel exporters) — `oc_telemetry_off` + `oc fix` keep them dark.
+- Do not re-enable OmO/OpenCode/CodeGraph telemetry (`telemetry`, PostHog, `share`, OTel exporters) — `oc_telemetry_off` + `oc fix` keep them dark.
 - Do not skip `oc signature` after editing identity files (`oc`, `lib/common.sh`, `versions.json`, …) — run `oc signature --refresh`.
 
 ## Sources

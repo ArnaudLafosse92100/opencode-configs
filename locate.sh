@@ -166,7 +166,7 @@ fi
 
 # ── Repo strays ──
 STRAYS=()
-for name in node_modules package.json .omo .sisyphus .codegraph command; do
+for name in node_modules package.json .omo .sisyphus command; do
   [[ -e "$REPO/$name" || -L "$REPO/$name" ]] && STRAYS+=("$name")
 done
 

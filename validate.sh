@@ -467,8 +467,12 @@ if omo:
     cg = omo.get("codegraph") or {}
     if cg.get("enabled") is False:
         err("oh-my-openagent.json: codegraph.enabled is false")
+    elif cg.get("auto_init") is not False:
+        err("oh-my-openagent.json: codegraph.auto_init must be false — managed projects are initialized explicitly")
     elif cg.get("auto_provision") is not True:
         err("oh-my-openagent.json: codegraph.auto_provision must be true — run: oc fix")
+    elif cg.get("telemetry") is not False:
+        err("oh-my-openagent.json: codegraph.telemetry must be false")
     elif cg.get("daemon") is not True:
         err("oh-my-openagent.json: codegraph.daemon must be true — run: oc fix")
     else:
@@ -1077,7 +1081,7 @@ if omo:
 STRAYS = (
     "node_modules", "package.json", "package-lock.json", "npm-shrinkwrap.json",
     "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", ".omo", ".sisyphus",
-    ".codegraph", "command", ".opencode", "plugins",
+    "command", ".opencode", "plugins",
 )
 present = [s for s in STRAYS if os.path.lexists(os.path.join(repo, s))]
 if present:
