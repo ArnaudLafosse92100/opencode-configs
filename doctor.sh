@@ -495,8 +495,8 @@ while IFS='|' read -r st msg; do
   esac
 done <<< "$prompt_report"
 
-# ─── Agent / category colors ─────────────────────────────────────────
-sec "Agent & category colors"
+# ─── Agent colors (categories do not accept color in OmO 4.19.4) ─────
+sec "Agent colors"
 color_report="$(python3 - "$REPO" <<'PY'
 import json, os, sys, re
 repo = sys.argv[1]
@@ -511,28 +511,21 @@ for n, a in (omo.get("agents") or {}).items():
         bad_a.append(f"{n}={c}")
     else:
         ok_a += 1
-miss_c, bad_c, ok_c = [], [], 0
+category_colors = []
 for n, a in (omo.get("categories") or {}).items():
-    if not isinstance(a, dict):
-        continue
-    c = a.get("color")
-    if c is None:
-        miss_c.append(n)
-    elif not hexre.match(str(c)):
-        bad_c.append(f"{n}={c}")
-    else:
-        ok_c += 1
-if bad_a or bad_c:
-    print("BAD|non-hex colors: " + ", ".join(bad_a + bad_c))
-if miss_a or miss_c:
-    ma = ",".join(miss_a) if miss_a else "—"
-    mc = ",".join(miss_c[:6]) + ("…" if len(miss_c) > 6 else "") if miss_c else "—"
-    print(f"OPT|missing colors (TUI tabs dull): agents={ma} categories={mc}")
-    print("TIP|restore: oc fix   # assigns Tokyonight hex colors")
-if ok_a or ok_c:
-    print(f"OK|{ok_a} agents + {ok_c} categories have valid #RRGGBB colors")
-if not (miss_a or miss_c or bad_a or bad_c):
-    print("OK|all agent/category colors set")
+    if isinstance(a, dict) and "color" in a:
+        category_colors.append(n)
+if bad_a:
+    print("BAD|non-hex agent colors: " + ", ".join(bad_a))
+if miss_a:
+    print(f"OPT|missing agent colors (TUI tabs dull): {','.join(miss_a)}")
+    print("TIP|restore: oc fix   # assigns agent Tokyonight hex colors")
+if ok_a:
+    print(f"OK|{ok_a} agents have valid #RRGGBB colors")
+if category_colors:
+    print("BAD|unsupported category colors present: " + ", ".join(category_colors))
+else:
+    print("OK|categories omit unsupported color keys")
 PY
 )"
 while IFS='|' read -r st msg; do
@@ -612,7 +605,7 @@ for n, c in m.items():
             if key:
                 print("OK|context7 has CONTEXT7_API_KEY")
             else:
-                print("OPT|context7 enabled but CONTEXT7_API_KEY unset")
+                print("INFO|context7 key is unset (already reported under API keys)")
     else:
         print("INFO|%s disabled" % n)
 PY
@@ -1371,8 +1364,7 @@ if [[ -n "$_gbin" ]]; then
     ok "ghostty: notify-on-command-finish configured"
   fi
 else
-  opt "Ghostty not found (optional but recommended)"
-  tip "install: https://ghostty.org  (≥ $(oc_versions_get ghostty.min 2>/dev/null || echo 1.3.0))"
+  info "Ghostty integration skipped (optional dependency already reported under supported versions)"
 fi
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Telemetry / phone-home ───────────────────────────────────────
@@ -1435,22 +1427,19 @@ unset _kv _k _want _got _tel_env_ok
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Compaction optimizations ─────────────────────────────────────
 sec "Compaction optimizations"
-# Compaction is JSON-config (opencode.json compaction.* + experimental.compaction.autocontinue).
-# Fake OPENCODE_EXPERIMENTAL_COMPACTION_* env vars do not exist in OpenCode 1.17.x.
+# Compaction is configured through opencode.json compaction.*. The similarly
+# named experimental.compaction.autocontinue is a plugin hook, not a config key.
 comp_report="$(python3 - "$REPO" <<'PY' 2>/dev/null || true
 import json, os, sys
 repo=sys.argv[1]
 oc=json.load(open(os.path.join(repo,"opencode.json")))
 comp=oc.get("compaction") or {}
-exp=(oc.get("experimental") or {}).get("compaction") or {}
 omo=json.load(open(os.path.join(repo,"oh-my-openagent.json")))
 oexp=omo.get("experimental") or {}
 if comp.get("auto"): print("OK|compaction.auto")
 else: print("OPT|compaction.auto not enabled")
 if comp.get("preserve_recent_tokens"):
     print("OK|preserve_recent_tokens=%s" % comp.get("preserve_recent_tokens"))
-if exp.get("autocontinue") is True: print("OK|experimental.compaction.autocontinue")
-else: print("OPT|set experimental.compaction.autocontinue=true so sessions keep going after compact")
 if oexp.get("preemptive_compaction"): print("OK|omo preemptive_compaction")
 if (oexp.get("dynamic_context_pruning") or {}).get("enabled"): print("OK|omo dynamic_context_pruning")
 PY

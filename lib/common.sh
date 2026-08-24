@@ -407,7 +407,7 @@ oc_is_cli_install_dir() {
   # Treat as CLI install when the only "interesting" entries are bin + install junk
   local extra
   extra="$(find "$d" -maxdepth 1 -mindepth 1 \
-    ! -name bin ! -name .gitignore \
+    ! -name bin ! -name .gitignore ! -name .DS_Store \
     ! -name node_modules ! -name package.json ! -name package-lock.json ! -name bun.lock ! -name bun.lockb \
     2>/dev/null | head -1)"
   [[ -z "$extra" ]]

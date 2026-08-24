@@ -113,6 +113,19 @@ if [[ "$r" == "would_create" && ! -e "$LINK" ]]; then ok "ensure_symlink dry-run
 else bad "ensure_symlink dry-run side effect ($r exists=$([[ -e $LINK ]] && echo y || echo n))"; fi
 unset OC_LINK_DRY
 
+# ~/.opencode is the CLI install even when Finder has added .DS_Store. It must
+# never be offered as a stale config tree merely because of that metadata file.
+CLI_TREE="$TMP/opencode-cli"
+mkdir -p "$CLI_TREE/bin" "$CLI_TREE/node_modules"
+: >"$CLI_TREE/bin/opencode"
+: >"$CLI_TREE/package.json"
+: >"$CLI_TREE/.DS_Store"
+if oc_is_cli_install_dir "$CLI_TREE"; then
+  ok "CLI install with .DS_Store is not misclassified as config copy"
+else
+  bad "CLI install with .DS_Store was misclassified as config copy"
+fi
+
 # ── 3. fix.sh twice when clean ──
 out1="$("$REPO/fix.sh" --dry-run 2>&1 || true)"
 if printf '%s' "$out1" | grep -q "already clean"; then
