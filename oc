@@ -220,9 +220,9 @@ PLUGINHELP
         ok "installed v${ver:-?}"
         if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
           if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
-            ok "runtime-fallback primary retry patch present"
+            ok "governed OmO runtime patch present (fallback + canonical agent models)"
           else
-            opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
+            opt "governed OmO runtime patch missing — run: oc plugin --fix"
           fi
         fi
       else
@@ -282,10 +282,10 @@ PLUGINHELP
     fi
     if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
       if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
-        ok "runtime-fallback primary retry patch present"
+        ok "governed OmO runtime patch present (fallback + canonical agent models)"
       else
         plugin_ok=1
-        opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
+        opt "governed OmO runtime patch missing — run: oc plugin --fix"
       fi
     else
       plugin_ok=1

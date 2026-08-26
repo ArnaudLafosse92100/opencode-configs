@@ -279,6 +279,12 @@ missing-key, model-not-found, abort, and
 context-overflow failures skip same-model retries. Reapply/verify the patch
 with `oc plugin --fix`; `oc doctor` reports whether it is present.
 
+The same governed patch makes OmO's canonical `agents.*.models` priority
+arrays effective for `task(subagent_type=...)`: the first entry is the primary,
+the remaining entries are its fallback order, and supported per-entry settings
+are retained. Native agent registration consumes those arrays too, matching
+categories; `oc plugin --fix` fails closed if its pinned anchors drift.
+
 Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|pentest` renders a complete machine-local generation under `~/.local/state/openconfig/{runtime,compat}/generations`; **`oc profile path` remains the stable runtime-overlay API** for integrations, while `oc profile compat-path` exposes the writable compatibility home and `oc profile env` returns the paired active config/XDG snapshot. `oc profile resolve <profile> <agents|categories> <name>` remains the stable route API. `pentest` uses Flash 0731 for ordinary/fast routes and Pro 0813 for Hephaestus, Oracle, Momus, content-aware-research, `deep`, `unspecified-high`, `arch-review`, and `content-aware-deep`; each falls back to GLM 5.3. `ultrabrain` stays GLM-primary with Pro fallback. Thus every route remains inside the exact DeepSeek/GLM allowlist without making the expensive Pro snapshot the daily default or dirtying Git during a switch.
 
 ### Bounded model-routing eval

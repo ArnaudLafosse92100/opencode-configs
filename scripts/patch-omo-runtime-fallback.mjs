@@ -4,17 +4,24 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MARKER = "OpenConfig runtime-fallback primary retry patch v2";
-const LEGACY_MARKER = "OpenConfig runtime-fallback primary retry patch v1";
+const MARKER = "OpenConfig runtime-fallback and canonical agent-model patch v7";
+const LEGACY_MARKERS = [
+  "OpenConfig runtime-fallback primary retry patch v1",
+  "OpenConfig runtime-fallback primary retry patch v2",
+  "OpenConfig runtime-fallback and canonical agent-model patch v3",
+];
 const EXPECTED_OMO_VERSION = "4.19.4";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
 function usage() {
   console.log(`Usage: node scripts/patch-omo-runtime-fallback.mjs [--check|--apply] [--repo PATH]
 
-Applies OpenConfig's small runtime-fallback patch to the pinned OmO package cache.
-The patch adds same-primary retries before model fallback and makes the first
-subagent prompt watchdog configurable from OpenConfig-owned environment knobs.`);
+Applies OpenConfig's governed runtime patch to the pinned OmO package cache.
+The patch adds same-primary retries before model fallback, makes the first
+subagent prompt watchdog configurable from OpenConfig-owned environment knobs,
+and makes canonical agents.*.models drive task(subagent_type) resolution.
+Accepts a fresh pinned dist or upgrades deployed markers v1-v3 only; unknown
+intermediate OpenConfig patch markers are refused fail-closed.`);
 }
 
 function parseArgs(argv) {
@@ -90,29 +97,265 @@ function shouldRetryPrimaryBeforeFallback(state3, config3, options = {}) {
     );
   }
 
-  text = replaceOnce(
-    text,
-    `      maxPrimaryRetries: config3.same_model_retries_before_fallback,`,
-    `      maxPrimaryRetries,`,
-    "same-model retry log limit",
-  );
+  if (!text.includes(`      maxPrimaryRetries,`)) {
+    text = replaceOnce(
+      text,
+      `      maxPrimaryRetries: config3.same_model_retries_before_fallback,`,
+      `      maxPrimaryRetries,`,
+      "same-model retry log limit",
+    );
+  }
 
-  text = replaceOnce(
-    text,
-    `  const firstPromptWatchdogMs = Math.max(1000, Number(config3.first_prompt_timeout_seconds ?? DEFAULT_FIRST_PROMPT_WATCHDOG_MS / 1000) * 1000);
+  if (!text.includes(`  const firstPromptWatchdogMs = configuredFirstPromptWatchdogMs(config3);`)) {
+    text = replaceOnce(
+      text,
+      `  const firstPromptWatchdogMs = Math.max(1000, Number(config3.first_prompt_timeout_seconds ?? DEFAULT_FIRST_PROMPT_WATCHDOG_MS / 1000) * 1000);
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs);`,
-    `  const firstPromptWatchdogMs = configuredFirstPromptWatchdogMs(config3);
+      `  const firstPromptWatchdogMs = configuredFirstPromptWatchdogMs(config3);
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs);`,
-    "firstPromptWatchdog.environment",
-  );
+      "firstPromptWatchdog.environment",
+    );
+  }
 
   return text;
 }
 
-function patchDist(original) {
+function removeLegacyNativeBuilderPatches(text) {
+  const helper = `function openConfigPrimaryAgentOverride(definition) {
+  const route = openConfigModelsRoute(definition);
+  if (!route.primary) return definition;
+  const primaryEntry = route.entries?.[0];
+  const primarySettings = typeof primaryEntry === "object" && primaryEntry !== null ? { ...primaryEntry } : {};
+  if (primarySettings.reasoning !== undefined && primarySettings.reasoningEffort === undefined) {
+    primarySettings.reasoningEffort = primarySettings.reasoning;
+  }
+  return {
+    ...definition,
+    ...primarySettings,
+    model: route.primary,
+    fallback_models: route.fallbackModels ?? definition?.fallback_models
+  };
+}
+`;
+  if (text.includes(helper)) text = text.replace(helper, "");
+  text = text.replace(`  const nativeSisyphusJuniorOverride = openConfigPrimaryAgentOverride(override);
+  override = nativeSisyphusJuniorOverride;
+`, "");
+  text = text.replace(`    maxTokens: override?.maxTokens ?? 64000,`, `    maxTokens: 64000,`);
+  text = text.replace(`    let override = agentOverrides[agentName] ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1];
+    const nativeBuiltinOverride = openConfigPrimaryAgentOverride(override);
+    override = nativeBuiltinOverride;
+    const requirement = AGENT_MODEL_REQUIREMENTS[agentName];`, `    const override = agentOverrides[agentName] ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1];
+    const requirement = AGENT_MODEL_REQUIREMENTS[agentName];`);
+  return text;
+}
+
+function applyCentralAgentOverrideModels(text) {
+  const schemaAnchor = `// packages/omo-opencode/src/config/schema/agent-overrides.ts
+var AgentOverrideConfigSchema = z14.object({`;
+  if (!text.includes("function openConfigMaterializeAgentOverride(override)")) {
+    text = replaceOnce(text, schemaAnchor, `// packages/omo-opencode/src/config/schema/agent-overrides.ts
+function openConfigMaterializeAgentOverride(override) {
+  if (!Array.isArray(override.models) || override.models.length === 0) return override;
+  const [primary, ...fallbackModels] = override.models;
+  const primarySettings = typeof primary === "object" && primary !== null ? primary : {};
+  const model = typeof primary === "string" ? primary : primary?.model;
+  if (typeof model !== "string" || model.length === 0) return override;
+  return { ...override, ...primarySettings, model, fallback_models: fallbackModels };
+}
+function openConfigMaterializeAgentOverrides(overrides) {
+  return Object.fromEntries(Object.entries(overrides).map(([name, override]) => [name, override === undefined ? override : openConfigMaterializeAgentOverride(override)]));
+}
+var AgentOverrideConfigSchema = z14.object({
+`, "AgentOverrideConfigSchema central models helper");
+  }
+  if (!text.includes(`  models: z14.array(z14.union([z14.string(), FallbackModelObjectSchema])).optional(),`)) {
+    text = replaceOnce(text, `  model: z14.string().optional(),
+  fallback_models: FallbackModelsSchema.optional(),`, `  model: z14.string().optional(),
+  models: z14.array(z14.union([z14.string(), FallbackModelObjectSchema])).optional(),
+  fallback_models: FallbackModelsSchema.optional(),`, "AgentOverrideConfigSchema central models input");
+  }
+  if (!text.includes(`}).catchall(AgentOverrideConfigSchema.optional()).transform(openConfigMaterializeAgentOverrides);`)) {
+    text = replaceOnce(text, `  atlas: AgentOverrideConfigSchema.optional()
+}).catchall(AgentOverrideConfigSchema.optional());`, `  atlas: AgentOverrideConfigSchema.optional()
+}).catchall(AgentOverrideConfigSchema.optional()).transform(openConfigMaterializeAgentOverrides);`, "AgentOverridesSchema central models transform");
+  }
+  if (!text.includes(`"description", "prompt", "model", "models", "variant", "reasoningEffort"`)) {
+    text = replaceOnce(text, `    const fields = recordFields(definition, ["description", "prompt", "model", "variant", "reasoningEffort", "tools", "temperature", "disable"]);`, `    const fields = recordFields(definition, ["description", "prompt", "model", "models", "variant", "reasoningEffort", "tools", "temperature", "disable"]);`, "native agent registration models");
+  }
+  return text;
+}
+
+function applyDirectTaskAgentModels(text) {
+  if (!text.includes("async function resolveSubagentModel(agentToUse, matchedAgent, executorCtx)")) return text;
+  const routeHelper = `function openConfigModelsRoute(definition) {
+  const entries = normalizeFallbackModels(definition?.models);
+  if (!entries || entries.length === 0) {
+    return {
+      entries: normalizeFallbackModels([definition?.model, ...(definition?.fallback_models ?? [])]),
+      primary: definition?.model,
+      fallbackModels: definition?.fallback_models
+    };
+  }
+  const [primaryEntry, ...fallbackEntries] = entries;
+  return {
+    entries,
+    primary: typeof primaryEntry === "string" ? primaryEntry : primaryEntry?.model,
+    fallbackModels: fallbackEntries.length > 0 ? fallbackEntries : definition?.fallback_models
+  };
+}
+function openConfigEntryForResolvedModel(entries, resolvedModel) {
+  if (!entries || !resolvedModel) return undefined;
+  const model = typeof resolvedModel === "string" ? resolvedModel : \`\${resolvedModel.providerID}/\${resolvedModel.modelID}\`;
+  return entries.find((entry) => (typeof entry === "string" ? entry : entry?.model) === model);
+}
+`;
+  const legacyRouteHelper = `function openConfigModelsRoute(definition) {
+  const entries = normalizeFallbackModels(definition?.models);
+  if (!entries || entries.length === 0) return { primary: definition?.model, primaryEntry: undefined, fallbackModels: definition?.fallback_models };
+  const [primaryEntry, ...fallbackEntries] = entries;
+  return {
+    primary: typeof primaryEntry === "string" ? primaryEntry : primaryEntry?.model,
+    primaryEntry: typeof primaryEntry === "object" && primaryEntry !== null ? primaryEntry : undefined,
+    fallbackModels: fallbackEntries.length > 0 ? fallbackEntries : definition?.fallback_models
+  };
+}
+`;
+  if (text.includes(legacyRouteHelper)) {
+    text = text.replace(legacyRouteHelper, routeHelper);
+  } else if (!text.includes("function openConfigModelsRoute(definition)")) {
+    text = replaceOnce(text, "function findAgentOverride2(agentOverrides, agentConfigKey) {", `${routeHelper}function findAgentOverride2(agentOverrides, agentConfigKey) {`, "direct task canonical model route helper");
+  }
+  if (!text.includes("const agentModelRoute = openConfigModelsRoute(agentOverride);\n  const agentModel = agentModelRoute.primary")) {
+    text = replaceOnce(text, `  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey];
+  const agentCategoryConfig = agentOverride?.category ? executorCtx.userCategories?.[agentOverride.category] : undefined;
+  const agentCategoryModel = agentCategoryConfig?.model;
+  const hasExplicitUserModel = Boolean(agentOverride?.model ?? agentCategoryModel);
+  const normalizedAgentFallbackModels = normalizeFallbackModels(agentOverride?.fallback_models ?? agentCategoryConfig?.fallback_models);`, `  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey];
+  const agentModelRoute = openConfigModelsRoute(agentOverride);
+  const agentModel = agentModelRoute.primary ?? agentOverride?.model;
+  const canonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;
+  const agentCategoryConfig = agentOverride?.category ? executorCtx.userCategories?.[agentOverride.category] : undefined;
+  const agentCategoryModel = agentCategoryConfig?.model;
+  const hasExplicitUserModel = Boolean(agentModel ?? agentCategoryModel);
+  const normalizedAgentFallbackModels = normalizeFallbackModels(agentModelRoute.fallbackModels ?? agentOverride?.fallback_models ?? agentCategoryConfig?.fallback_models);`, "resolveSubagentModel canonical route");
+    text = replaceOnce(text, `  if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
+    const resolution2 = resolveModelForDelegateTask2({
+      userModel: agentOverride?.model ?? agentCategoryModel,`, `  if (agentModel || agentCategoryModel || agentRequirement || matchedAgent.model) {
+    const resolution2 = resolveModelForDelegateTask2({
+      userModel: agentModel ?? agentCategoryModel,`, "resolveSubagentModel canonical primary");
+    text = replaceOnce(text, `    } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
+      const explicitModel = agentOverride?.model ?? agentCategoryModel;`, `    } else if (resolutionSkipped && (agentModel ?? agentCategoryModel)) {
+      const explicitModel = agentModel ?? agentCategoryModel;`, "resolveSubagentModel canonical cold cache");
+    text = replaceOnce(text, `          model: agentOverride?.model ?? agentCategoryModel`, `          model: agentModel ?? agentCategoryModel`, "resolveSubagentModel canonical cold cache log");
+  }
+  if (!text.includes("const canonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;")) {
+    text = replaceOnce(text, `  const agentModel = agentModelRoute.primary ?? agentOverride?.model;
+  const agentCategoryConfig = agentOverride?.category ? executorCtx.userCategories?.[agentOverride.category] : undefined;`, `  const agentModel = agentModelRoute.primary ?? agentOverride?.model;
+  const canonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;
+  const agentCategoryConfig = agentOverride?.category ? executorCtx.userCategories?.[agentOverride.category] : undefined;`, "resolveSubagentModel canonical variant boundary");
+  }
+  text = text.replace(`const variantToUse = agentOverride?.variant ?? resolution2.variant ?? agentCategoryConfig?.variant;`, `const variantToUse = canonicalVariantOverride ?? resolution2.variant ?? agentCategoryConfig?.variant;`);
+  text = text.replace(`const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant;`, `const variantToUse = canonicalVariantOverride ?? agentCategoryConfig?.variant;`);
+  const legacyPrimaryApplication = `    if (categoryModel && agentModelRoute.primaryEntry) {
+      categoryModel = applyFallbackEntrySettings({
+        categoryModel,
+        effectiveEntry: agentModelRoute.primaryEntry,
+        variantOverride: agentOverride?.variant
+      });
+    }
+    if (categoryModel && effectiveEntry) {
+      categoryModel = applyFallbackEntrySettings({
+        categoryModel,
+        effectiveEntry,
+        variantOverride: agentOverride?.variant
+      });
+    }`;
+  const canonicalEntryApplication = `    const selectedAgentModelEntry = effectiveEntry ?? openConfigEntryForResolvedModel(agentModelRoute.entries, categoryModel);
+    if (categoryModel && selectedAgentModelEntry) {
+      categoryModel = applyFallbackEntrySettings({
+        categoryModel,
+        effectiveEntry: selectedAgentModelEntry,
+        variantOverride: canonicalVariantOverride
+      });
+    }`;
+  if (text.includes(legacyPrimaryApplication)) {
+    text = text.replace(legacyPrimaryApplication, canonicalEntryApplication);
+  } else if (!text.includes("const selectedAgentModelEntry = effectiveEntry ?? openConfigEntryForResolvedModel(agentModelRoute.entries, categoryModel);")) {
+    text = replaceOnce(text, `    if (categoryModel && effectiveEntry) {
+      categoryModel = applyFallbackEntrySettings({
+        categoryModel,
+        effectiveEntry,
+        variantOverride: agentOverride?.variant
+      });
+    }`, canonicalEntryApplication, "resolveSubagentModel canonical entry settings");
+  }
+  text = text.replace(`        variantOverride: agentOverride?.variant
+      });
+    }
+  }
+  if (!categoryModel && normalizedMatchedModel)`, `        variantOverride: canonicalVariantOverride
+      });
+    }
+  }
+  if (!categoryModel && normalizedMatchedModel)`);
+  if (!text.includes("const callOmoAgentModelRoute = openConfigModelsRoute(agentOverride);")) {
+    text = replaceOnce(text, `  const agentOverride = agentOverrides?.[agentConfigKey] ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined);
+  const agentCategoryModel = agentOverride?.category ? userCategories?.[agentOverride.category]?.model : undefined;`, `  const agentOverride = agentOverrides?.[agentConfigKey] ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined);
+  const callOmoAgentModelRoute = openConfigModelsRoute(agentOverride);
+  const callOmoAgentModel = callOmoAgentModelRoute.primary ?? agentOverride?.model;
+  const callOmoCanonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;
+  const agentCategoryModel = agentOverride?.category ? userCategories?.[agentOverride.category]?.model : undefined;`, "call_omo_agent canonical route");
+    text = replaceOnce(text, `  if (agentOverride?.model) {
+    const normalized = parseModelString(agentOverride.model);`, `  if (callOmoAgentModel) {
+    const normalized = parseModelString(callOmoAgentModel);`, "call_omo_agent canonical primary");
+    text = replaceOnce(text, `        model: agentOverride.model,`, `        model: callOmoAgentModel,`, "call_omo_agent canonical primary log");
+    text = replaceOnce(text, `  const normalizedFallbackModels = normalizeFallbackModels(agentOverride?.fallback_models ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined));`, `  const primaryCallOmoAgentEntry = openConfigEntryForResolvedModel(callOmoAgentModelRoute.entries, model);
+  if (model && primaryCallOmoAgentEntry) {
+    model = applyFallbackEntrySettings({
+      categoryModel: model,
+      effectiveEntry: primaryCallOmoAgentEntry,
+      variantOverride: callOmoCanonicalVariantOverride
+    });
+  }
+  const normalizedFallbackModels = normalizeFallbackModels(callOmoAgentModelRoute.fallbackModels ?? agentOverride?.fallback_models ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined));`, "call_omo_agent canonical entry settings");
+  }
+  if (!text.includes("const callOmoCanonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;")) {
+    text = replaceOnce(text, `  const callOmoAgentModel = callOmoAgentModelRoute.primary ?? agentOverride?.model;
+  const agentCategoryModel = agentOverride?.category ? userCategories?.[agentOverride.category]?.model : undefined;`, `  const callOmoAgentModel = callOmoAgentModelRoute.primary ?? agentOverride?.model;
+  const callOmoCanonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;
+  const agentCategoryModel = agentOverride?.category ? userCategories?.[agentOverride.category]?.model : undefined;`, "call_omo_agent canonical variant boundary");
+  }
+  text = text.replace(`model = agentOverride.variant ? { ...normalized, variant: agentOverride.variant } : normalized;`, `model = callOmoCanonicalVariantOverride ? { ...normalized, variant: callOmoCanonicalVariantOverride } : normalized;`);
+  text = text.replace(`variant: agentOverride.variant`, `variant: callOmoCanonicalVariantOverride`);
+  text = text.replace(`variantOverride: agentOverride?.variant
+    });
+  }
+  const normalizedFallbackModels = normalizeFallbackModels(callOmoAgentModelRoute.fallbackModels`, `variantOverride: callOmoCanonicalVariantOverride
+    });
+  }
+  const normalizedFallbackModels = normalizeFallbackModels(callOmoAgentModelRoute.fallbackModels`);
+  return text;
+}
+
+export function applyCanonicalAgentModels(original) {
+  return applyDirectTaskAgentModels(applyCentralAgentOverrideModels(removeLegacyNativeBuilderPatches(original)));
+}
+
+function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
+  const openConfigMarkers = [...new Set(text.match(/OpenConfig runtime-fallback[^\n*]*patch v\d+/g) ?? [])];
+  const unsupportedMarkers = openConfigMarkers.filter(marker => marker !== MARKER && !LEGACY_MARKERS.includes(marker));
+  if (unsupportedMarkers.length > 0) {
+    throw new Error(`Refusing unsupported OpenConfig OmO runtime patch marker(s): ${unsupportedMarkers.join(", ")}. Only fresh dist or deployed v1-v3 upgrades are supported.`);
+  }
+}
+
+// Canonical route patch follows the existing runtime-fallback patch.
+export function patchDist(original) {
+  assertNoUnsupportedOpenConfigRuntimePatchMarkers(original);
   if (original.includes(MARKER)) return { text: original, changed: false };
-  if (original.includes(LEGACY_MARKER)) {
-    const text = `${applyEnvironmentRuntimeKnobs(original)}\n/* ${MARKER} */\n`;
+  if (LEGACY_MARKERS.some(marker => original.includes(marker))) {
+    const text = `${applyCanonicalAgentModels(applyEnvironmentRuntimeKnobs(original))}\n/* ${MARKER} */\n`;
     return { text, changed: true };
   }
   let text = original;
@@ -375,12 +618,13 @@ function prepareFallback(sessionID, state3, fallbackModels, config3, options = {
     "firstPromptWatchdog.config",
   );
 
-  text = applyEnvironmentRuntimeKnobs(text);
+  text = applyCanonicalAgentModels(applyEnvironmentRuntimeKnobs(text));
   text = `${text}\n/* ${MARKER} */\n`;
   return { text, changed: true };
 }
 
-function assertPatched(text) {
+export function assertPatched(text) {
+  assertNoUnsupportedOpenConfigRuntimePatchMarkers(text);
   const required = [
     MARKER,
     "same_model_retries_before_fallback",
@@ -391,25 +635,66 @@ function assertPatched(text) {
     "primaryRetryCount",
     "allowPrimaryRetry",
     "firstPromptWatchdogMs",
+    "function openConfigMaterializeAgentOverride(override)",
+    "if (!Array.isArray(override.models) || override.models.length === 0) return override",
+    "models: z14.array(z14.union([z14.string(), FallbackModelObjectSchema])).optional()",
+    "function openConfigMaterializeAgentOverrides(overrides)",
+    "}).catchall(AgentOverrideConfigSchema.optional()).transform(openConfigMaterializeAgentOverrides);",
+    "return { ...override, ...primarySettings, model, fallback_models: fallbackModels };",
+    `"models", "variant", "reasoningEffort"`,
+    "function openConfigModelsRoute(definition)",
+    "function openConfigEntryForResolvedModel(entries, resolvedModel)",
+    "const agentModelRoute = openConfigModelsRoute(agentOverride);",
+    "const selectedAgentModelEntry = effectiveEntry ?? openConfigEntryForResolvedModel(agentModelRoute.entries, categoryModel);",
+    "const callOmoAgentModelRoute = openConfigModelsRoute(agentOverride);",
+    "const primaryCallOmoAgentEntry = openConfigEntryForResolvedModel(callOmoAgentModelRoute.entries, model);",
+    "const canonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;",
+    "const callOmoCanonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;",
   ];
   const missing = required.filter(value => !text.includes(value));
-  if (missing.length > 0) throw new Error(`OmO runtime-fallback patch missing: ${missing.join(", ")}`);
+  if (missing.length > 0) throw new Error(`OmO governed runtime patch missing: ${missing.join(", ")}`);
+  const forbidden = [
+    "function openConfigPrimaryAgentOverride(",
+    "nativeSisyphusJuniorOverride",
+    "nativeBuiltinOverride",
+    "maxTokens: override?.maxTokens ?? 64000,",
+  ].filter(value => text.includes(value));
+  if (forbidden.length > 0) throw new Error(`OmO governed runtime patch contains removed v5 native-builder patch: ${forbidden.join(", ")}`);
+  const exactOnce = [
+    "function openConfigMaterializeAgentOverride(override)",
+    "function openConfigMaterializeAgentOverrides(overrides)",
+    "}).catchall(AgentOverrideConfigSchema.optional()).transform(openConfigMaterializeAgentOverrides);",
+    "function openConfigModelsRoute(definition)",
+    "function openConfigEntryForResolvedModel(entries, resolvedModel)",
+    "const agentModelRoute = openConfigModelsRoute(agentOverride);",
+    "const callOmoAgentModelRoute = openConfigModelsRoute(agentOverride);",
+    "const selectedAgentModelEntry = effectiveEntry ?? openConfigEntryForResolvedModel(agentModelRoute.entries, categoryModel);",
+    "const primaryCallOmoAgentEntry = openConfigEntryForResolvedModel(callOmoAgentModelRoute.entries, model);",
+    "const canonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;",
+    "const callOmoCanonicalVariantOverride = Array.isArray(agentOverride?.models) ? undefined : agentOverride?.variant;",
+  ];
+  const duplicated = exactOnce.filter(value => text.split(value).length - 1 !== 1);
+  if (duplicated.length > 0) throw new Error(`OmO governed runtime patch has non-unique canonical blocks: ${duplicated.join(", ")}`);
 }
 
-const args = parseArgs(process.argv.slice(2));
-const dir = packageDir(args.repo);
-const pkg = readJson(join(dir, "package.json"));
-if (pkg.version !== EXPECTED_OMO_VERSION) {
-  throw new Error(`Refusing to patch OmO ${pkg.version}; OpenConfig expects ${EXPECTED_OMO_VERSION}`);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const dir = packageDir(args.repo);
+  const pkg = readJson(join(dir, "package.json"));
+  if (pkg.version !== EXPECTED_OMO_VERSION) {
+    throw new Error(`Refusing to patch OmO ${pkg.version}; OpenConfig expects ${EXPECTED_OMO_VERSION}`);
+  }
+  const dist = join(dir, "dist", "index.js");
+  const original = readFileSync(dist, "utf8");
+  if (args.mode === "check") {
+    assertPatched(original);
+    console.log(`OK|omo governed runtime patch present|${dist}`);
+    return;
+  }
+  const { text, changed } = patchDist(original);
+  assertPatched(text);
+  if (changed) writeFileSync(dist, text);
+  console.log(`${changed ? "PATCHED" : "OK"}|omo governed runtime patch|${dist}`);
 }
-const dist = join(dir, "dist", "index.js");
-const original = readFileSync(dist, "utf8");
-if (args.mode === "check") {
-  assertPatched(original);
-  console.log(`OK|omo runtime-fallback patch present|${dist}`);
-  process.exit(0);
-}
-const { text, changed } = patchDist(original);
-assertPatched(text);
-if (changed) writeFileSync(dist, text);
-console.log(`${changed ? "PATCHED" : "OK"}|omo runtime-fallback primary retry patch|${dist}`);
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

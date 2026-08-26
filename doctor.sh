@@ -224,9 +224,9 @@ fi
 if [[ -n "$pin" ]]; then
   if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
     if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
-      ok "runtime-fallback primary retry patch present"
+      ok "governed OmO runtime patch present (fallback + canonical agent models)"
     else
-      opt "runtime-fallback primary retry patch missing — run: oc plugin --fix"
+      opt "governed OmO runtime patch missing — run: oc plugin --fix"
     fi
   else
     opt "runtime-fallback patch check unavailable — missing node or patch script"
@@ -1630,9 +1630,9 @@ if [[ -n "${pin:-}" ]]; then
     ok "package caches healthy (plugin installed)"
     if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
       if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
-        ok "OmO runtime-fallback primary retry patch present"
+        ok "OmO governed runtime patch present (fallback + canonical agent models)"
       else
-        opt "OmO runtime-fallback primary retry patch missing — run: oc plugin --fix"
+        opt "OmO governed runtime patch missing — run: oc plugin --fix"
       fi
     fi
   fi
