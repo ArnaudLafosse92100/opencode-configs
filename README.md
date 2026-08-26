@@ -498,6 +498,15 @@ priority arrays (not legacy `model` + `fallback_models`) and carry both
 `2026-07-opencode-config-unification` and `2026-08-reasoning-unification`
 markers, so OmO startup has no native migration to write. `runtime-profile.json`
 remains the routing SSoT and retains its profile-oriented route representation.
+The normal generated `codex-router` agent definition (apart from its canonical
+profile model frontmatter) and `content-aware-deep` prompt remain at their
+tracked baselines; the authoring mirror `prompts/agents/codex-router.md` is
+copied byte-for-byte. Only the pentest generation adds a soft cost-aware overlay
+to the effective router definition and deep category prompt: Flash
+reconnaissance/deduplication before Pro adjudication, bounded evidence batches
+and resumed-gap work, and explicit unverified gaps after the target tool-call
+rounds. This prompt guidance is not a hard runtime cap and does not change
+routes, permissions, or global OmO limits.
 Runtime-profile never creates that native symlink itself:
 `oc setup`/install do so only after profile/envelope/source consensus and make
 a recoverable backup carrying the original mode and SHA-256. Until setup has

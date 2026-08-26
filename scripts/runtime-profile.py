@@ -42,6 +42,38 @@ SOURCE_FINGERPRINT_INPUTS = (
     *COMPAT_EXECUTED_SOURCE_INPUTS,
 )
 SISYPHUS_PROMPT_URI = "file://~/.config/opencode/prompts/agents/sisyphus.md"
+PENTEST_PROMPT_OVERLAY_START = "<!-- BEGIN GENERATED: pentest-cost-policy -->"
+PENTEST_PROMPT_OVERLAY_END = "<!-- END GENERATED: pentest-cost-policy -->"
+
+
+def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
+    """Apply the pentest-only delegation policy to generated prompt copies.
+
+    Source prompts stay the normal baseline. Removing a prior generated block
+    first makes re-rendering idempotent and keeps the normal generation byte
+    identical to its source prompt.
+    """
+    if text.count(PENTEST_PROMPT_OVERLAY_START) != text.count(PENTEST_PROMPT_OVERLAY_END):
+        raise SystemExit(f"unbalanced generated pentest policy markers in {path}")
+    if text.count(PENTEST_PROMPT_OVERLAY_START) > 1:
+        raise SystemExit(f"duplicate generated pentest policy markers in {path}")
+    if PENTEST_PROMPT_OVERLAY_START in text:
+        before, remainder = text.split(PENTEST_PROMPT_OVERLAY_START, 1)
+        _, after = remainder.split(PENTEST_PROMPT_OVERLAY_END, 1)
+        text = before.rstrip() + "\n" + after.lstrip("\n")
+    if profile == "normal":
+        return text
+    if profile != "pentest":
+        raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
+
+    policies = {
+        "agents/codex-router.md": """## Pentest cost-aware delegation policy\n\nThis is a soft prompt policy, not a hard runtime cap. For authorized pentest work, run `content-aware-fast` on Flash first for reconnaissance and deduplication. Escalate only concrete evidence-backed targets: batch no more than three targets in one deep request, launch at most one **new** `content-aware-deep` Pro child for the parent request, and resume that same child at most once only for one narrow, named gap instead of launching another child.\n\nThe Pro child adjudicates the Flash evidence; it must not broadly rediscover or repeat scans. Batch reads and tool calls. Aim for at most four tool-call rounds, then return a final answer with explicit unverified gaps rather than expanding or looping. An explicit user demand for multiple independent deep reviewers may override the one-child count, but disclose the expected cost before launching them.\n""",
+        "prompts/categories/content-aware-deep.md": """## Pentest cost-aware depth policy\n\nThis is a soft prompt policy, not a hard runtime cap. Treat Flash `content-aware-fast` reconnaissance and deduplication as the input to Pro adjudication. Work only the concrete evidence-backed targets supplied by that recon, batching no more than three targets. Do not broadly rediscover or repeat scans. Batch reads and tool calls; target at most four tool-call rounds, then return the finding with explicit unverified gaps rather than expanding or looping.\n\nFor one parent request, there should be at most one new Pro `content-aware-deep` child. That child may be resumed once only for one narrow, named gap; do not create another deep child for the same gap. If the user explicitly requires multiple independent deep reviewers, disclose the expected cost before they are launched.\n""",
+    }
+    policy = policies.get(path.as_posix())
+    if policy is None:
+        return text
+    return "\n".join((text.rstrip(), "", PENTEST_PROMPT_OVERLAY_START, policy.rstrip(), PENTEST_PROMPT_OVERLAY_END, ""))
 
 
 def load_json(path: Path) -> dict:
@@ -945,6 +977,10 @@ class RuntimeProfiles:
             source = self.repo / "agents" / filename
             target = runtime_dir / "agents" / filename
             write_if_changed(target, update_frontmatter_model(source.read_text(encoding="utf-8"), model, source))
+
+        for relative in ("agents/codex-router.md", "prompts/categories/content-aware-deep.md"):
+            target = runtime_dir / relative
+            write_if_changed(target, render_pentest_prompt_overlay(target.read_text(encoding="utf-8"), profile, Path(relative)))
 
         content_aware_source = self.repo / "profiles/content-aware.json"
         content_aware = load_json(content_aware_source)

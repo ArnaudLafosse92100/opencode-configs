@@ -11,6 +11,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -344,6 +345,65 @@ class NativeOmoMigrationTests(unittest.TestCase):
         ):
             with self.subTest(extra=extra), self.assertRaises(SystemExit):
                 runtime_profile._native_models({**base, **extra}, "agents")
+
+
+class PentestPromptOverlayTests(unittest.TestCase):
+    effective_paths = (
+        "agents/codex-router.md",
+        "prompts/categories/content-aware-deep.md",
+    )
+    router_mirror = "prompts/agents/codex-router.md"
+
+    def test_normal_generation_preserves_effective_baselines_and_pentest_adds_only_overlay(self) -> None:
+        source = {name: (REPO / name).read_bytes() for name in self.effective_paths}
+        mirror_source = (REPO / self.router_mirror).read_bytes()
+        routes_before = (REPO / "runtime-profile.json").read_bytes()
+        with tempfile.TemporaryDirectory() as state:
+            environment = os.environ.copy()
+            environment["OC_RUNTIME_STATE_DIR"] = state
+            with mock.patch.dict(os.environ, environment, clear=True):
+                profiles = runtime_profile.RuntimeProfiles(REPO)
+                normal = profiles.render("normal", force=True)
+                pentest = profiles.render("pentest", force=True)
+            normal_router = runtime_profile.update_frontmatter_model(
+                (REPO / "agents/codex-router.md").read_text(encoding="utf-8"),
+                profiles.selected("normal")["agents"]["codex-router"]["model"],
+                REPO / "agents/codex-router.md",
+            ).encode("utf-8")
+            self.assertEqual((normal / "agents/codex-router.md").read_bytes(), normal_router)
+            self.assertEqual(
+                (normal / "prompts/categories/content-aware-deep.md").read_bytes(),
+                source["prompts/categories/content-aware-deep.md"],
+            )
+            self.assertEqual((normal / self.router_mirror).read_bytes(), mirror_source)
+            self.assertEqual((pentest / self.router_mirror).read_bytes(), mirror_source)
+            router = (pentest / "agents/codex-router.md").read_text(encoding="utf-8")
+            deep = (pentest / "prompts/categories/content-aware-deep.md").read_text(encoding="utf-8")
+            self.assertIn("This is a soft prompt policy, not a hard runtime cap.", router)
+            self.assertIn("content-aware-fast` on Flash first", router)
+            self.assertIn("at most one **new** `content-aware-deep` Pro child", router)
+            self.assertIn("at most four tool-call rounds", router)
+            self.assertIn("This is a soft prompt policy, not a hard runtime cap.", deep)
+            self.assertIn("batching no more than three targets", deep)
+            self.assertIn("may be resumed once only for one narrow, named gap", deep)
+        self.assertEqual((REPO / "runtime-profile.json").read_bytes(), routes_before)
+        self.assertEqual({name: (REPO / name).read_bytes() for name in self.effective_paths}, source)
+        self.assertEqual((REPO / self.router_mirror).read_bytes(), mirror_source)
+
+    def test_unknown_profile_still_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            with self.assertRaisesRegex(SystemExit, "profile must be one of normal, pentest"):
+                runtime_profile.RuntimeProfiles(REPO).selected("unknown")
+
+    def test_overlay_helper_is_idempotent(self) -> None:
+        relative = pathlib.Path("agents/codex-router.md")
+        source = (REPO / relative).read_text(encoding="utf-8")
+        once = runtime_profile.render_pentest_prompt_overlay(source, "pentest", relative)
+        twice = runtime_profile.render_pentest_prompt_overlay(once, "pentest", relative)
+        self.assertEqual(twice, once)
+        self.assertEqual(runtime_profile.render_pentest_prompt_overlay(source, "normal", relative), source)
 
 
 class CampaignLedgerTests(unittest.TestCase):
