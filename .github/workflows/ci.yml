@@ -33,6 +33,13 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/prompts" "$HOME/.config/opencode/prompts"
       - name: Validate tracked configuration
         run: ./validate.sh --quiet
+      - name: Hydrate the pinned clean OmO fixture
+        run: |
+          omo_root="$HOME/.cache/opencode/packages/oh-my-openagent@4.19.4"
+          npm install --prefix "$omo_root" --ignore-scripts --no-audit --no-fund oh-my-openagent@4.19.4
+          bun_fixture="$HOME/.bun/install/cache/oh-my-openagent@4.19.4"
+          mkdir -p "$bun_fixture/dist"
+          cp "$omo_root/node_modules/oh-my-openagent/dist/index.js" "$bun_fixture/dist/index.js"
       - name: Run deterministic routing and patch tests
         run: |
           python3 tests/test_model_routing_eval.py
