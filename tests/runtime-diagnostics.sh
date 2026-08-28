@@ -598,6 +598,12 @@ else
   ok "native alias migration refuses pending OmO journal"
 fi
 # Applied markers are written only after the existing bridge health/model proof.
+if ! grep -qF 'lsof -tiTCP:4097' "$REPO/runtime-profile.sh" \
+  && grep -qF 'drains active Responses handlers on SIGTERM' "$REPO/runtime-profile.sh"; then
+  ok "profile activation leaves OpenCode lifecycle to the draining bridge"
+else
+  bad "profile activation must not kill the bridge-owned OpenCode child directly"
+fi
 BRIDGE_FAKE="$TMP/bridge-fake"; mkdir -p "$BRIDGE_FAKE"
 cat >"$BRIDGE_FAKE/launchctl" <<'SH'
 #!/bin/sh
@@ -635,10 +641,10 @@ case "$*" in
       malformed) idempotency_ledger=',"idempotency_ledger":{"healthy":true,"error":null,"entries":1,"max_entries":10000,"remaining_capacity":10000}';;
     esac
     if [ "${FAKE_PREVIOUS_503:-0}" = 1 ] && [ ! -f "$state.previous" ]; then
-      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","opencode":null,"error":"upstream recovering"%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "$gateway_health" "$idempotency_ledger"
+      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":null,"error":"upstream recovering"%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger"
       case "$*" in *-fsS*) exit 22;; esac
     else
-      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","opencode":{"healthy":true},"error":null%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "$gateway_health" "$idempotency_ledger"
+      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":{"healthy":true},"error":null%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger"
     fi;;
   *) [ "${FAKE_HEALTH_FAIL:-0}" = 1 ] && exit 1 || exit 0;;
 esac
@@ -687,6 +693,14 @@ fi
 owner_matches_parent_contract || lock_contract_ok=0
 rm -f "$ACTIVATION_LOCK_DIR/owner"; rmdir "$ACTIVATION_LOCK_DIR"
 if [[ $lock_contract_ok -eq 1 ]]; then ok "bridge activation lock rejects races and preserves inherited ownership"; else bad "bridge activation lock ownership"; fi
+ACTIVE_REFUSAL_STATE="$TMP/active-refusal-state"; ACTIVE_REFUSAL_NATIVE="$TMP/active-refusal-native/omo.jsonc"
+if PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$TMP/active-refusal-bridge" FAKE_ACTIVE_EXECUTIONS=1 OC_RUNTIME_STATE_DIR="$ACTIVE_REFUSAL_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/active-refusal-prompts" OC_NATIVE_OMO_PATH="$ACTIVE_REFUSAL_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+  bad "profile activation refuses to restart an active bridge"
+elif [[ ! -e "$ACTIVE_REFUSAL_STATE" && ! -e "$ACTIVE_REFUSAL_NATIVE" ]]; then
+  ok "profile activation refuses active executions before runtime mutation"
+else
+  bad "active-execution refusal must preserve runtime state"
+fi
 APPLIED_STATE="$TMP/applied-state"; APPLIED_NATIVE="$TMP/applied-native/omo.jsonc"
 APPLIED_BRIDGE_STATE="$TMP/applied-bridge-state"
 PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$APPLIED_BRIDGE_STATE" FAKE_HEALTH_FAIL=0 FAKE_KICKSTART_RC=0 OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null
@@ -722,10 +736,10 @@ elif [[ "$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/app
 else bad "same-profile kickstart marker"; fi
 PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$APPLIED_BRIDGE_STATE" FAKE_HEALTH_FAIL=0 FAKE_KICKSTART_RC=0 OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null
 if PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$APPLIED_BRIDGE_STATE" FAKE_HEALTH_FAIL=1 OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS=1 OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
-  bad "same-profile health timeout clears applied marker"
-elif [[ "$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "${applied_cmd[@]}")" == null ]]; then
-  ok "same-profile health timeout clears applied marker"
-else bad "same-profile health timeout marker"; fi
+  bad "same-profile preflight health failure preserves applied marker"
+elif [[ "$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "${applied_cmd[@]}")" != null ]]; then
+  ok "same-profile preflight health failure preserves applied marker"
+else bad "same-profile preflight health marker"; fi
 if PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$APPLIED_BRIDGE_STATE" FAKE_KICKSTART_RC=1 OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" pentest >/dev/null 2>&1; then
   bad "profile change invalidates applied marker before failed restart"
 elif [[ "$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "${applied_cmd[@]}")" == null ]]; then
@@ -785,10 +799,10 @@ unready_env=(PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$UNREADY_BRIDGE_STATE"
 env "${unready_env[@]}" "$REPO/runtime-profile.sh" normal >/dev/null
 rm -f "$UNREADY_BRIDGE_STATE.previous"
 if env "${unready_env[@]}" FAKE_PREVIOUS_503=1 FAKE_STALE_INSTANCE=1 OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS=1 "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
-  bad "unready previous bridge identity cannot be reused after restart"
-elif [[ "$(OC_RUNTIME_STATE_DIR="$UNREADY_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/unready-proof-prompts" OC_NATIVE_OMO_PATH="$UNREADY_NATIVE" "${applied_cmd[@]}")" == null ]]; then
-  ok "unready 503 bridge identity is captured and stale reuse is rejected"
-else bad "unready previous bridge identity applied marker"; fi
+  bad "unready previous bridge blocks mutation before restart"
+elif [[ "$(OC_RUNTIME_STATE_DIR="$UNREADY_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/unready-proof-prompts" OC_NATIVE_OMO_PATH="$UNREADY_NATIVE" "${applied_cmd[@]}")" != null ]]; then
+  ok "unready previous bridge blocks mutation and preserves applied proof"
+else bad "unready previous bridge preflight marker"; fi
 if [[ -L "$compat_current" && -x "$compat_current/oc" && -f "$compat_current/opencode.json" \
   && -L "$compat_current/lib" && -L "$compat_current/.openconfig-source" ]] \
   && ! oc_link_points_to "$compat_current" "$REPO"; then

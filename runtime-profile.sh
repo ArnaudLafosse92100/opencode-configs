@@ -111,34 +111,57 @@ acquire_activation_lock() {
 acquire_activation_lock
 trap release_activation_lock EXIT
 
-python3 "$PYTHON_TOOL" --repo "$REPO" activate "$MODE"
-echo "OpenConfig runtime profile: $MODE"
-
-# A profile switch affects only future OpenCode sessions. Restart the bridge so
-# Codex immediately receives the newly rendered runtime overlay.
-if command -v lsof >/dev/null 2>&1; then
-  while IFS= read -r pid; do
-    [[ -n "$pid" ]] || continue
-    command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-    if [[ "$command_line" == *"opencode serve"* && "$command_line" == *"--port 4097"* ]]; then
-      kill "$pid" 2>/dev/null || true
-      for _ in $(seq 1 20); do
-        if ! kill -0 "$pid" 2>/dev/null; then
-          break
-        fi
-        sleep 0.1
-      done
-      if kill -0 "$pid" 2>/dev/null; then
-        kill -9 "$pid" 2>/dev/null || true
-      fi
-    fi
-  done < <(lsof -tiTCP:4097 -sTCP:LISTEN 2>/dev/null || true)
-fi
-
 bridge_label="com.arnaud.opencode-codex-bridge"
 bridge_domain="gui/$(id -u)"
 bridge_target="$bridge_domain/$bridge_label"
 bridge_plist="$HOME/Library/LaunchAgents/$bridge_label.plist"
+password_file="${OPENCODE_SERVER_PASSWORD_FILE:-${OPENCODE_BRIDGE_STATE_DIR:-$HOME/.local/state/opencode-codex-bridge}/opencode-server-password}"
+
+oc_curl() {
+  if [[ -s "$password_file" ]]; then
+    curl -fsS -u "opencode:$(tr -d '\r\n' < "$password_file")" "$@"
+  else
+    curl -fsS "$@"
+  fi
+}
+
+bridge_active_executions() {
+  oc_curl http://127.0.0.1:10101/healthz 2>/dev/null | python3 -c 'import json, sys
+body = json.load(sys.stdin)
+active = body.get("active_executions")
+if (
+    body.get("service") != "opencode-codex-bridge"
+    or not isinstance(active, int)
+    or isinstance(active, bool)
+    or active < 0
+):
+    raise SystemExit(1)
+print(active)'
+}
+
+# The activation lock fences new bridge dispatches. Refuse before rendering
+# any new profile while an existing execution is still active; the operator
+# can retry after that run completes without losing its work.
+if launchctl print "$bridge_target" >/dev/null 2>&1 || launchctl list | grep -q "$bridge_label" || [[ -f "$bridge_plist" ]]; then
+  if ! active_executions="$(bridge_active_executions)"; then
+    echo "cannot verify active bridge executions; refusing profile activation before runtime mutation" >&2
+    exit 1
+  fi
+  if (( active_executions > 0 )); then
+    echo "bridge has $active_executions active execution(s); refusing restart until they drain" >&2
+    exit 3
+  fi
+fi
+
+python3 "$PYTHON_TOOL" --repo "$REPO" activate "$MODE"
+echo "OpenConfig runtime profile: $MODE"
+
+# A profile switch affects only future OpenCode sessions. The bridge owns its
+# OpenCode child and drains active Responses handlers on SIGTERM before it
+# stops that child. Never kill port 4097 directly here: doing so races the
+# drain, strands an already-dispatched execution, and surfaces a
+# recovery_required 409 to Codex.
+
 bridge_health_attempts="${OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS:-80}"
 [[ "$bridge_health_attempts" =~ ^[1-9][0-9]*$ ]] || { echo "invalid OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS" >&2; exit 2; }
 
@@ -209,7 +232,7 @@ def valid_idempotency_ledger(value):
     )
 identity_ok = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error", "gateway_health", "idempotency_ledger"}
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
     and body.get("schema_version") == 2
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
@@ -217,6 +240,9 @@ identity_ok = (
     and started.tzinfo is not None
     and body.get("pid") == expected_pid
     and body.get("model") == "opencode/router"
+    and type(body.get("active_executions")) is int
+    and body.get("active_executions") >= 0
+    and type(body.get("accepting_executions")) is bool
     and valid_gateway_health(body.get("gateway_health"))
     and valid_idempotency_ledger(body.get("idempotency_ledger"))
 )
@@ -286,7 +312,7 @@ def valid_idempotency_ledger(value):
     )
 healthy = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error", "gateway_health", "idempotency_ledger"}
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
     and body.get("schema_version") == 2
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
@@ -295,6 +321,9 @@ healthy = (
     and body.get("pid") == expected_pid
     and body.get("ok") is True
     and body.get("model") == "opencode/router"
+    and type(body.get("active_executions")) is int
+    and body.get("active_executions") >= 0
+    and body.get("accepting_executions") is True
     and isinstance(body.get("opencode"), dict)
     and body["opencode"].get("healthy") is True
     and body.get("error") is None
@@ -315,15 +344,11 @@ if launchctl print "$bridge_target" >/dev/null 2>&1 || launchctl list | grep -q 
     launchctl bootstrap "$bridge_domain" "$bridge_plist" 2>/dev/null || true
   fi
   if launchctl kickstart -k "$bridge_target" 2>/dev/null; then
+    # The previous instance had no active execution and has now been asked to
+    # stop. Release the admission fence so the replacement can prove it is
+    # accepting work with the newly rendered profile.
+    release_activation_lock
     ready=0
-    password_file="${OPENCODE_SERVER_PASSWORD_FILE:-${OPENCODE_BRIDGE_STATE_DIR:-$HOME/.local/state/opencode-codex-bridge}/opencode-server-password}"
-    oc_curl() {
-      if [[ -s "$password_file" ]]; then
-        curl -fsS -u "opencode:$(tr -d '\r\n' < "$password_file")" "$@"
-      else
-        curl -fsS "$@"
-      fi
-    }
     expected_model="$(python3 "$PYTHON_TOOL" --repo "$REPO" resolve "$MODE" agents codex-router \
       | python3 -c 'import json,sys; print(json.load(sys.stdin)["model"].split("/", 1)[1])')"
     for _ in $(seq 1 "$bridge_health_attempts"); do
