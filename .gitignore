@@ -25,6 +25,8 @@
 !opencode.json
 !oh-my-openagent.json
 !oc
+!.github/
+!.github/**
 !docs/
 
 # ── Allowlist: scripts ──────────────────────────────────────────────
