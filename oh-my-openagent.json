@@ -25,7 +25,7 @@
       "temperature": 0.25,
       "prompt_append": "file://~/.config/opencode/prompts/agents/sisyphus.md",
       "color": "#00F0FF",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "low",
       "fallback_models": [
@@ -54,7 +54,7 @@
       "temperature": 0.25,
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "low",
       "fallback_models": [
@@ -67,7 +67,7 @@
       "temperature": 0.2,
       "prompt_append": "file://~/.config/opencode/prompts/agents/atlas.md",
       "color": "#39FF14",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "low",
       "fallback_models": [
@@ -93,7 +93,7 @@
       "temperature": 0.1,
       "prompt_append": "file://~/.config/opencode/prompts/agents/librarian.md",
       "color": "#00FFD1",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
       "fallback_models": [
@@ -111,7 +111,7 @@
       },
       "prompt_append": "file://~/.config/opencode/prompts/agents/explore.md",
       "color": "#FFD400",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "high",
       "fallback_models": [
@@ -160,7 +160,7 @@
       "temperature": 0.2,
       "prompt_append": "file://~/.config/opencode/prompts/agents/sisyphus-junior.md",
       "color": "#7A8BFF",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
       "fallback_models": [
@@ -195,7 +195,7 @@
       ],
       "temperature": 0.2,
       "reasoning": "low",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "prompt_append": "file://~/.config/opencode/prompts/agents/codex-router.md",
       "permission": {
         "*": "deny",
@@ -250,7 +250,7 @@
     },
     "quick": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/quick.md",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
       "fallback_models": [
@@ -259,7 +259,7 @@
     },
     "unspecified-low": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
       "fallback_models": [
@@ -288,7 +288,7 @@
     "bug-hunt": {
       "description": "Reproduce \u2192 root cause \u2192 minimal fix \u2192 verify. Cite file:line.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "low",
       "fallback_models": [
@@ -299,7 +299,7 @@
     "refactor-safe": {
       "description": "Tests-first, behavior-preserving refactors. Small steps only.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/refactor-safe.md",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
       "reasoning": "low",
       "fallback_models": [
@@ -321,7 +321,7 @@
     "content-aware-fast": {
       "description": "Fast attack-surface recon: endpoints, misconfigs, deps.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-fast.md",
-      "maxTokens": 8192,
+      "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
       "fallback_models": [
