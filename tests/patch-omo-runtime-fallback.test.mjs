@@ -520,8 +520,8 @@ function runtimeEventHandlerBundle(patched) {
     baseEventHandler: async ({ event }) => calls.push(event.type),
     deps: eventDeps,
   };
-  vm.runInNewContext(`${patched.slice(helperStart, helperEnd)}\n${patched.slice(start, end)}\nglobalThis.eventHandler = eventHandler; globalThis.visible = hasVisibleAssistantResponse;`, context);
-  return { eventHandler: context.eventHandler, calls, visible: context.visible, context, eventDeps };
+  vm.runInNewContext(`${patched.slice(helperStart, helperEnd)}\n${patched.slice(start, end)}\nglobalThis.eventHandler = eventHandler; globalThis.visible = hasVisibleAssistantResponse; globalThis.latches = openConfigVisibleAssistantOutputSessions;`, context);
+  return { eventHandler: context.eventHandler, calls, visible: context.visible, latches: context.latches, context, eventDeps };
 }
 
 function messageUpdateHandlerBundle(patched, profile) {
@@ -558,6 +558,34 @@ function messageUpdateHandlerBundle(patched, profile) {
   };
   vm.runInNewContext(`${patched.slice(start, end)}; globalThis.create = createMessageUpdateHandler;`, context);
   return { handler: context.create(deps, helpers), calls, deps, sessionID };
+}
+
+function configuredAgentContextBundle(patched, messages = []) {
+  const start = patched.indexOf("function openConfigConfiguredAgentName(agent, pluginConfig)");
+  const end = patched.indexOf("// packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts", start);
+  assert.ok(start >= 0 && end > start, "configured agent context resolver is present");
+  const context = {
+    resolveAgentForSession: (_sessionID, eventAgent) => eventAgent === "Sisyphus" ? "sisyphus" : undefined,
+    extractSessionMessages: response => response?.data ?? response,
+    normalizeAgentName: agent => agent === "Sisyphus" ? "sisyphus" : undefined,
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.create = createAgentContextResolver;`, context);
+  const deps = {
+    pluginConfig: { agents: { "codex-router": {}, "Security-Router": {}, sisyphus: {} } },
+    ctx: { directory: "/tmp", client: { session: { messages: async () => ({ data: messages }) } } },
+  };
+  return context.create(deps);
+}
+
+function fallbackBootstrapBundle(patched) {
+  const start = patched.indexOf("function createFallbackState(originalModel)");
+  const end = patched.indexOf("function isModelInCooldown(model, state3, cooldownSeconds)", start);
+  assert.ok(start >= 0 && end > start, "atomic fallback bootstrap helper is present");
+  const context = {
+    stringifyRuntimeModel: value => typeof value === "string" ? value : `${value.providerID}/${value.modelID}`,
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.createOrGet = openConfigGetOrCreateFallbackState;`, context);
+  return context.createOrGet;
 }
 
 function replaceExactlyOnce(text, from, to, label) {
@@ -758,7 +786,7 @@ function deployedV29StalePentestAliasFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
   text = replaceExactlyOnce(
     text,
-    "OpenConfig runtime-fallback and canonical agent-model patch v31",
+    "OpenConfig runtime-fallback and canonical agent-model patch v35",
     "OpenConfig runtime-fallback and canonical agent-model patch v29",
     "v29 marker",
   );
@@ -774,7 +802,7 @@ function deployedV30StaleExploreHelperFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
   text = replaceExactlyOnce(
     text,
-    "OpenConfig runtime-fallback and canonical agent-model patch v31",
+    "OpenConfig runtime-fallback and canonical agent-model patch v35",
     "OpenConfig runtime-fallback and canonical agent-model patch v30",
     "v30 marker",
   );
@@ -784,6 +812,64 @@ function deployedV30StaleExploreHelperFixture() {
     "vulnerability\\s+(?:scan|assessment|research|report)|exploit(?:ation)?|recon(?:naissance)?|osint|forensic(?:s)?|security\\s+(?:audit|assessment|review|test(?:ing)?|research|scan)",
     "v30 stale security intent regex",
   );
+}
+
+function deployedV31RestrictedAgentResolverFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v31", "v31 marker");
+  text = replaceExactlyOnce(text, `function openConfigConfiguredAgentName(agent, pluginConfig) {
+  if (typeof agent !== "string" || !pluginConfig?.agents) return;
+  const normalized = agent.trim().toLowerCase();
+  if (!normalized) return;
+  return Object.keys(pluginConfig.agents).find((name) => name.toLowerCase() === normalized);
+}
+
+`, "", "v31 configured agent helper");
+  text = replaceExactlyOnce(text, "  const { ctx, pluginConfig } = deps;\n  return async (sessionID, eventAgent) => {\n    const resolved = openConfigConfiguredAgentName(eventAgent, pluginConfig) ?? resolveAgentForSession(sessionID, eventAgent);", "  const { ctx } = deps;\n  return async (sessionID, eventAgent) => {\n    const resolved = resolveAgentForSession(sessionID, eventAgent);", "v31 event agent resolver");
+  return replaceExactlyOnce(text, `        const infoAgent = typeof info?.agent === "string" ? info.agent : undefined;
+        const configured = openConfigConfiguredAgentName(infoAgent, pluginConfig);
+        if (configured) return configured;
+        const normalized = normalizeAgentName(infoAgent);`, `        const infoAgent = typeof info?.agent === "string" ? info.agent : undefined;
+        const normalized = normalizeAgentName(infoAgent);`, "v31 message agent resolver");
+}
+
+function deployedV32RacyFallbackBootstrapFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v32", "v32 marker");
+  text = replaceExactlyOnce(text, `function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel) {
+  const existing = sessionStates.get(sessionID);
+  if (existing) return existing;
+  const created = createFallbackState(initialModel);
+  sessionStates.set(sessionID, created);
+  return created;
+}
+`, "", "v32 atomic bootstrap helper");
+  text = text.replaceAll("state3 = openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel);", "state3 = createFallbackState(initialModel);\n      sessionStates.set(sessionID, state3);");
+  text = text.replaceAll("state3 = openConfigGetOrCreateFallbackState(deps.sessionStates, sessionID, initialModel);", "state3 = createFallbackState(initialModel);\n      deps.sessionStates.set(sessionID, state3);");
+  return text.replaceAll("maxPrimaryRetries: configuredPrimaryRetryLimit(config3, state3),", "maxPrimaryRetries: configuredPrimaryRetryLimit(config3),");
+}
+
+function deployedV33IdleCleanupFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v33", "v33 marker");
+  return replaceExactlyOnce(text, `    if (event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`, `    if (event.type === "session.idle" || event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`, "v33 idle cleanup");
+}
+
+function deployedV34NativeIdleCleanupFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v34", "v34 marker");
+  const preserved = `  const handleSessionIdle2 = (props) => {
+    const sessionID = resolveSessionEventID(props);
+    if (!sessionID)
+      return;
+    if (cancelledSessions.has(sessionID)) {`;
+  const stale = `  const handleSessionIdle2 = (props) => {
+    const sessionID = resolveSessionEventID(props);
+    if (!sessionID)
+      return;
+    openConfigClearFallbackReplay(sessionID);
+    if (cancelledSessions.has(sessionID)) {`;
+  return replaceExactlyOnce(text, preserved, stale, "v34 native idle cleanup");
 }
 
 test("central AgentOverridesSchema transform materializes canonical models without losing them", () => {
@@ -802,6 +888,80 @@ test("central AgentOverridesSchema transform materializes canonical models witho
     variant: "nitro",
   });
   assert.equal(applyCanonicalAgentModels(patched), patched, "central transform patch is idempotent");
+});
+
+test("runtime fallback resolves configured root and custom agents outside OmO's builtin allowlist", async () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const direct = configuredAgentContextBundle(patched);
+  assert.equal(await direct("ses_root", "codex-router"), "codex-router");
+  assert.equal(await direct("ses_custom", "security-router"), "Security-Router");
+  assert.equal(await direct("ses_builtin", "Sisyphus"), "sisyphus");
+  const recovered = configuredAgentContextBundle(patched, [{ info: { agent: "codex-router" } }]);
+  assert.equal(await recovered("ses_missing_event_agent"), "codex-router");
+});
+
+test("v31 upgrade adds configured-agent recovery for codex-router fallback", () => {
+  const staleV31 = deployedV31RestrictedAgentResolverFixture();
+  assert.throws(() => assertPatched(staleV31), /openConfigConfiguredAgentName/, "v31 hard-coded agent resolver fails closed");
+  const upgraded = patchDist(staleV31);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v35/);
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v35 resolver upgrade is idempotent");
+});
+
+test("fallback bootstrap is atomic across concurrent message.updated and session.error handlers", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const createOrGet = fallbackBootstrapBundle(patched);
+  const states = new Map();
+  const first = createOrGet(states, "ses_race", "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput");
+  first.primaryRetryCount = 2;
+  const concurrent = createOrGet(states, "ses_race", "openrouter/other-model");
+  assert.equal(concurrent, first, "a racing handler reuses the established state object");
+  assert.equal(concurrent.primaryRetryCount, 2, "a racing handler cannot reset the retry counter");
+  assert.equal(patched.split("openConfigGetOrCreateFallbackState(").length - 1, 5, "one helper and four bootstrap call sites are governed");
+});
+
+test("v32 upgrade removes the fallback-state bootstrap race", () => {
+  const staleV32 = deployedV32RacyFallbackBootstrapFixture();
+  assert.throws(() => assertPatched(staleV32), /openConfigGetOrCreateFallbackState/, "v32 racy bootstrap fails closed");
+  const upgraded = patchDist(staleV32);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v35/);
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v35 bootstrap upgrade is idempotent");
+});
+
+test("idle preserves the durable turn latch while deletion clears it", async () => {
+  const { eventHandler, latches } = runtimeEventHandlerBundle(patchDist(cleanOmo4194Source()).text);
+  const sessionID = "ses_idle_replay";
+  await eventHandler({ event: { type: "message.updated", properties: { sessionID, info: { role: "user", id: "usr_turn" } } } });
+  await eventHandler({ event: { type: "message.updated", properties: { sessionID, info: { role: "assistant", id: "asst_turn", parts: [{ type: "text", text: "semantic output" }] } } } });
+  assert.equal(latches.has(sessionID), true);
+  await eventHandler({ event: { type: "session.idle", properties: { sessionID } } });
+  assert.equal(latches.has(sessionID), true, "idle cannot erase an in-progress fallback turn");
+  await eventHandler({ event: { type: "session.deleted", properties: { sessionID } } });
+  assert.equal(latches.has(sessionID), false, "session deletion performs terminal cleanup");
+});
+
+test("v33 upgrade preserves fallback state across session.idle", () => {
+  const staleV33 = deployedV33IdleCleanupFixture();
+  assert.throws(() => assertPatched(staleV33), /session\.deleted/, "v33 idle cleanup fails closed");
+  const upgraded = patchDist(staleV33);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v35/);
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v35 idle upgrade is idempotent");
+});
+
+test("v34 upgrade removes the native idle cleanup path", () => {
+  const staleV34 = deployedV34NativeIdleCleanupFixture();
+  assert.throws(() => assertPatched(staleV34), /handleSessionIdle2/, "v34 native idle cleanup fails closed");
+  const upgraded = patchDist(staleV34);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v35/);
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v35 native idle upgrade is idempotent");
 });
 
 test("direct explore rejects clear security and source-recovery work before dispatch", () => {
@@ -834,7 +994,7 @@ test("v29 upgrade migrates stale governed pentest aliases to throughput and reta
   assert.throws(() => assertPatched(staleV29), /stale pentest ZDR Floor alias/, "stale aliases inside the governed retry matrix fail closed");
   const upgraded = patchDist(staleV29);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v31/);
+  assert.match(upgraded.text, /patch v35/);
   assert.doesNotMatch(upgraded.text.slice(
     upgraded.text.indexOf("function configuredPrimaryRetryLimit(config3, state3) {"),
     upgraded.text.indexOf("function openConfigMaxRecoveryDispatches() {"),
@@ -849,7 +1009,7 @@ test("v29 upgrade migrates stale governed pentest aliases to throughput and reta
     state.pendingFallbackModel = undefined;
   }
   assert.equal(prepare("ses_v29_upgrade", state, ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"], config).newModel, "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput");
-  assert.equal(patchDist(upgraded.text).changed, false, "v31 output is idempotent");
+  assert.equal(patchDist(upgraded.text).changed, false, "v35 output is idempotent");
 });
 
 test("v30 upgrade replaces the restricted explore helper with expanded semantics", () => {
@@ -857,7 +1017,7 @@ test("v30 upgrade replaces the restricted explore helper with expanded semantics
   assert.throws(() => assertPatched(staleV30), /restricted explore helper missing required semantics/, "v30 helper semantics fail closed before migration");
   const upgraded = patchDist(staleV30);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v31/);
+  assert.match(upgraded.text, /patch v35/);
   assert.equal(upgraded.text.split("function openConfigRejectRestrictedExploreTask(args)").length - 1, 1, "helper is replaced rather than duplicated");
   const reject = restrictedExploreBundle(upgraded.text);
   for (const prompt of [
@@ -871,7 +1031,7 @@ test("v30 upgrade replaces the restricted explore helper with expanded semantics
     assert.doesNotThrow(() => reject({ subagent_type: "explore", prompt }), prompt);
   }
   assertPatched(upgraded.text);
-  assert.equal(patchDist(upgraded.text).changed, false, "v31 helper upgrade is idempotent");
+  assert.equal(patchDist(upgraded.text).changed, false, "v32 helper upgrade is idempotent");
 });
 
 test("category preflight preserves a syntactically valid canonical ZDR primary before cache fallback selection", async () => {

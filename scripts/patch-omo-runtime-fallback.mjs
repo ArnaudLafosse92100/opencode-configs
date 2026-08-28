@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MARKER = "OpenConfig runtime-fallback and canonical agent-model patch v31";
+const MARKER = "OpenConfig runtime-fallback and canonical agent-model patch v35";
 const LEGACY_MARKERS = [
   "OpenConfig runtime-fallback primary retry patch v1",
   "OpenConfig runtime-fallback primary retry patch v2",
@@ -33,6 +33,10 @@ const LEGACY_MARKERS = [
   "OpenConfig runtime-fallback and canonical agent-model patch v28",
   "OpenConfig runtime-fallback and canonical agent-model patch v29",
   "OpenConfig runtime-fallback and canonical agent-model patch v30",
+  "OpenConfig runtime-fallback and canonical agent-model patch v31",
+  "OpenConfig runtime-fallback and canonical agent-model patch v32",
+  "OpenConfig runtime-fallback and canonical agent-model patch v33",
+  "OpenConfig runtime-fallback and canonical agent-model patch v34",
 ];
 const EXPECTED_OMO_VERSION = "4.19.4";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -44,7 +48,7 @@ Applies OpenConfig's governed runtime patch to the pinned OmO package cache.
 The patch adds same-primary retries before model fallback, makes the first
 subagent prompt watchdog configurable from OpenConfig-owned environment knobs,
 and makes canonical agents.*.models drive task(subagent_type) resolution.
-Accepts a fresh pinned dist or upgrades deployed markers v1-v3 and v7-v30; unknown
+Accepts a fresh pinned dist or upgrades deployed markers v1-v3 and v7-v34; unknown
 intermediate OpenConfig patch markers are refused fail-closed.`);
 }
 
@@ -1904,11 +1908,88 @@ function applyPentestThroughputAliasMigrationV30(original) {
     : original.slice(0, start) + migratedMatrix + original.slice(end);
 }
 
+function applyConfiguredAgentContextResolutionV32(original) {
+  const helper = `function openConfigConfiguredAgentName(agent, pluginConfig) {
+  if (typeof agent !== "string" || !pluginConfig?.agents) return;
+  const normalized = agent.trim().toLowerCase();
+  if (!normalized) return;
+  return Object.keys(pluginConfig.agents).find((name) => name.toLowerCase() === normalized);
+}
+
+`;
+  let text = original;
+  if (!text.includes("function openConfigConfiguredAgentName(agent, pluginConfig)")) {
+    text = replaceOnce(text, "function createAgentContextResolver(deps) {", `${helper}function createAgentContextResolver(deps) {`, "v32 configured agent helper");
+  }
+  const oldEventResolution = "  const { ctx } = deps;\n  return async (sessionID, eventAgent) => {\n    const resolved = resolveAgentForSession(sessionID, eventAgent);";
+  const newEventResolution = "  const { ctx, pluginConfig } = deps;\n  return async (sessionID, eventAgent) => {\n    const resolved = openConfigConfiguredAgentName(eventAgent, pluginConfig) ?? resolveAgentForSession(sessionID, eventAgent);";
+  if (text.includes(oldEventResolution)) text = replaceOnce(text, oldEventResolution, newEventResolution, "v32 configured event agent resolution");
+  else if (!text.includes(newEventResolution)) throw new Error("Patch anchor mismatch for v32 configured event agent resolution");
+  const oldMessageResolution = `        const infoAgent = typeof info?.agent === "string" ? info.agent : undefined;
+        const normalized = normalizeAgentName(infoAgent);`;
+  const newMessageResolution = `        const infoAgent = typeof info?.agent === "string" ? info.agent : undefined;
+        const configured = openConfigConfiguredAgentName(infoAgent, pluginConfig);
+        if (configured) return configured;
+        const normalized = normalizeAgentName(infoAgent);`;
+  if (text.includes(oldMessageResolution)) text = replaceOnce(text, oldMessageResolution, newMessageResolution, "v32 configured message agent resolution");
+  else if (!text.includes(newMessageResolution)) throw new Error("Patch anchor mismatch for v32 configured message agent resolution");
+  return text;
+}
+
+function applyFallbackBootstrapRaceFixV33(original) {
+  const helper = `function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel) {
+  const existing = sessionStates.get(sessionID);
+  if (existing) return existing;
+  const created = createFallbackState(initialModel);
+  sessionStates.set(sessionID, created);
+  return created;
+}
+`;
+  let text = original;
+  if (!text.includes("function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel)")) {
+    text = replaceOnce(text, "function isModelInCooldown(model, state3, cooldownSeconds) {", `${helper}function isModelInCooldown(model, state3, cooldownSeconds) {`, "v33 atomic fallback bootstrap helper");
+  }
+  text = text.replaceAll("state3 = createFallbackState(initialModel);\n      sessionStates.set(sessionID, state3);", "state3 = openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel);");
+  text = text.replaceAll("state3 = createFallbackState(initialModel);\n        sessionStates.set(sessionID, state3);", "state3 = openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel);");
+  text = text.replaceAll("state3 = createFallbackState(initialModel);\n      deps.sessionStates.set(sessionID, state3);", "state3 = openConfigGetOrCreateFallbackState(deps.sessionStates, sessionID, initialModel);");
+  text = text.replaceAll("maxPrimaryRetries: configuredPrimaryRetryLimit(config3),", "maxPrimaryRetries: configuredPrimaryRetryLimit(config3, state3),");
+  return text;
+}
+
+function applyFallbackIdleTurnPreservationV34(original) {
+  const oldCleanup = `    if (event.type === "session.idle" || event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`;
+  const newCleanup = `    if (event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`;
+  if (original.includes(oldCleanup)) return replaceOnce(original, oldCleanup, newCleanup, "v34 preserve durable turn across idle fallback replay");
+  if (!original.includes(newCleanup)) throw new Error("Patch anchor mismatch for v34 idle fallback replay preservation");
+  return original;
+}
+
+function applyNativeIdleTurnPreservationV35(original) {
+  const oldIdle = `  const handleSessionIdle2 = (props) => {
+    const sessionID = resolveSessionEventID(props);
+    if (!sessionID)
+      return;
+    openConfigClearFallbackReplay(sessionID);
+    if (cancelledSessions.has(sessionID)) {`;
+  const newIdle = `  const handleSessionIdle2 = (props) => {
+    const sessionID = resolveSessionEventID(props);
+    if (!sessionID)
+      return;
+    if (cancelledSessions.has(sessionID)) {`;
+  if (original.includes(oldIdle)) return replaceOnce(original, oldIdle, newIdle, "v35 native idle durable-turn preservation");
+  if (!original.includes(newIdle)) throw new Error("Patch anchor mismatch for v35 native idle durable-turn preservation");
+  return original;
+}
+
+function applyCurrentRuntimeFixes(original) {
+  return applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(applyConfiguredAgentContextResolutionV32(original))));
+}
+
 function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
   const openConfigMarkers = [...new Set(text.match(/OpenConfig runtime-fallback[^\n*]*patch v\d+/g) ?? [])];
   const unsupportedMarkers = openConfigMarkers.filter(marker => marker !== MARKER && !LEGACY_MARKERS.includes(marker));
   if (unsupportedMarkers.length > 0) {
-    throw new Error(`Refusing unsupported OpenConfig OmO runtime patch marker(s): ${unsupportedMarkers.join(", ")}. Only fresh dist or deployed v1-v30 upgrades are supported.`);
+    throw new Error(`Refusing unsupported OpenConfig OmO runtime patch marker(s): ${unsupportedMarkers.join(", ")}. Only fresh dist or deployed v1-v34 upgrades are supported.`);
   }
 }
 
@@ -1916,23 +1997,43 @@ function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
 export function patchDist(original) {
   assertNoUnsupportedOpenConfigRuntimePatchMarkers(original);
   if (original.includes(MARKER)) return { text: original, changed: false };
+  if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v34")) {
+    const text = `${applyNativeIdleTurnPreservationV35(original)}\n/* ${MARKER} */\n`;
+    assertPatched(text);
+    return { text, changed: true };
+  }
+  if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v33")) {
+    const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(original))}\n/* ${MARKER} */\n`;
+    assertPatched(text);
+    return { text, changed: true };
+  }
+  if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v32")) {
+    const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(original)))}\n/* ${MARKER} */\n`;
+    assertPatched(text);
+    return { text, changed: true };
+  }
+  if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v31")) {
+    const text = `${applyCurrentRuntimeFixes(original)}\n/* ${MARKER} */\n`;
+    assertPatched(text);
+    return { text, changed: true };
+  }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v30")) {
-    const text = `${applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original)))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v29")) {
-    const text = `${applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original)))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v28")) {
-    const text = `${applyPentestThroughputAliasMigrationV30(applyExploreSecurityIntentRejection(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyPentestThroughputAliasMigrationV30(applyExploreSecurityIntentRejection(original)))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v27")) {
-    const text = `${applyExploreSecurityIntentRejection(applyCanonicalAgentModels(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyCanonicalAgentModels(original)))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
@@ -1940,17 +2041,17 @@ export function patchDist(original) {
   // source anchors have already been consumed, so re-running the historical
   // string transforms would be both brittle and unsafe.
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v25")) {
-    const text = `${applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(original)))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(original))))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v26")) {
-    const text = `${applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(original)))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v24")) {
-    const text = `${applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(applyPerModelRetryAndDispatchBoundsV25(original))))}\n/* ${MARKER} */\n`;
+    const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(applyPerModelRetryAndDispatchBoundsV25(original)))))}\n/* ${MARKER} */\n`;
     assertPatched(text);
     return { text, changed: true };
   }
@@ -1979,7 +2080,7 @@ export function patchDist(original) {
     text = applyPerModelRetryAndDispatchBoundsV25(text);
     text = applyDurableUserTurnResetV26(text);
     text = applyDurableUserTurnLatchV27(text);
-    text = applyPentestThroughputAliasMigrationV30(applyExploreSecurityIntentRejection(text));
+    text = applyCurrentRuntimeFixes(applyPentestThroughputAliasMigrationV30(applyExploreSecurityIntentRejection(text)));
     text = `${text}\n/* ${MARKER} */\n`;
     return { text, changed: true };
   }
@@ -2262,7 +2363,7 @@ function prepareFallback(sessionID, state3, fallbackModels, config3, options = {
   text = applyNestedTextStatusSafetyV22(text);
   text = applyErrorEnvelopeStatusSafetyV23(text);
   text = applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(applyPerModelRetryAndDispatchBoundsV25(text)));
-  text = applyExploreSecurityIntentRejection(text);
+  text = applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(text));
   text = `${text}\n/* ${MARKER} */\n`;
   return { text, changed: true };
 }
@@ -2297,6 +2398,14 @@ export function assertPatched(text) {
     "function openConfigPentestStatusCode(error)",
     "function openConfigCanRetrySessionStatus(retrySignal, retryMessage, retryOnErrors)",
     "function openConfigRejectRestrictedExploreTask(args)",
+    "function openConfigConfiguredAgentName(agent, pluginConfig)",
+    "function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel)",
+    "state3 = openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel);",
+    "state3 = openConfigGetOrCreateFallbackState(deps.sessionStates, sessionID, initialModel);",
+    "maxPrimaryRetries: configuredPrimaryRetryLimit(config3, state3),",
+    `if (event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`,
+    "const { ctx, pluginConfig } = deps;",
+    "openConfigConfiguredAgentName(eventAgent, pluginConfig) ?? resolveAgentForSession(sessionID, eventAgent)",
     "Direct explore is limited to code-location tasks. Route security, pentest, or source-recovery work with category content-aware-fast or content-aware-deep.",
     "Duplicate fallback signal skipped",
     "No durable human user message/messageID",
@@ -2339,6 +2448,12 @@ export function assertPatched(text) {
     ? ["deepseek-v4-flash-0731-zdr-floor", "deepseek-v4-pro-0813-zdr-floor"].filter(alias => text.slice(matrixStart, matrixEnd).includes(alias))
     : [];
   if (stalePentestAliases.length > 0) throw new Error(`OmO governed runtime patch contains stale pentest ZDR Floor alias(es): ${stalePentestAliases.join(", ")}`);
+  const nativeIdleStart = text.indexOf("const handleSessionIdle2 = (props) => {");
+  const nativeIdleEnd = text.indexOf("const handleSessionError = async (props) => {", nativeIdleStart);
+  const nativeIdleHandler = nativeIdleStart >= 0 && nativeIdleEnd > nativeIdleStart ? text.slice(nativeIdleStart, nativeIdleEnd) : "";
+  if (!nativeIdleHandler || nativeIdleHandler.includes("openConfigClearFallbackReplay(sessionID)")) {
+    throw new Error("OmO governed runtime patch still clears the durable fallback turn inside handleSessionIdle2");
+  }
   const missing = required.filter(value => !text.includes(value));
   if (missing.length > 0) throw new Error(`OmO governed runtime patch missing: ${missing.join(", ")}`);
   const forbidden = [
@@ -2349,6 +2464,8 @@ export function assertPatched(text) {
   ].filter(value => text.includes(value));
   if (forbidden.length > 0) throw new Error(`OmO governed runtime patch contains removed v5 native-builder patch: ${forbidden.join(", ")}`);
   const exactOnce = [
+    "function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel)",
+    "function openConfigConfiguredAgentName(agent, pluginConfig)",
     "function openConfigMaterializeAgentOverride(override)",
     "function openConfigMaterializeAgentOverrides(overrides)",
     "}).catchall(AgentOverrideConfigSchema.optional()).transform(openConfigMaterializeAgentOverrides);",
