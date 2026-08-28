@@ -27,8 +27,24 @@ jobs:
           node-version: 24
       - name: Verify repository signature
         run: ./signature.sh
-      - name: Run complete OpenConfig test suite
+      - name: Prepare the portable config-home prompt contract
+        run: |
+          mkdir -p "$HOME/.config/opencode"
+          ln -s "$GITHUB_WORKSPACE/prompts" "$HOME/.config/opencode/prompts"
+      - name: Validate tracked configuration
+        run: ./validate.sh --quiet
+      - name: Run deterministic routing and patch tests
+        run: |
+          python3 tests/test_model_routing_eval.py
+          python3 tests/test_orchestration_routing_eval.py
+          python3 scripts/render-routing-docs.py --check
+          node --test tests/patch-omo-runtime-fallback.test.mjs
+          ./eval-models.sh
+          ./eval-orchestration.sh
+      - name: Run sandboxed idempotency and runtime diagnostics
         env:
           NO_COLOR: "1"
           PYTHONDONTWRITEBYTECODE: "1"
-        run: ./oc test
+        run: |
+          ./oc test idempotency
+          ./oc test runtime
