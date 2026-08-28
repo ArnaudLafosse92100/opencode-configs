@@ -296,6 +296,19 @@ class ContentAwareFallbackTests(unittest.TestCase):
         else:
             self.assertNotIn("Runtime profile `pentest`", prompt)
 
+    def test_rendered_pentest_sisyphus_prompt_requires_flash_retries_then_one_pro_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            rendered = runtime_profile.RuntimeProfiles(REPO).render("pentest", force=True)
+            prompt = (rendered / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
+            self.assertIn("starts on DeepSeek V4 Flash 0731 ZDR Throughput", prompt)
+            self.assertIn("retries Flash exactly three times", prompt)
+            self.assertIn("exactly one DeepSeek V4 Pro 0813 ZDR Throughput attempt", prompt)
+            self.assertIn("that failure is terminal", prompt)
+            self.assertIn("Do not dispatch GLM, GPT/subscription-gateway, Kimi", prompt)
+            self.assertNotIn("pentest-safe routes use only GLM 5.3", prompt)
+
     def test_profile_activation_renders_external_state_without_mutating_sources(self) -> None:
         tracked = (
             "opencode.json",
@@ -460,13 +473,15 @@ class PentestPromptOverlayTests(unittest.TestCase):
             self.assertEqual((pentest / self.router_mirror).read_bytes(), mirror_source)
             router = (pentest / "agents/codex-router.md").read_text(encoding="utf-8")
             deep = (pentest / "prompts/categories/content-aware-deep.md").read_text(encoding="utf-8")
-            self.assertIn("This is a soft prompt policy, not a hard runtime cap.", router)
-            self.assertIn("content-aware-fast` on Flash first", router)
-            self.assertIn("at most one **new** `content-aware-deep` Pro child", router)
-            self.assertIn("at most four tool-call rounds", router)
-            self.assertIn("This is a soft prompt policy, not a hard runtime cap.", deep)
-            self.assertIn("batching no more than three targets", deep)
-            self.assertIn("may be resumed once only for one narrow, named gap", deep)
+            for prompt in (router, deep):
+                self.assertIn("DeepSeek V4 Flash 0731 ZDR Throughput", prompt)
+                self.assertIn("retry Flash exactly three times", prompt)
+                self.assertIn("DeepSeek V4 Pro 0813 ZDR Throughput", prompt)
+                self.assertIn("exactly once", prompt)
+                self.assertIn("terminal failure", prompt)
+                self.assertIn("Do not dispatch GLM, GPT/subscription-gateway, Kimi", prompt)
+                self.assertNotIn("at most one", prompt)
+                self.assertNotIn("may be resumed once", prompt)
         self.assertEqual((REPO / "runtime-profile.json").read_bytes(), routes_before)
         self.assertEqual({name: (REPO / name).read_bytes() for name in self.effective_paths}, source)
         self.assertEqual((REPO / self.router_mirror).read_bytes(), mirror_source)

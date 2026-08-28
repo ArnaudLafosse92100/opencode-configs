@@ -67,8 +67,8 @@ def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
         raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
 
     policies = {
-        "agents/codex-router.md": """## Pentest cost-aware delegation policy\n\nThis is a soft prompt policy, not a hard runtime cap. For authorized pentest work, run `content-aware-fast` on Flash first for reconnaissance and deduplication. Escalate only concrete evidence-backed targets: batch no more than three targets in one deep request, launch at most one **new** `content-aware-deep` Pro child for the parent request, and resume that same child at most once only for one narrow, named gap instead of launching another child.\n\nThe Pro child adjudicates the Flash evidence; it must not broadly rediscover or repeat scans. Batch reads and tool calls. Aim for at most four tool-call rounds, then return a final answer with explicit unverified gaps rather than expanding or looping. An explicit user demand for multiple independent deep reviewers may override the one-child count, but disclose the expected cost before launching them.\n""",
-        "prompts/categories/content-aware-deep.md": """## Pentest cost-aware depth policy\n\nThis is a soft prompt policy, not a hard runtime cap. Treat Flash `content-aware-fast` reconnaissance and deduplication as the input to Pro adjudication. Work only the concrete evidence-backed targets supplied by that recon, batching no more than three targets. Do not broadly rediscover or repeat scans. Batch reads and tool calls; target at most four tool-call rounds, then return the finding with explicit unverified gaps rather than expanding or looping.\n\nFor one parent request, there should be at most one new Pro `content-aware-deep` child. That child may be resumed once only for one narrow, named gap; do not create another deep child for the same gap. If the user explicitly requires multiple independent deep reviewers, disclose the expected cost before they are launched.\n""",
+        "agents/codex-router.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
+        "prompts/categories/content-aware-deep.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
     }
     policy = policies.get(path.as_posix())
     if policy is None:
@@ -419,12 +419,11 @@ def update_sisyphus_prompt(text: str, profile: str) -> str:
     )
     pentest_line = (
         "- Runtime profile `pentest`: keep all agents/categories available, but "
-        "pentest-safe routes use only GLM 5.3 and exact DeepSeek V4 snapshots "
-        "(Flash 0731 for economical work, Pro 0813 for deep implementation/review). "
-        "Do not use Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway, "
-        "`ultrawork`, `ulw`, or generic stronger-reasoning escalation inside "
-        "pentest work. If filters bite, reroute unfinished work to "
-        "`content-aware-fast`, `content-aware-deep`, or `content-aware-research`."
+        "every agent/category starts on DeepSeek V4 Flash 0731 ZDR Throughput, "
+        "retries Flash exactly three times, then makes exactly one DeepSeek V4 Pro 0813 "
+        "ZDR Throughput attempt; that failure is terminal. Do not dispatch GLM, GPT/"
+        "subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other "
+        "model for pentest work."
     )
     lines = [
         line
@@ -791,7 +790,6 @@ class RuntimeProfiles:
             for source in sorted(source_xdg.iterdir(), key=lambda path: path.name):
                 if source.name == "opencode":
                     continue
-                stat = source.lstat()
                 kind = "symlink" if source.is_symlink() else "dir" if source.is_dir() else "file" if source.is_file() else "other"
                 entries.append({"name": source.name, "kind": kind, "resolved": str(source.resolve(strict=False))})
         return hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
