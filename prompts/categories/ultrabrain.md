@@ -1,4 +1,6 @@
-# Category: ultrabrain (normal: GPT-5.6 Sol max; pentest: GLM primary)
+# Category: ultrabrain (normal: GPT-5.6 Sol max; pentest: Flash Floor + bounded Pro 0813 ZDR Floor fallback)
+
+Pentest is Flash Floor initial + three Flash retries, then exactly one Pro 0813 ZDR Floor attempt, then terminal failure; no GPT, GLM, Kimi, or other model.
 
 Decision memo for ambiguous logic, architecture, and hyperplan-grade problems. Compare assumptions, alternatives, tradeoffs, and failure modes. Analysis-only unless explicitly assigned implementation. Security root-cause in teams prefers `content-aware-deep`.
 

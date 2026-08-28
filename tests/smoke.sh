@@ -162,12 +162,32 @@ oc=json.load(open(repo/"opencode.json"))
 omo=json.load(open(repo/"oh-my-openagent.json"))
 models=oc["provider"]["openrouter"]["models"]
 flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
+throughput=models.get("deepseek/deepseek-v4-flash-0731-zdr-throughput") or {}
 pro=models.get("deepseek/deepseek-v4-pro-0813") or {}
+pro_throughput=models.get("deepseek/deepseek-v4-pro-0813-zdr-throughput") or {}
 runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
 rf=omo.get("runtime_fallback") or {}
 common=(repo/"lib/common.sh").read_text()
-ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
-    and pro.get("id")=="deepseek/deepseek-v4-pro-0813"
+ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:floor"
+    and throughput.get("id")=="deepseek/deepseek-v4-flash-0731"
+    and throughput.get("options", {}).get("provider")=={
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "allow_fallbacks": True,
+        "sort": "throughput",
+        "max_price": {"prompt": 0.50, "completion": 1.50},
+    }
+    and pro.get("id")=="deepseek/deepseek-v4-pro-0813:floor"
+    and pro_throughput.get("id")=="deepseek/deepseek-v4-pro-0813"
+    and pro_throughput.get("options", {}).get("provider")=={
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "allow_fallbacks": True,
+        "sort": "throughput",
+        "max_price": {"prompt": 1.50, "completion": 4.50},
+    }
     and pro.get("tool_call") is True
     and pro.get("reasoning") is True
     and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
@@ -180,7 +200,7 @@ ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:nitro"
     and (repo/"scripts/patch-omo-runtime-fallback.mjs").is_file())
 sys.exit(0 if ok else 1)
 ' "$REPO"; then
-  ok "exact DeepSeek Flash 0731 / Pro 0813 routes + OmO schema-clean runtime fallback + OpenConfig retry policy"
+  ok "separate normal/pentest Floor DeepSeek 0731 routes + OmO schema-clean bounded retry policy"
 else
   bad "DeepSeek version, OmO reasoning schema, or OpenConfig runtime fallback retry policy drift"
 fi
@@ -197,7 +217,9 @@ ok=(bt.get("defaultConcurrency")==6
     and pc.get("subscription-gateway")==4
     and pc.get("anthropic")==2
     and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==5
+    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput")==5
     and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==10
+    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")==6
     and mc.get("openrouter/z-ai/glm-5.3")==8
     and mc.get("openrouter/moonshotai/kimi-k2.7-code")==5
     and mc.get("openrouter/nousresearch/hermes-4-405b")==2)
@@ -210,7 +232,8 @@ fi
 
 # OpenRouter lanes usually fail over to the independent subscription gateway
 # first in normal mode. Runtime-profile-listed routes are authoritative. In
-# pentest mode, listed agents/categories must stay GLM/DeepSeek-only.
+# In pentest mode, every listed agent/category must take the fixed price-capped
+# Flash 0731 ZDR Throughput then Pro 0813 ZDR Throughput path, with no other provider/model.
 if python3 -c '
 import json, sys
 omo=json.load(open(sys.argv[1]))
@@ -228,11 +251,8 @@ if prof == "pentest":
     declared=set(expected)
     if actual != declared:
         raise SystemExit(5)
-allowed={
-    "openrouter/z-ai/glm-5.3",
-    "openrouter/deepseek/deepseek-v4-flash-0731",
-    "openrouter/deepseek/deepseek-v4-pro-0813",
-}
+flash="openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
+pro="openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
 for section in ("agents", "categories"):
     for name, cfg in (omo.get(section) or {}).items():
         if not isinstance(cfg, dict): continue
@@ -245,7 +265,7 @@ for section in ("agents", "categories"):
             expected_primary, expected_fallbacks = route_expected
             if primary != expected_primary or fbs != expected_fallbacks:
                 raise SystemExit(3)
-            if prof == "pentest" and any(x not in allowed for x in [primary, *fbs]):
+            if prof == "pentest" and (primary != flash or fbs != [pro]):
                 raise SystemExit(4)
             continue
         if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("subscription-gateway/")):

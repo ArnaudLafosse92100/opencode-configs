@@ -7,113 +7,90 @@
     "agents": {
       "codex-router": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/deepseek/deepseek-v4-flash-0731"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "sisyphus": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "hephaestus": {
         "model": "subscription-gateway/gpt-5.6-terra",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "subscription-gateway/gpt-5.6-sol",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "prometheus": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-flash-0731"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "atlas": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-flash-0731"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "oracle": {
         "model": "subscription-gateway/gpt-5.6-sol",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "librarian": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/minimax/minimax-m3",
-          "subscription-gateway/gpt-5.6-terra"
+      "fallback_models": [
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "explore": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "openrouter/deepseek/deepseek-v4-flash-0731"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "multimodal-looker": {
         "model": "openrouter/google/gemini-3.1-pro-preview",
-        "fallback_models": [
-          "openrouter/google/gemini-3.7-flash",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/google/gemini-3.7-flash",
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "metis": {
         "model": "openrouter/google/gemini-3.1-pro-preview",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "subscription-gateway/gpt-5.6-sol",
+        "openrouter/moonshotai/kimi-k2.7-code"
         ]
       },
       "momus": {
         "model": "subscription-gateway/gpt-5.6-sol-review",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "sisyphus-junior": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "content-aware-research": {
         "model": "openrouter/nousresearch/hermes-4-405b",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       }
     },
@@ -127,62 +104,49 @@
       },
       "ultrabrain": {
         "model": "subscription-gateway/gpt-5.6-sol",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/moonshotai/kimi-k2.7-code"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "deep": {
         "model": "subscription-gateway/gpt-5.6-sol",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol-review",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "agentic-deep-kimi": {
         "model": "openrouter/moonshotai/kimi-k2.7-code",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/deepseek/deepseek-v4-flash-0731"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "artistry": {
         "model": "openrouter/google/gemini-3.1-pro-preview",
-        "fallback_models": [
-          "openrouter/google/gemini-3.7-flash",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/google/gemini-3.7-flash",
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "quick": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "unspecified-low": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/minimax/minimax-m3"
         ]
       },
       "unspecified-high": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "subscription-gateway/gpt-5.6-terra"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "writing": {
@@ -193,214 +157,84 @@
       },
       "bug-hunt": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "refactor-safe": {
         "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/moonshotai/kimi-k2.7-code",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "arch-review": {
         "model": "subscription-gateway/gpt-5.6-sol-review",
-        "fallback_models": [
-          "subscription-gateway/gpt-5.6-sol",
-          "subscription-gateway/gpt-5.6-terra",
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/moonshotai/kimi-k2.7-code"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
         ]
       },
       "content-aware-fast": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-pro-0813",
-          "openrouter/minimax/minimax-m3",
-          "openrouter/z-ai/glm-5.3"
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813"
         ]
       },
       "content-aware-deep": {
         "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-flash-0731",
-          "openrouter/z-ai/glm-5.3",
-          "openrouter/minimax/minimax-m3"
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3"
         ]
       }
     }
   },
+  "normal-private": {
+    "compose": "normal",
+    "privacy": {
+      "openrouter": {
+        "data_collection": "deny",
+        "zdr": true
+      },
+      "exclude_providers": [
+        "subscription-gateway"
+      ]
+    }
+  },
   "pentest": {
-    "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
-    "helper_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "small_model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+    "helper_model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
     "agents": {
-      "codex-router": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "sisyphus": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "hephaestus": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "prometheus": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "atlas": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "oracle": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "librarian": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "explore": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "multimodal-looker": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "metis": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "momus": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "sisyphus-junior": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "content-aware-research": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      }
+      "codex-router": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "sisyphus": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "hephaestus": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "prometheus": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "atlas": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "oracle": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "librarian": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "explore": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "multimodal-looker": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "metis": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "momus": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "sisyphus-junior": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "content-aware-research": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] }
     },
     "categories": {
-      "visual-engineering": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "ultrabrain": {
-        "model": "openrouter/z-ai/glm-5.3",
-        "fallback_models": [
-          "openrouter/deepseek/deepseek-v4-pro-0813"
-        ]
-      },
-      "deep": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "agentic-deep-kimi": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "artistry": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "quick": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "unspecified-low": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "unspecified-high": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "writing": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "bug-hunt": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "refactor-safe": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "arch-review": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "content-aware-fast": {
-        "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      },
-      "content-aware-deep": {
-        "model": "openrouter/deepseek/deepseek-v4-pro-0813",
-        "fallback_models": [
-          "openrouter/z-ai/glm-5.3"
-        ]
-      }
+      "visual-engineering": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "ultrabrain": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "deep": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "agentic-deep-kimi": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "artistry": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "quick": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "unspecified-low": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "unspecified-high": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "writing": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "bug-hunt": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "refactor-safe": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "arch-review": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "content-aware-fast": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] },
+      "content-aware-deep": { "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"] }
     }
   }
 }

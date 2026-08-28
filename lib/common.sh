@@ -325,7 +325,7 @@ oc_provision_native_omo_alias() {
   marker_real="$(realpath "$(dirname "$target")/.openconfig-source" 2>/dev/null || true)"
   repo_real="$(realpath "$repo" 2>/dev/null || true)"
   profile_marker="$(cat "$(dirname "$target")/.active-profile" 2>/dev/null || true)"
-  [[ "$active" =~ ^(normal|pentest)$ && "$target_real" && "$profile_marker" == "$active" && "$marker_real" == "$repo_real" ]] \
+  [[ "$active" =~ ^(normal|normal-private|pentest)$ && "$target_real" && "$profile_marker" == "$active" && "$marker_real" == "$repo_real" ]] \
     || { echo "compat profile/envelope/source consensus failed (active=${active:-missing}, envelope=$target_real, source=$marker_real)" >&2; return 2; }
   case "$state" in
     alias) return 0 ;;
@@ -523,7 +523,7 @@ oc_telemetry_off() {
   export OTEL_SDK_DISABLED=true
   # OpenConfig-owned OmO runtime fallback knobs. Keep custom behavior out of
   # native runtime_fallback JSON so upstream OmO schema/doctor stay clean.
-  export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK="${OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK:-3}"
+  export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK="${OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK:-2}"
   export OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS="${OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS:-20}"
   export OPENCODE_DISABLE_EXTERNAL_SKILLS="${OPENCODE_DISABLE_EXTERNAL_SKILLS:-1}"
   export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS="${OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:-1}"
@@ -551,12 +551,23 @@ oc_load_runtime_profile_env() {
     return 1
   fi
   if [[ "${OPENCODE_CONFIG_DIR:-}" != /* || "${XDG_CONFIG_HOME:-}" != /* \
-    || "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ]]; then
+    || "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal-private && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ]]; then
     unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
     echo "OpenConfig runtime profile snapshot is invalid" >&2
     return 1
   fi
   export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+}
+
+# The pinned OmO hook reads this before its first prompt watchdog. Keep the
+# profile split explicit here; model/rung-specific recovery remains governed by
+# the patched runtime and never invents a lineage identity or a USD hard cap.
+oc_apply_profile_retry_policy() {
+  case "${OPENCONFIG_RUNTIME_PROFILE:-normal}" in
+    pentest) export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=3 ;;
+    normal|normal-private) export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=2 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Applied markers are bridge health evidence only when they bind the complete

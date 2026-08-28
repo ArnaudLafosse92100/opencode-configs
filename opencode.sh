@@ -58,6 +58,7 @@ oc_export_env_file "$ENV_FILE"
 # Resolve the paired paths in one call so a profile switch cannot make this
 # process combine one profile's config with another profile's XDG home.
 oc_load_runtime_profile_env "$REPO/runtime-profile.sh" || exit 1
+oc_apply_profile_retry_policy || exit 1
 
 cd "$TARGET_DIR" || {
   echo "opencode.sh: cannot cd to $TARGET_DIR" >&2

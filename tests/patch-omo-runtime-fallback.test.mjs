@@ -224,6 +224,15 @@ function resolveModelAndFallbackChain(args) {
     }
   }
   const normalizedFallbackModels = normalizeFallbackModels(agentOverride?.fallback_models ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined));
+}
+function createDelegateTask(options) {
+  return tool({
+    async execute(args, toolContext) {
+      const ctx = toolContext;
+      const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx);
+      return delegateTaskArgs;
+    }
+  });
 }`;
 
 const CLEAN_OMO_4194_SHA256 = "e522d513a08d0a6871129dbf3d9c3a79e4871693997fbf34190c4d3fa3d6b4b5";
@@ -236,6 +245,8 @@ const FRESH_FIXTURE_ANCHORS = [
   "function findAgentOverride2(agentOverrides, agentConfigKey) {",
   "async function resolveSubagentModel(agentToUse, matchedAgent, executorCtx) {",
   "function resolveModelAndFallbackChain(args) {",
+  "function createDelegateTask(options) {",
+  "const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx);",
 ];
 
 function bunCacheRoots(env = process.env, home = homedir()) {
@@ -343,6 +354,15 @@ function routeBundle(patched) {
   return context;
 }
 
+function restrictedExploreBundle(patched) {
+  const start = patched.indexOf("function openConfigRejectRestrictedExploreTask(args)");
+  const end = patched.indexOf("function createDelegateTask(options) {", start);
+  assert.ok(start >= 0 && end > start, "restricted explore pre-dispatch helper is present");
+  const context = { Error };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.reject = openConfigRejectRestrictedExploreTask;`, context);
+  return context.reject;
+}
+
 function entrySettingsBundle(patched) {
   const start = patched.indexOf("function applyFallbackEntrySettings(input)");
   const end = patched.indexOf("\n}\n", start) + 2;
@@ -350,6 +370,194 @@ function entrySettingsBundle(patched) {
   const context = {};
   vm.runInNewContext(`${patched.slice(start, end)}; globalThis.apply = applyFallbackEntrySettings;`, context);
   return context.apply;
+}
+
+function categoryPreflightBundle(patched, availableModels) {
+  const start = patched.indexOf("function getConfiguredModel(entry)");
+  const end = patched.indexOf("// packages/omo-opencode/src/tools/delegate-task/subagent-resolver.ts", start);
+  assert.ok(start >= 0 && end > start, "category preflight resolver is present");
+  let resolverCalls = 0;
+  const context = {
+    CATEGORY_MODEL_REQUIREMENTS: { quick: { fallbackChain: ["builtin/fallback"] } },
+    BUILTIN_CATEGORY_REQUIRES_MODEL: {},
+    CATEGORY_PROMPT_APPEND_RESOLVERS: {},
+    SISYPHUS_JUNIOR_AGENT2: "sisyphus-junior",
+    log2() {},
+    mergeCategories: categories => categories,
+    getAvailableModelsForDelegateTask: async () => new Set(availableModels),
+    resolveCategoryConfig: (_category, { userCategories }) => ({
+      config: userCategories.quick,
+      model: userCategories.quick.models[0].model,
+      isUserConfiguredModel: true,
+    }),
+    normalizeFallbackModels: value => Array.isArray(value) ? value.filter(entry => entry !== undefined) : undefined,
+    flattenToFallbackModelStrings: entries => (entries ?? []).map(entry => typeof entry === "string" ? entry : entry.model),
+    resolveModelForDelegateTask2: ({ userModel, userFallbackModels, availableModels: cache }) => {
+      resolverCalls += 1;
+      if (cache.has(userModel)) return { model: userModel };
+      const fallback = userFallbackModels.find(model => cache.has(model));
+      return fallback ? { model: fallback, matchedFallback: true } : { skipped: true };
+    },
+    parseModelString: model => {
+      if (typeof model !== "string") return undefined;
+      const slash = model.indexOf("/");
+      return slash > 0 && slash < model.length - 1 ? { providerID: model.slice(0, slash), modelID: model.slice(slash + 1) } : undefined;
+    },
+    applyCategoryParams: (model, config) => ({ ...model, reasoning: config.reasoning }),
+    resolveCategoryPromptAppendForModel: () => undefined,
+    buildFallbackChainFromModels: models => models,
+    findMostSpecificFallbackEntry: (providerID, modelID, chain) => chain.find(entry => (typeof entry === "string" ? entry : entry.model) === `${providerID}/${modelID}`),
+    applyFallbackEntrySettings: ({ categoryModel, effectiveEntry }) => ({ ...categoryModel, reasoning: effectiveEntry.reasoning ?? categoryModel.reasoning }),
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.resolve = resolveCategoryExecution;`, context);
+  return {
+    resolve: args => context.resolve(args, {
+      client: {},
+      userCategories: {
+        quick: {
+          models: [
+            { model: "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", reasoning: "low" },
+            { model: "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput", reasoning: "high" },
+          ],
+        },
+      },
+      sisyphusJuniorModel: undefined,
+    }, undefined, undefined),
+    get resolverCalls() { return resolverCalls; },
+  };
+}
+
+function fallbackStateMachineBundle(patched, profile = "pentest") {
+  const start = patched.indexOf("function createFallbackState(originalModel)");
+  const end = patched.indexOf("function snapshotFallbackState", start);
+  assert.ok(start >= 0 && end > start, "patched fallback state machine is present");
+  const context = {
+    stringifyRuntimeModel: value => typeof value === "string" ? value : `${value.providerID}/${value.modelID}`,
+    HOOK_NAME13: "runtime-fallback",
+    log2() {},
+    areRuntimeFallbackModelsEquivalent: (left, right) => left === right,
+    process: { env: { OPENCONFIG_RUNTIME_PROFILE: profile } },
+    openConfigPentestFallbackActive: () => profile === "pentest",
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.createState = createFallbackState; globalThis.prepare = prepareFallback;`, context);
+  return context;
+}
+
+function retryabilityBundle(patched, profile = "pentest") {
+  const start = patched.indexOf("function openConfigPentestStatusCode(error)");
+  const end = patched.indexOf("// packages/omo-opencode/src/hooks/runtime-fallback/fallback-bootstrap-model.ts", start);
+  assert.ok(start >= 0 && end > start, "patched retryability classifier is present");
+  const nested = (value, keys) => {
+    if (!value || typeof value !== "object") return undefined;
+    for (const key of keys) {
+      if (typeof value[key] === "number") return value[key];
+    }
+    for (const child of Object.values(value)) {
+      const found = nested(child, keys);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  const context = {
+    extractStatusCode: error => nested(error, ["statusCode", "status"]),
+    classifyErrorType: error => {
+      const value = JSON.stringify(error);
+      if (/abort/i.test(value)) return "abort";
+      if (/context[ _-]?overflow/i.test(value)) return "context_overflow";
+      if (/model[ _-]?not[ _-]?found/i.test(value)) return "model_not_found";
+      if (/missing[ _-]?api[ _-]?key/i.test(value)) return "missing_api_key";
+      if (/invalid[ _-]?api[ _-]?key/i.test(value)) return "invalid_api_key";
+      if (/quota[ _-]?exceeded/i.test(value)) return "quota_exceeded";
+      return undefined;
+    },
+    isRetryableError: error => /retryable/i.test(JSON.stringify(error)),
+    openConfigPentestFallbackActive: () => profile === "pentest",
+    RETRYABLE_ERROR_PATTERNS: [/retrying/i, /endpoint unavailable/i],
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.canRetry = openConfigCanRetryFallbackError; globalThis.canRetryStatus = openConfigCanRetrySessionStatus;`, context);
+  return context;
+}
+
+function visibleOutputBundle(patched) {
+  const start = patched.indexOf("const openConfigVisibleAssistantOutputSessions = new Map;");
+  const end = patched.indexOf("// packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts", start);
+  assert.ok(start >= 0 && end > start, "patched visible-output event guard is present");
+  const context = {
+    Set,
+    Error,
+    getAssistantText(parts) {
+      return (parts ?? []).filter((part) => typeof part?.text === "string").map((part) => part.text).join("\n").trim();
+    },
+    extractSessionMessages(response) { return response?.data ?? response; },
+    getLastUserMessageIndex(messages) { return messages.findLastIndex((message) => message?.info?.role === "user"); },
+    resolveMessageEventSessionID(props) { return props?.sessionID ?? props?.info?.sessionID ?? props?.part?.sessionID; },
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.visible = hasVisibleAssistantResponse; globalThis.observe = openConfigObserveFallbackEvent; globalThis.clear = openConfigClearFallbackReplay;`, context);
+  return context;
+}
+
+function runtimeEventHandlerBundle(patched) {
+  const helperStart = patched.indexOf("const openConfigVisibleAssistantOutputSessions = new Map;");
+  const helperEnd = patched.indexOf("// packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts", helperStart);
+  const setup = patched.indexOf("const baseEventHandler = factories.createEventHandler(deps, helpers);");
+  const start = patched.indexOf("  const eventHandler = async ({ event }) => {", setup);
+  const end = patched.indexOf("  const dispose = () => {", start);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart && start >= 0 && end > start, "real runtime event handler is present");
+  const calls = [];
+  const eventDeps = { sessionStates: new Map() };
+  const context = {
+    Map, Set, Error,
+    getAssistantText(parts) { return (parts ?? []).filter((part) => typeof part?.text === "string").map((part) => part.text).join("\n").trim(); },
+    extractSessionMessages(response) { return response?.data ?? response; },
+    getLastUserMessageIndex(messages) { return messages.findLastIndex((message) => message?.info?.role === "user"); },
+    resolveMessageEventSessionID(props) { return props?.sessionID ?? props?.info?.sessionID ?? props?.part?.sessionID; },
+    resolveSessionEventID(props) { return props?.sessionID ?? props?.info?.id; },
+    extractAutoRetrySignal: ({ message }) => /retrying|endpoint (?:is )?unavailable/i.test(message ?? "") ? { signal: "retrying" } : undefined,
+    ensureInterval() { calls.push("interval"); },
+    config3: { enabled: true },
+    observeEventForWatchdog() {}, firstPromptWatchdog: {},
+    messageUpdateHandler: async () => calls.push("message.updated"),
+    baseEventHandler: async ({ event }) => calls.push(event.type),
+    deps: eventDeps,
+  };
+  vm.runInNewContext(`${patched.slice(helperStart, helperEnd)}\n${patched.slice(start, end)}\nglobalThis.eventHandler = eventHandler; globalThis.visible = hasVisibleAssistantResponse;`, context);
+  return { eventHandler: context.eventHandler, calls, visible: context.visible, context, eventDeps };
+}
+
+function messageUpdateHandlerBundle(patched, profile) {
+  const start = patched.indexOf("function createMessageUpdateHandler(deps, helpers)");
+  const end = patched.indexOf("\n// packages/", start + 10);
+  assert.ok(start >= 0 && end > start, "real message.updated handler is present");
+  const calls = [];
+  const sessionID = "ses_duplicate";
+  const deps = {
+    ctx: { directory: "/tmp" },
+    config: { timeout_seconds: 20, retry_on_errors: [408, 425, 429, 500, 502, 503, 504] },
+    pluginConfig: {},
+    sessionStates: new Map(),
+    sessionLastAccess: new Map(),
+    sessionRetryInFlight: new Set([sessionID]),
+    sessionAwaitingFallbackResult: new Set(),
+    sessionStatusRetryKeys: new Set(),
+  };
+  const helpers = {
+    abortSessionRequest: async (...args) => calls.push(["abort", ...args]),
+    clearSessionFallbackTimeout: () => calls.push(["clear-timeout"]),
+    resolveAgentForSessionFromContext: async () => "sisyphus",
+  };
+  const context = {
+    Map, Set, Error,
+    hasVisibleAssistantResponse: () => async () => false,
+    extractAutoRetrySignal: value => /retrying|endpoint (?:is )?unavailable/i.test(value?.message ?? value?.status ?? "") ? { signal: "retrying" } : undefined,
+    resolveMessageEventSessionID: props => props?.sessionID ?? props?.info?.sessionID,
+    containsErrorContent: () => ({ hasError: false }),
+    normalizeModelToCanonicalString: value => value,
+    log2() {},
+    HOOK_NAME13: "runtime-fallback",
+    process: { env: { OPENCONFIG_RUNTIME_PROFILE: profile } },
+  };
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.create = createMessageUpdateHandler;`, context);
+  return { handler: context.create(deps, helpers), calls, deps, sessionID };
 }
 
 function replaceExactlyOnce(text, from, to, label) {
@@ -546,6 +754,38 @@ function shouldRetryPrimaryBeforeFallback(state3, config3, options = {}) {
 /* OpenConfig runtime-fallback and canonical agent-model patch v3 */`;
 }
 
+function deployedV29StalePentestAliasFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(
+    text,
+    "OpenConfig runtime-fallback and canonical agent-model patch v31",
+    "OpenConfig runtime-fallback and canonical agent-model patch v29",
+    "v29 marker",
+  );
+  return replaceExactlyOnce(
+    text,
+    "/deepseek-v4-flash-0731-zdr-throughput/.test(model)",
+    "/deepseek-v4-flash-0731-zdr-floor/.test(model)",
+    "v29 stale pentest Flash alias",
+  );
+}
+
+function deployedV30StaleExploreHelperFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(
+    text,
+    "OpenConfig runtime-fallback and canonical agent-model patch v31",
+    "OpenConfig runtime-fallback and canonical agent-model patch v30",
+    "v30 marker",
+  );
+  return replaceExactlyOnce(
+    text,
+    "vulnerability\\s+(?:scan(?:ning)?|assessment|research|report)|find\\s+vulnerabilities|exploit(?:ation)?|recon(?:naissance)?|osint|forensic(?:s)?|security\\s+(?:audit|assessment|analysis|review|test(?:ing)?|research|scan(?:ning)?)",
+    "vulnerability\\s+(?:scan|assessment|research|report)|exploit(?:ation)?|recon(?:naissance)?|osint|forensic(?:s)?|security\\s+(?:audit|assessment|review|test(?:ing)?|research|scan)",
+    "v30 stale security intent regex",
+  );
+}
+
 test("central AgentOverridesSchema transform materializes canonical models without losing them", () => {
   const patched = applyCanonicalAgentModels(FIXTURE);
   const { overridesSchema } = schemaBundle(patched);
@@ -562,6 +802,405 @@ test("central AgentOverridesSchema transform materializes canonical models witho
     variant: "nitro",
   });
   assert.equal(applyCanonicalAgentModels(patched), patched, "central transform patch is idempotent");
+});
+
+test("direct explore rejects clear security and source-recovery work before dispatch", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const reject = restrictedExploreBundle(patched);
+  for (const prompt of [
+    "Locate TrellisTech pentest artifacts",
+    "Conduct a security audit of the exposed service",
+    "Recover the backend source from the archived deployment",
+    "Source recovery for the server-side application",
+    "Run vulnerability scanning against the API",
+    "Find vulnerabilities in the deployed service",
+    "Perform security analysis of the login flow",
+    "Backend source reconstruction from the build artifact",
+  ]) {
+    assert.throws(() => reject({ subagent_type: "explore", prompt }), /content-aware-fast or content-aware-deep/, prompt);
+  }
+  assert.throws(() => reject({ subagent_type: " Explore ", prompt: "Locate TrellisTech pentest artifacts" }), /content-aware-fast or content-aware-deep/, "explore aliases cannot bypass the pre-dispatch guard");
+  assert.doesNotThrow(() => reject({ subagent_type: "explore", prompt: "Where is function X defined?" }), "pure code-location work remains allowed");
+  assert.doesNotThrow(() => reject({ subagent_type: "explore", prompt: "Locate the security configuration function" }), "security vocabulary without clear assessment intent remains allowed");
+  assert.doesNotThrow(() => reject({ subagent_type: "content-aware-fast", prompt: "Locate TrellisTech pentest artifacts" }), "category routing is not rewritten or rejected");
+  const executeStart = patched.indexOf("async execute(args, toolContext) {");
+  const guard = patched.indexOf("openConfigRejectRestrictedExploreTask(args);", executeStart);
+  const preparation = patched.indexOf("const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx);", executeStart);
+  assert.ok(executeStart >= 0 && guard > executeStart && preparation > guard, "guard runs before argument preparation and dispatch");
+});
+
+test("v29 upgrade migrates stale governed pentest aliases to throughput and retains three Flash retries", () => {
+  const staleV29 = deployedV29StalePentestAliasFixture();
+  assert.throws(() => assertPatched(staleV29), /stale pentest ZDR Floor alias/, "stale aliases inside the governed retry matrix fail closed");
+  const upgraded = patchDist(staleV29);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v31/);
+  assert.doesNotMatch(upgraded.text.slice(
+    upgraded.text.indexOf("function configuredPrimaryRetryLimit(config3, state3) {"),
+    upgraded.text.indexOf("function openConfigMaxRecoveryDispatches() {"),
+  ), /deepseek-v4-(?:flash-0731|pro-0813)-zdr-floor/);
+  assertPatched(upgraded.text);
+  const { createState, prepare } = fallbackStateMachineBundle(upgraded.text, "pentest");
+  const flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput";
+  const state = createState(flash);
+  const config = { max_fallback_attempts: 3, cooldown_seconds: 0 };
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    assert.equal(prepare("ses_v29_upgrade", state, ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"], config).sameModelRetry, true, `Flash retry ${attempt}`);
+    state.pendingFallbackModel = undefined;
+  }
+  assert.equal(prepare("ses_v29_upgrade", state, ["openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"], config).newModel, "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput");
+  assert.equal(patchDist(upgraded.text).changed, false, "v31 output is idempotent");
+});
+
+test("v30 upgrade replaces the restricted explore helper with expanded semantics", () => {
+  const staleV30 = deployedV30StaleExploreHelperFixture();
+  assert.throws(() => assertPatched(staleV30), /restricted explore helper missing required semantics/, "v30 helper semantics fail closed before migration");
+  const upgraded = patchDist(staleV30);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v31/);
+  assert.equal(upgraded.text.split("function openConfigRejectRestrictedExploreTask(args)").length - 1, 1, "helper is replaced rather than duplicated");
+  const reject = restrictedExploreBundle(upgraded.text);
+  for (const prompt of [
+    "Locate TrellisTech pentest artifacts",
+    "Run vulnerability scanning against the API",
+    "Find vulnerabilities in the deployed service",
+    "Perform security analysis of the login flow",
+    "Backend source reconstruction from the build artifact",
+  ]) assert.throws(() => reject({ subagent_type: "explore", prompt }), /content-aware-fast or content-aware-deep/, prompt);
+  for (const prompt of ["Where is function X defined?", "Locate the security configuration function"]) {
+    assert.doesNotThrow(() => reject({ subagent_type: "explore", prompt }), prompt);
+  }
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v31 helper upgrade is idempotent");
+});
+
+test("category preflight preserves a syntactically valid canonical ZDR primary before cache fallback selection", async () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput";
+  const pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput";
+  const nonZdrFlash = "openrouter/deepseek/deepseek-v4-flash-0731-floor";
+  for (const [name, cachedModels] of [
+    ["mismatched cache", [nonZdrFlash, pro]],
+    ["exact cache", [flash, pro]],
+    ["fallback-only cache", [pro]],
+  ]) {
+    const bundle = categoryPreflightBundle(patched, cachedModels);
+    const resolved = await bundle.resolve({ category: "quick" });
+    assert.equal(resolved.actualModel, flash, `${name}: the canonical Flash ZDR alias remains the dispatch model`);
+    assert.deepEqual(JSON.parse(JSON.stringify(resolved.categoryModel)), {
+      providerID: "openrouter",
+      modelID: "deepseek/deepseek-v4-flash-0731-zdr-throughput",
+      reasoning: "low",
+    }, `${name}: no fallback child is selected during preflight`);
+    assert.deepEqual(JSON.parse(JSON.stringify(resolved.fallbackChain)), [{ model: pro, reasoning: "high" }], `${name}: Pro remains available only as the configured runtime fallback`);
+    assert.equal(bundle.resolverCalls, 0, `${name}: cache resolution cannot promote Pro before Flash dispatch`);
+  }
+});
+
+test("fault-injected root and delegated-child pentest fallback is Flash plus three retries, one Pro, then terminal", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  assertPatched(patched);
+  const { createState, prepare } = fallbackStateMachineBundle(patched);
+  const flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput";
+  const pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput";
+  const config = { same_model_retries_before_fallback: 3, max_fallback_attempts: 3, cooldown_seconds: 0 };
+  for (const sessionID of ["ses_root", "ses_delegated_child"]) {
+    const state = createState(flash);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const next = prepare(sessionID, state, [pro], config, { allowPrimaryRetry: true });
+      assert.deepEqual(JSON.parse(JSON.stringify(next)), { success: true, newModel: flash, sameModelRetry: true }, `${sessionID} Flash retry ${attempt}`);
+      assert.equal(state.attemptCount, 0, "same-model retries never consume a model transition");
+      assert.equal(state.primaryRetryCount, attempt);
+      state.pendingFallbackModel = undefined;
+    }
+    const proAttempt = prepare(sessionID, state, [pro], config, { allowPrimaryRetry: true });
+    assert.deepEqual(JSON.parse(JSON.stringify(proAttempt)), { success: true, newModel: pro });
+    assert.equal(state.attemptCount, 1, "only Flash → Pro counts as a model transition");
+    assert.equal(state.primaryRetryCount, 3);
+    state.pendingFallbackModel = undefined;
+    const terminal = prepare(sessionID, state, [pro], config, { allowPrimaryRetry: true });
+    assert.equal(terminal.success, false);
+    assert.equal(terminal.maxDispatchesReached, true, "initial plus three Flash retries plus Pro is the five-dispatch ceiling");
+  }
+
+  const duplicate = createState(flash);
+  prepare("ses_duplicate", duplicate, [pro], config, { allowPrimaryRetry: true });
+  const repeatedSignal = prepare("ses_duplicate", duplicate, [pro], config, { allowPrimaryRetry: true });
+  assert.equal(repeatedSignal.duplicate, true, "one upstream error reported twice cannot transition twice");
+  assert.equal(duplicate.primaryRetryCount, 1);
+  assert.equal(duplicate.attemptCount, 0);
+});
+
+test("pentest preserves its one-transition cap while normal keeps its configured transition budget", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput";
+  const pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput";
+  const config = { same_model_retries_before_fallback: 0, max_fallback_attempts: 3, cooldown_seconds: 0 };
+  const pentest = fallbackStateMachineBundle(patched, "pentest");
+  const pentestState = pentest.createState(flash);
+  for (let retry = 0; retry < 3; retry += 1) {
+    assert.equal(pentest.prepare("ses_pentest", pentestState, [pro], config).newModel, flash);
+    pentestState.pendingFallbackModel = undefined;
+  }
+  assert.equal(pentest.prepare("ses_pentest", pentestState, [pro], config).newModel, pro);
+  pentestState.pendingFallbackModel = undefined;
+  assert.equal(pentest.prepare("ses_pentest", pentestState, [pro], config).maxDispatchesReached, true);
+
+  const normal = fallbackStateMachineBundle(patched, "normal");
+  const normalState = normal.createState("openrouter/deepseek/deepseek-v4-pro-0813");
+  assert.equal(normal.prepare("ses_normal", normalState, [pro, "openrouter/z-ai/glm-5.3", "openrouter/minimax/minimax-m3"], config).newModel, pro);
+  normalState.pendingFallbackModel = undefined;
+  assert.equal(normal.prepare("ses_normal", normalState, [pro, "openrouter/z-ai/glm-5.3", "openrouter/minimax/minimax-m3"], config).newModel, "openrouter/z-ai/glm-5.3");
+});
+
+test("fault-injected retry signals accept transient 429/503 but reject unsafe failures", () => {
+  const { canRetry } = retryabilityBundle(patchDist(cleanOmo4194Source()).text);
+  const retryOn = [408, 429, 500, 502, 503, 504];
+  for (const error of [
+    { error: { data: { statusCode: 429, message: "nested rate limit" } } },
+    { data: { error: { statusCode: 503, message: "nested unavailable" } } },
+    { data: { message: "[503] request queue is full" } },
+    { error: { message: "Endpoint is unavailable" } },
+  ]) assert.equal(canRetry(error, retryOn), true, JSON.stringify(error));
+  for (const error of [
+    { data: { statusCode: 400, message: "Endpoint is unavailable" } },
+    { statusCode: 401, message: "retryable" },
+    { error: { statusCode: 403, message: "[503] request queue is full" } },
+    { status: "HTTP 400", message: "Endpoint is unavailable; retrying" },
+    { error: { statusCode: "401", message: "retryable endpoint unavailable" } },
+    { statusCode: 503, cause: { statusCode: "401" }, message: "Endpoint is unavailable" },
+    { name: "ProviderModelNotFoundError", message: "model not found" },
+    { name: "MissingApiKeyError", message: "Endpoint is unavailable" },
+    { name: "QuotaExceededError", message: "[503] request queue is full" },
+  ]) assert.equal(canRetry(error, retryOn), false, JSON.stringify(error));
+});
+
+test("per-model rung retries and recovery dispatches stay isolated per root or delegated session", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const cases = [
+    ["normal", "openrouter/deepseek/deepseek-v4-flash-0731", 2],
+    ["normal-private", "openrouter/z-ai/glm-5.3", 1],
+    ["normal", "openrouter/google/gemini-3.7-flash", 1],
+    ["normal", "openrouter/minimax/minimax-m3", 1],
+    ["normal", "subscription-gateway/gpt-5.6-sol", 1],
+    ["normal", "openrouter/moonshotai/kimi-k2.7-code", 0],
+    ["normal", "openrouter/google/gemini-3.1-pro-preview", 0],
+    ["normal", "openrouter/nousresearch/hermes-4-405b", 0],
+    ["normal", "openrouter/deepseek/deepseek-v4-pro-0813", 0],
+    ["pentest", "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput", 3],
+    ["pentest", "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput", 0],
+  ];
+  for (const [profile, model, retries] of cases) {
+    const { createState, prepare } = fallbackStateMachineBundle(patched, profile);
+    for (const sessionID of ["ses_root", "ses_child"]) {
+      const state = createState(model);
+      for (let index = 0; index < retries; index += 1) {
+        assert.equal(prepare(sessionID, state, ["openrouter/deepseek/deepseek-v4-pro-0813"], { max_fallback_attempts: 3, cooldown_seconds: 0 }).sameModelRetry, true, `${profile} ${model} retry ${index + 1}`);
+        state.pendingFallbackModel = undefined;
+      }
+      const next = prepare(sessionID, state, ["openrouter/deepseek/deepseek-v4-pro-0813"], { max_fallback_attempts: 3, cooldown_seconds: 0 });
+      assert.notEqual(next.sameModelRetry, true, `${profile} ${model} stops at exact retry limit`);
+      assert.ok((state.recoveryDispatchCount ?? 0) <= 4, `${sessionID} never exceeds four recoveries / five total dispatches`);
+    }
+  }
+  const { createState, prepare } = fallbackStateMachineBundle(patched, "normal");
+  const bounded = createState("openrouter/deepseek/deepseek-v4-flash-0731");
+  for (let index = 0; index < 2; index += 1) { prepare("ses_bound", bounded, ["openrouter/z-ai/glm-5.3"], { max_fallback_attempts: 3, cooldown_seconds: 0 }); bounded.pendingFallbackModel = undefined; }
+  prepare("ses_bound", bounded, ["openrouter/z-ai/glm-5.3"], { max_fallback_attempts: 3, cooldown_seconds: 0 }); bounded.pendingFallbackModel = undefined;
+  assert.equal(prepare("ses_bound", bounded, ["openrouter/z-ai/glm-5.3"], { max_fallback_attempts: 3, cooldown_seconds: 0 }).sameModelRetry, true);
+  bounded.pendingFallbackModel = undefined;
+  assert.equal(prepare("ses_bound", bounded, ["openrouter/z-ai/glm-5.3"], { max_fallback_attempts: 3, cooldown_seconds: 0 }).maxDispatchesReached, true);
+});
+
+test("every profile rejects fatal nested errors before retrying or transitioning", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const normal = retryabilityBundle(patched, "normal");
+  const pentest = retryabilityBundle(patched, "pentest");
+  for (const policy of [normal, pentest]) {
+    assert.equal(policy.canRetryStatus(true, "HTTP 403 endpoint unavailable", [429, 503]), false, "403 takes absolute precedence over a retry signal");
+    assert.equal(policy.canRetry({ error: { statusCode: 403, message: "[503] queue full" } }, [429, 503]), false, "nested 403 cannot become retryable through a nested 503 string");
+    assert.equal(policy.canRetry({ error: { statusCode: 402, message: "max price exceeded" }, cause: { statusCode: 503 } }, [429, 503]), false, "nested 402 max-price failure dominates a nested 503");
+    assert.equal(policy.canRetry({ error: { statusCode: 404, message: "no provider available" }, cause: { statusCode: 503 } }, [429, 503]), false, "nested 404 no-provider failure dominates a nested 503");
+    assert.equal(policy.canRetry({ error: { statusCode: 401, message: "retryable" } }, [429, 503]), false, "nested auth failure is terminal");
+    assert.equal(policy.canRetry({ name: "MissingApiKeyError", message: "endpoint unavailable" }, [429, 503]), false, "fatal provider configuration errors are terminal");
+    assert.equal(policy.canRetry({ name: "AbortError", message: "retryable" }, [429, 503]), false, "abort is terminal");
+    assert.equal(policy.canRetry({ name: "ContextOverflowError", message: "retryable" }, [429, 503]), false, "context overflow is terminal");
+    for (const status of [400, 401, 403, 404]) {
+      assert.equal(policy.canRetry(`HTTP ${status} endpoint unavailable [503] queue full`, [429, 503]), false, `raw HTTP ${status} dominates a bracketed 503`);
+      assert.equal(policy.canRetry({ message: `HTTP ${status} endpoint unavailable [503] queue full` }, [429, 503]), false, `message-only HTTP ${status} dominates a bracketed 503`);
+      assert.equal(policy.canRetry({ error: `HTTP ${status} endpoint unavailable [503] queue full` }, [429, 503]), false, `nested error string HTTP ${status} dominates a bracketed 503`);
+      assert.equal(policy.canRetry({ cause: `HTTP ${status} endpoint unavailable [503] queue full` }, [429, 503]), false, `nested cause string HTTP ${status} dominates a bracketed 503`);
+    }
+    assert.equal(policy.canRetry({ error: "provider [503] queue full" }, [429, 503]), true, "mid-message bracketed transient status remains retryable");
+    assert.equal(policy.canRetry(new Error("HTTP 403 endpoint unavailable"), [429, 503]), false, "non-enumerable Error.message fatal status is terminal");
+    assert.equal(policy.canRetry(new Error("HTTP 503 endpoint unavailable"), [429, 503]), true, "non-enumerable Error.message transient status retries");
+    assert.equal(policy.canRetry(new Error("wrapper", { cause: new Error("HTTP 404 no provider") }), [429, 503]), false, "non-enumerable Error.cause fatal status is terminal");
+    for (const status of [500, 502, 504]) {
+      assert.equal(policy.canRetry({ error: { code: status, message: "provider transient" } }, [408, 425, 429, 500, 502, 503, 504]), true, `nested code ${status} remains retryable after fatal-status priority`);
+    }
+  }
+  assert.equal(normal.canRetry({ error: { statusCode: 503, message: "Endpoint unavailable" } }, [429, 503]), true, "transient 503 remains retryable");
+});
+
+test("normal uses the same durable replay and output guards as pentest", () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  assert.match(patched, /OpenConfig strict fallback classifier v20/);
+  assert.equal(patched.includes("if (!openConfigPentestFallbackActive()) return isRetryableError(error, retryOnErrors);"), false, "normal cannot bypass strict nested-error classification");
+  assert.equal(patched.includes("if (!openConfigPentestFallbackActive()) {\n        const fetchedParts = originalRetryMetadata.parts"), false, "normal cannot synthesize a replay without a durable user message");
+  assert.equal(patched.includes("openConfigPentestFallbackActive() && await"), false, "visible assistant output blocks replay in normal too");
+  const normal = fallbackStateMachineBundle(patched, "normal");
+  const state = normal.createState("openrouter/deepseek/deepseek-v4-flash-0731");
+  const config = { same_model_retries_before_fallback: 3, max_fallback_attempts: 3, cooldown_seconds: 0 };
+  assert.equal(normal.prepare("ses_normal", state, ["openrouter/fallback"], config, { allowPrimaryRetry: true }).sameModelRetry, true);
+  assert.equal(normal.prepare("ses_normal", state, ["openrouter/fallback"], config, { allowPrimaryRetry: true }).duplicate, true, "a pending normal retry cannot be duplicated");
+});
+
+test("real message.updated handler never aborts or clears an in-flight retry signal in either profile", async () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  for (const profile of ["normal", "pentest"]) {
+    const { handler, calls, deps, sessionID } = messageUpdateHandlerBundle(patched, profile);
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openrouter/primary",
+        error: { statusCode: 503, message: "Endpoint is unavailable; retrying" },
+      },
+    });
+    assert.deepEqual(calls, [], `${profile}: duplicate retry signal causes no abort/timeout mutation`);
+    assert.equal(deps.sessionRetryInFlight.has(sessionID), true, `${profile}: in-flight retry remains latched`);
+  }
+});
+
+test("event-driven root and delegated assistant errors block every replay path after semantic output", async () => {
+  const patched = patchDist(cleanOmo4194Source()).text;
+  const { visible, observe, clear } = visibleOutputBundle(patched);
+  const retrySignal = ({ message }) => /retrying|endpoint (?:is )?unavailable/i.test(message ?? "") ? { signal: "retrying" } : undefined;
+  const calls = [];
+  const ctx = {
+    directory: "/tmp",
+    client: { session: { messages: async ({ path }) => {
+      calls.push(path.id);
+      return [{ info: { role: "user" } }];
+    } } },
+  };
+  const check = visible(retrySignal);
+  const semanticError = { role: "assistant", error: { statusCode: 503 }, parts: [{ type: "text", text: "I found a real authorization boundary issue." }] };
+  assert.equal(await check(ctx, "ses_root", semanticError, semanticError.parts), true, "message.updated root semantic error blocks replay without a stale refetch");
+  assert.equal(calls.length, 0);
+  assert.equal(await check(ctx, "ses_root"), true, "session.timeout sees the root event's durable semantic-output guard");
+
+  const toolError = { role: "assistant", error: { statusCode: 503 }, parts: [{ type: "tool-call", tool: "bash" }] };
+  assert.equal(observe({ sessionID: "ses_delegated_child", info: toolError, part: { sessionID: "ses_delegated_child", type: "tool-call", tool: "bash" } }, retrySignal), true, "message.part.delta latches delegated tool output before persistence");
+  assert.equal(await check(ctx, "ses_delegated_child", toolError, toolError.parts), true, "session.error blocks delegated replay from current event parts");
+  assert.equal(await check(ctx, "ses_delegated_child"), true, "timeout blocks delegated replay after the emitted tool delta");
+
+  const pureRetry = { role: "assistant", error: { statusCode: 503 }, parts: [{ type: "text", text: "Endpoint is unavailable; retrying" }] };
+  assert.equal(await check(ctx, "ses_pure_retry", pureRetry, pureRetry.parts), false, "pure retry-signal text is not semantic output");
+  const mixedRetry = { role: "assistant", error: { statusCode: 503 }, parts: [{ type: "text", text: "I found a real authorization flaw. Service unavailable; try again." }] };
+  assert.equal(await check(ctx, "ses_mixed_retry", mixedRetry, mixedRetry.parts), true, "semantic text plus retry wording blocks replay");
+
+  observe({ sessionID: "ses_root", info: { role: "user", id: "usr_second_turn" } }, retrySignal);
+  assert.equal(await check(ctx, "ses_root"), false, "a new durable user turn resets the root latch");
+  clear("ses_delegated_child");
+  assert.equal(await check(ctx, "ses_delegated_child"), false, "session cleanup clears the delegated latch");
+});
+
+test("actual runtime event handler latches part deltas before the error and timeout races", async () => {
+  const { eventHandler, calls, visible } = runtimeEventHandlerBundle(patchDist(cleanOmo4194Source()).text);
+  const ctx = { directory: "/tmp", client: { session: { messages: async () => [{ info: { role: "user" } }] } } };
+  const checker = visible(({ message }) => /retrying|endpoint (?:is )?unavailable/i.test(message ?? "") ? { signal: "retrying" } : undefined);
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_root", messageID: "asst_root", field: "text", delta: "Authorization flaw confirmed" },
+  } });
+  assert.equal(await checker(ctx, "ses_root"), true, "part delta wins before unpersisted session.error");
+  await eventHandler({ event: { type: "session.error", properties: { sessionID: "ses_root" } } });
+  assert.ok(calls.includes("session.error"));
+  assert.equal(await checker(ctx, "ses_root"), true, "timeout callback still sees the latched root turn");
+
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_split_retry", messageID: "asst_split_retry", field: "text", delta: "Endpoint is " },
+  } });
+  assert.equal(await checker(ctx, "ses_split_retry"), false, "a retry-signal prefix remains provisional until its text is complete");
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_split_retry", messageID: "asst_split_retry", field: "text", delta: "unavailable; retrying" },
+  } });
+  assert.equal(await checker(ctx, "ses_split_retry"), false, "split exact pure retry signal never creates a semantic-output latch");
+
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_split_mixed", messageID: "asst_split_mixed", field: "text", delta: "Endpoint is " },
+  } });
+  assert.equal(await checker(ctx, "ses_split_mixed"), false, "mixed text remains provisional while it is still a retry-only prefix");
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_split_mixed", messageID: "asst_split_mixed", field: "text", delta: "unavailable; retrying. Authorization flaw confirmed" },
+  } });
+  assert.equal(await checker(ctx, "ses_split_mixed"), true, "mixed split text latches as soon as the completed buffer is no longer pure retry output");
+
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_completed_part", messageID: "asst_completed_part", partID: "prt_completed_text", field: "text", delta: "Endpoint is " },
+  } });
+  await eventHandler({ event: {
+    type: "message.part.updated",
+    properties: { part: { id: "prt_completed_text", sessionID: "ses_completed_part", messageID: "asst_completed_part", type: "text", text: "Endpoint is unavailable; retrying" } },
+  } });
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_completed_part", messageID: "asst_completed_part", partID: "prt_completed_text", field: "text", delta: "Endpoint is " },
+  } });
+  assert.equal(await checker(ctx, "ses_completed_part"), false, "matching top-level delta partID and completed part.id discard stale buffered text");
+
+  await eventHandler({ event: {
+    type: "message.part.updated",
+    properties: { part: { sessionID: "ses_child", messageID: "asst_child", type: "text", text: "Endpoint is unavailable; retrying" } },
+  } });
+  assert.equal(await checker(ctx, "ses_child"), false, "pure retry-only child delta does not latch");
+  await eventHandler({ event: {
+    type: "message.part.updated",
+    properties: { part: { sessionID: "ses_child", messageID: "asst_child_tool", type: "tool-call" } },
+  } });
+  assert.equal(await checker(ctx, "ses_child"), true, "tool update without info.role latches");
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID: "ses_reasoning", messageID: "asst_reasoning", field: "reasoning", delta: "I verified the bypass." },
+  } });
+  assert.equal(await checker(ctx, "ses_reasoning"), true, "reasoning delta without info.role latches");
+});
+
+test("replayed durable user events preserve recovery state and output latch until a distinct turn resets both", async () => {
+  const { eventHandler, eventDeps, visible } = runtimeEventHandlerBundle(patchDist(cleanOmo4194Source()).text);
+  const sessionID = "ses_replayed_user_turn";
+  const recoveryState = { recoveryDispatchCount: 4, rungRetryCount: 2 };
+  const ctx = { directory: "/tmp", client: { session: { messages: async () => [{ info: { role: "user" } }] } } };
+  const checker = visible(({ message }) => /retrying|endpoint (?:is )?unavailable/i.test(message ?? "") ? { signal: "retrying" } : undefined);
+  eventDeps.sessionStates.set(sessionID, recoveryState);
+  const userEvent = messageID => eventHandler({ event: {
+    type: "message.updated",
+    properties: { sessionID, info: { role: "user", id: messageID } },
+  } });
+
+  await userEvent("usr_durable_1");
+  // A new durable turn intentionally starts clean; restore the state as the
+  // message handler would after the initial dispatch, then replay that event.
+  eventDeps.sessionStates.set(sessionID, recoveryState);
+  await eventHandler({ event: {
+    type: "message.part.delta",
+    properties: { sessionID, messageID: "asst_semantic", field: "text", delta: "A semantic finding was produced." },
+  } });
+  assert.equal(await checker(ctx, sessionID), true, "semantic output latches the durable user turn");
+  await userEvent("usr_durable_1");
+  assert.equal(eventDeps.sessionStates.get(sessionID), recoveryState, "same message.updated replay keeps the bounded recovery counter");
+  assert.equal(eventDeps.sessionStates.get(sessionID).recoveryDispatchCount, 4, "replay cannot reopen a fifth recovery / sixth dispatch");
+  assert.equal(await checker(ctx, sessionID), true, "same durable user replay preserves strict visible-output and dedup latches");
+
+  await userEvent("usr_durable_2");
+  assert.equal(eventDeps.sessionStates.has(sessionID), false, "only a distinct durable user message starts a new session-turn state");
+  assert.equal(await checker(ctx, sessionID), false, "distinct durable user turn clears the semantic-output latch");
 });
 
 test("fresh relevant-region fixture is grounded in the checked clean OmO 4.19.4 source", () => {

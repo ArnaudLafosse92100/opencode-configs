@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -45,7 +47,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-fast", "load_skills": ["content-aware-recon"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-flash-0731",
+                "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -66,7 +68,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "z-ai/glm-5.3",
+                "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -76,19 +78,53 @@ class GradeTests(unittest.TestCase):
         self.assertFalse(grade["explicit_skill_loaded"])
         self.assertTrue(grade["checks"]["specialization_contract"])
 
-    def test_configured_fallback_model_is_accepted(self) -> None:
+    def test_flash_only_terminal_model_is_accepted(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recon")
         evidence = {
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "z-ai/glm-5.3",
+                "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
         }
         self.assertTrue(runner.grade(case, evidence)["passed"])
+
+    def test_normal_profile_accepts_declared_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {"OC_RUNTIME_STATE_DIR": state}, clear=False
+        ):
+            suite = runner.load_cases()
+        self.assertEqual(suite["active_profile"], "normal")
+        case = next(case for case in suite["cases"] if case["id"] == "security-recon")
+        fallback = case["expected_routes"][1]
+        self.assertEqual(
+            fallback,
+            {"provider": "openrouter", "model": "deepseek/deepseek-v4-pro-0813"},
+        )
+        evidence = {
+            "root": {"agent": "codex-router"},
+            "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
+            "children": [{
+                "terminal_provider": fallback["provider"],
+                "terminal_model": fallback["model"],
+                "terminal_finish": "stop",
+                "terminal_error": None,
+            }],
+        }
+        self.assertTrue(runner.grade(case, evidence)["passed"])
+
+    def test_normal_private_composes_normal_routes_without_subscription_gateway(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {"OC_RUNTIME_STATE_DIR": state}, clear=False
+        ):
+            pathlib.Path(state, "active-profile").write_text("normal-private\n", encoding="utf-8")
+            suite = runner.load_cases()
+        self.assertEqual(suite["active_profile"], "normal-private")
+        for case in suite["cases"]:
+            self.assertNotIn("subscription-gateway", [route["provider"] for route in case["expected_routes"]])
 
     def test_service_role_recovery_case_requires_content_aware_deep(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recovery-deep")
@@ -100,7 +136,7 @@ class GradeTests(unittest.TestCase):
             "tasks": [{"category": "content-aware-deep", "load_skills": ["content-aware-audit"], "status": "completed"}],
             "children": [{
                 "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-pro-0813",
+                "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],
@@ -117,12 +153,13 @@ class GradeTests(unittest.TestCase):
 
     def test_accepts_category_without_a_skill_contract(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "architecture-review")
+        expected_route = case["expected_routes"][0]
         evidence = {
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "arch-review", "load_skills": [], "status": "completed"}],
             "children": [{
-                "terminal_provider": "openrouter",
-                "terminal_model": "deepseek/deepseek-v4-pro-0813",
+                "terminal_provider": expected_route["provider"],
+                "terminal_model": expected_route["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
             }],

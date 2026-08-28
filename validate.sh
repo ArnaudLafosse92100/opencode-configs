@@ -116,19 +116,82 @@ if oc:
     flash = models.get("deepseek/deepseek-v4-flash-0731")
     if not isinstance(flash, dict):
         err("opencode.json: exact DeepSeek V4 Flash 0731 model definition missing")
-    elif flash.get("id") != "deepseek/deepseek-v4-flash-0731:nitro":
-        err("opencode.json: DeepSeek V4 Flash 0731 must use the :nitro API id")
+    elif flash.get("id") != "deepseek/deepseek-v4-flash-0731:floor":
+        err("opencode.json: normal DeepSeek V4 Flash 0731 must use the price-first :floor API id")
     else:
-        ok("DeepSeek V4 Flash 0731 Nitro definition exact")
+        ok("DeepSeek V4 Flash 0731 normal Floor definition exact")
+    flash_throughput = models.get("deepseek/deepseek-v4-flash-0731-zdr-throughput")
+    if not isinstance(flash_throughput, dict):
+        err("opencode.json: pentest DeepSeek V4 Flash 0731 ZDR Throughput definition missing")
+    elif flash_throughput.get("id") != "deepseek/deepseek-v4-flash-0731":
+        err("opencode.json: pentest DeepSeek V4 Flash 0731 ZDR Throughput must use the base API id")
+    else:
+        throughput_provider = ((flash_throughput.get("options") or {}).get("provider") or {})
+        expected_throughput_price = {"prompt": 0.50, "completion": 1.50}
+        if (
+            throughput_provider.get("sort") != "throughput"
+            or throughput_provider.get("max_price") != expected_throughput_price
+            or throughput_provider.get("allow_fallbacks") is not True
+            or throughput_provider.get("require_parameters") is not True
+            or throughput_provider.get("data_collection") != "deny"
+            or throughput_provider.get("zdr") is not True
+            or "only" in throughput_provider
+        ):
+            err("opencode.json: pentest Flash ZDR Throughput must be throughput-sorted, ZDR-strict, uncapped by provider.only, fallback-enabled, parameter-required, collection-denied, and capped at $0.50/$1.50 per million")
+        else:
+            ok("DeepSeek V4 Flash 0731 ZDR Throughput definition exact and throughput-capped")
     pro = models.get("deepseek/deepseek-v4-pro-0813")
     if not isinstance(pro, dict):
         err("opencode.json: exact DeepSeek V4 Pro 0813 model definition missing")
-    elif pro.get("id") != "deepseek/deepseek-v4-pro-0813":
-        err("opencode.json: DeepSeek V4 Pro must pin the exact 0813 API id")
+    elif pro.get("id") != "deepseek/deepseek-v4-pro-0813:floor":
+        err("opencode.json: normal DeepSeek V4 Pro must use the price-first :floor API id")
     elif pro.get("tool_call") is not True or pro.get("reasoning") is not True:
         err("opencode.json: DeepSeek V4 Pro 0813 must remain tool/reasoning capable")
     else:
-        ok("DeepSeek V4 Pro 0813 definition exact and tool-capable")
+        ok("DeepSeek V4 Pro 0813 normal Floor definition exact and tool-capable")
+    pro_throughput = models.get("deepseek/deepseek-v4-pro-0813-zdr-throughput")
+    if not isinstance(pro_throughput, dict):
+        err("opencode.json: pentest DeepSeek V4 Pro 0813 ZDR Throughput definition missing")
+    elif pro_throughput.get("id") != "deepseek/deepseek-v4-pro-0813":
+        err("opencode.json: pentest DeepSeek V4 Pro 0813 ZDR Throughput must use the base API id")
+    else:
+        pro_throughput_provider = ((pro_throughput.get("options") or {}).get("provider") or {})
+        expected_pro_throughput_price = {"prompt": 1.50, "completion": 4.50}
+        if (
+            pro_throughput_provider.get("sort") != "throughput"
+            or pro_throughput_provider.get("max_price") != expected_pro_throughput_price
+            or pro_throughput_provider.get("allow_fallbacks") is not True
+            or pro_throughput_provider.get("require_parameters") is not True
+            or pro_throughput_provider.get("data_collection") != "deny"
+            or pro_throughput_provider.get("zdr") is not True
+            or "only" in pro_throughput_provider
+        ):
+            err("opencode.json: pentest Pro 0813 ZDR Throughput must be throughput-sorted, ZDR-strict, uncapped by provider.only, fallback-enabled, parameter-required, collection-denied, and capped at $1.50/$4.50 per million")
+        else:
+            ok("DeepSeek V4 Pro 0813 ZDR Throughput definition exact and throughput-capped")
+    normal_price_caps = {
+        "z-ai/glm-5.3": (True, 1.40, 4.40),
+        "google/gemini-3.1-pro-preview": (False, 3.60, 21.60),
+        "google/gemini-3.7-flash": (False, 1.35, 6.75),
+        "moonshotai/kimi-k2.7-code": (False, 0.95, 4.00),
+        "minimax/minimax-m3": (True, 0.30, 1.20),
+        "deepseek/deepseek-v4-pro-0813": (False, 1.32, 3.96),
+        "deepseek/deepseek-v4-flash-0731": (False, 0.10, 0.30),
+        "nousresearch/hermes-4-405b": (False, 1.00, 3.00),
+    }
+    for model_id, (require_parameters, prompt_price, completion_price) in normal_price_caps.items():
+        provider_policy = (((models.get(model_id) or {}).get("options") or {}).get("provider") or {})
+        if (
+            provider_policy.get("require_parameters") is not require_parameters
+            or provider_policy.get("data_collection") != "allow"
+            or provider_policy.get("allow_fallbacks") is not True
+            or provider_policy.get("sort") != "price"
+            or provider_policy.get("max_price") != {"prompt": prompt_price, "completion": completion_price}
+            or "only" in provider_policy
+        ):
+            err(f"opencode.json[{model_id}]: normal route must be price-first, capped, collection-allowed, fallback-enabled, and unpinned")
+        else:
+            ok(f"normal OpenRouter cap/policy exact: {model_id}")
     # Whitelist must match models{} keys (orphans / missing entries cause silent routing gaps).
     wl = prov.get("whitelist")
     if isinstance(wl, list):
@@ -165,11 +228,26 @@ if oc:
         # Live-provider pins ported from upstream 1.5.60, adapted for the local
         # mixed OpenRouter + subscription-gateway stack. GLM 5.3 intentionally
         # remains unpinned: a stale GLM provider.only roster blackholes it.
+        is_pentest_throughput = mid in {"deepseek/deepseek-v4-flash-0731-zdr-throughput", "deepseek/deepseek-v4-pro-0813-zdr-throughput"}
+        is_normal_price_capped = mid in normal_price_caps
         want_only = {
             "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
             "minimax": ["gmicloud", "novita", "deepinfra", "together"],
         }.get(fam)
-        if want_only is not None:
+        if is_pentest_throughput:
+            if pv.get("only"):
+                err(f"opencode.json[{mid}]: pentest Throughput model must not set provider.only")
+            if pv.get("require_parameters") is not True:
+                err(f"opencode.json[{mid}]: pentest Throughput provider.require_parameters must be true")
+            expected_collection = "deny"
+            if pv.get("data_collection") != expected_collection:
+                err(f"opencode.json[{mid}]: pentest Throughput provider.data_collection must be {expected_collection}")
+            if pv.get("zdr") is not True:
+                err(f"opencode.json[{mid}]: ZDR must be true for every pentest Throughput alias")
+        elif is_normal_price_capped:
+            if pv.get("only"):
+                err(f"opencode.json[{mid}]: normal price-capped route must not pin provider.only")
+        elif want_only is not None:
             if pv.get("only") != want_only:
                 err(f"opencode.json[{mid}]: {fam} must pin provider.only={want_only} (live-verified unmoderated hosts, no fp4). Run: oc fix")
             if fam == "deepseek":
@@ -212,7 +290,7 @@ if oc:
             sort = pv.get("sort")
             if sort in ("price", "latency", "exacto"):
                 err(f"opencode.json[{mid}]: provider.sort={sort!r} fights Nitro throughput routing — remove sort (or use :nitro only).")
-            if sort == "throughput":
+            if sort == "throughput" and str(api_id).endswith(":nitro"):
                 warn(f"opencode.json[{mid}]: provider.sort='throughput' is redundant with id ':nitro' — drop sort.")
         # Claude and DeepSeek have first-party endpoints reporting quant 'unknown'
         # (DeepSeek first-party is the cheapest + best cache) — filtering without
@@ -509,8 +587,8 @@ if omo:
             default_profile = (json.load(open(runtime_profile_path)).get("default_profile") or "normal").strip()
         except Exception:
             default_profile = "invalid"
-    if default_profile not in ("normal", "pentest"):
-        err(f"runtime-profile.json default_profile must be normal or pentest (got {default_profile!r})")
+    if default_profile not in ("normal", "normal-private", "pentest"):
+        err(f"runtime-profile.json default_profile must be normal, normal-private, or pentest (got {default_profile!r})")
     else:
         ok(f"source defaults to runtime profile {default_profile!r}")
 
@@ -555,39 +633,27 @@ if omo:
         pcfg = provider_configs.get(provider) or {}
         return (pcfg.get("models") or {}).get(model_id)
     normal_profile = _normalize_profile(runtime_profile_data.get("normal") if isinstance(runtime_profile_data, dict) else {})
+    normal_private_profile = _normalize_profile(runtime_profile_data.get("normal-private") if isinstance(runtime_profile_data, dict) else {})
     pentest_profile = _normalize_profile(runtime_profile_data.get("pentest") if isinstance(runtime_profile_data, dict) else {})
     selected_profile = _normalize_profile(selected_profile)
-    pentest_pro_routes = {
-        ("agents", "hephaestus"),
-        ("agents", "oracle"),
-        ("agents", "momus"),
-        ("agents", "content-aware-research"),
-        ("categories", "deep"),
-        ("categories", "unspecified-high"),
-        ("categories", "arch-review"),
-        ("categories", "content-aware-deep"),
-    }
     pentest_pro = "openrouter/deepseek/deepseek-v4-pro-0813"
-    pentest_flash = "openrouter/deepseek/deepseek-v4-flash-0731"
-    pentest_glm = "openrouter/z-ai/glm-5.3"
+    pentest_pro_throughput = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+    pentest_flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
     for section in ("agents", "categories"):
         for name, cfg in ((pentest_profile or {}).get(section) or {}).items():
             primary = str((cfg or {}).get("model") or "")
             fallbacks = [str(x) for x in ((cfg or {}).get("fallback_models") or [])]
-            route = (section, name)
-            if route == ("categories", "ultrabrain"):
-                expected_primary, expected_fallbacks = pentest_glm, [pentest_pro]
-            elif route in pentest_pro_routes:
-                expected_primary, expected_fallbacks = pentest_pro, [pentest_glm]
-            else:
-                expected_primary, expected_fallbacks = pentest_flash, [pentest_glm]
+            expected_primary, expected_fallbacks = pentest_flash, [pentest_pro_throughput]
             if primary != expected_primary or fallbacks != expected_fallbacks:
                 err(
                     f"runtime-profile.json[pentest.{section}.{name}]: capability lane must be "
                     f"{expected_primary} with fallbacks {expected_fallbacks}"
                 )
     if pentest_profile:
-        ok("pentest profile separates Flash economy, Pro depth, and GLM ultrabrain lanes")
+        for field in ("small_model", "helper_model"):
+            if pentest_profile.get(field) != pentest_flash:
+                err(f"runtime-profile.json[pentest.{field}]: must use {pentest_flash}")
+        ok("pentest profile routes every lane from DeepSeek V4 Flash 0731 ZDR Throughput to Pro 0813 ZDR Throughput")
     normal_ca_deep = (((normal_profile or {}).get("categories") or {}).get("content-aware-deep") or {})
     if normal_profile and normal_ca_deep.get("model") != pentest_pro:
         err("runtime-profile.json[normal.categories.content-aware-deep]: primary must be DeepSeek V4 Pro 0813")
@@ -613,7 +679,7 @@ if omo:
     ok("normal profile vision chains stay attachment-capable")
     # Tool-using routes must not fall back to a no-tools model. Hermes is allowed
     # only for content-aware-research, where edit/tools are intentionally denied.
-    capability_profiles = [("normal", normal_profile), ("pentest", pentest_profile)]
+    capability_profiles = [("normal", normal_profile), ("normal-private", normal_private_profile), ("pentest", pentest_profile)]
     for profile_name, profile in capability_profiles:
         for section in ("agents", "categories"):
             for name, cfg in ((profile or {}).get(section) or {}).items():
@@ -855,10 +921,11 @@ if omo:
                 if isinstance(fb, str):
                     ref_ids.add(fb)
     mc_keys = set(mc)
-    if mc.get("openrouter/deepseek/deepseek-v4-pro-0813") != 5:
-        err("modelConcurrency DeepSeek V4 Pro 0813 must be 5 — run: oc fix")
+    if (mc.get("openrouter/deepseek/deepseek-v4-pro-0813") != 5
+            or mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput") != 5):
+        err("modelConcurrency DeepSeek V4 Pro 0813 and ZDR Throughput must be 5 — run: oc fix")
     else:
-        ok("modelConcurrency DeepSeek V4 Pro 0813=5")
+        ok("modelConcurrency DeepSeek V4 Pro 0813 and ZDR Throughput=5")
     miss_mc = sorted(i for i in ref_ids if not (_mc_aliases(i) & mc_keys))
     if miss_mc:
         warn(f"modelConcurrency missing {len(miss_mc)} model(s): {', '.join(miss_mc[:5])}"

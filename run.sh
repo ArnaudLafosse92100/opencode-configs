@@ -70,6 +70,7 @@ esac
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
 oc_load_runtime_profile_env "$REPO/runtime-profile.sh" || exit 1
+oc_apply_profile_retry_policy || exit 1
 
 # `bunx oh-my-openagent run` launches the OpenCode binary by name. Desktop
 # shells normally add this directory through zshrc, but a headless run (or the

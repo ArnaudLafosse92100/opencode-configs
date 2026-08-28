@@ -55,7 +55,8 @@ def runtime_routing(repo: Path) -> str:
         [
             "",
             "Fallback order and reasoning remain machine-readable through "
-            "`oc profile resolve <normal|pentest> <agents|categories> <name>`.",
+            "`oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. "
+            "`normal-private` composes normal routes with subscription-gateway removed and OpenRouter ZDR constraints.",
             ROUTING_END,
         ]
     )

@@ -167,18 +167,20 @@ else
   bad "zsh wrapper profile snapshot failure handling"
 fi
 
-# Compatibility homes keep raw OpenCode away from the immutable checkout.  Use
-# a fully isolated runtime/native state and exercise normal -> pentest -> normal.
+# Compatibility homes keep raw OpenCode away from the immutable checkout. Use
+# a fully isolated runtime/native state and exercise every profile lifecycle.
 COMPAT_STATE="$TMP/compat-state"
 COMPAT_NATIVE="$TMP/compat-native/omo.jsonc"
 compat_env=(OC_RUNTIME_STATE_DIR="$COMPAT_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/compat-prompts" OC_NATIVE_OMO_PATH="$COMPAT_NATIVE")
 compat_normal="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env)"
+compat_private="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env normal-private)"
 compat_pentest="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env pentest)"
 compat_back="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env normal)"
 if printf '%s' "$compat_normal" | grep -q 'compat/generations/normal-' \
+  && printf '%s' "$compat_private" | grep -q 'compat/generations/normal-private-' \
   && printf '%s' "$compat_pentest" | grep -q 'compat/generations/pentest-' \
   && printf '%s' "$compat_back" | grep -q 'compat/generations/normal-'; then
-  ok "compat profile resolver switches normal -> pentest -> normal"
+  ok "compat profile resolver switches normal -> normal-private -> pentest -> normal"
 else bad "compat profile resolver profile switch"; fi
 compat_current="$COMPAT_STATE/compat/current"
 runtime_normal="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" path normal)"
@@ -224,8 +226,9 @@ then
   ok "concurrent profile snapshot never mixes runtime and compat generations"
 else bad "profile snapshot concurrency coherence"; fi
 if [[ "$(grep -c 'runtime-profile.sh snapshot' "$REPO/doctor.sh")" -eq 1 ]] \
+  && grep -q '"normal-private"' "$REPO/doctor.sh" \
   && ! grep -Eq 'runtime-profile\.sh (show|applied|identity)' "$REPO/doctor.sh"; then
-  ok "OpenConfig doctor consumes one atomic profile snapshot"
+  ok "OpenConfig doctor consumes one atomic profile snapshot and accepts normal-private"
 else bad "OpenConfig doctor atomic snapshot consumer"; fi
 compat_config_dir="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["configDir"])' <<<"$compat_back")"
 repo_hash_before_raw="$(git -C "$REPO" hash-object opencode.json)"
@@ -518,7 +521,10 @@ elif kind=='forged-generation':
 elif kind=='other-diff':
     value['[opencode]']['categories']['quick']['model']='unexpected/model'
 elif kind=='fallback-order':
-    value['[opencode]']['categories']['quick']['fallback_models'].reverse()
+    # `quick` currently has one fallback, so reversing it was a no-op and made
+    # this negative fixture fail for the wrong reason. codex-router has at
+    # least two ordered fallbacks in the normal profile.
+    value['[opencode]']['agents']['codex-router']['fallback_models'].reverse()
 elif kind=='reasoning-drift':
     value['[opencode]']['agents']['sisyphus']['reasoning']='high'
 elif kind=='temperature-drift':
@@ -618,11 +624,21 @@ case "$*" in
     [ -f "$state" ] && count="$(cat "$state")"
     if [ "${FAKE_STALE_INSTANCE:-0}" = 1 ] && [ -f "$state.previous" ]; then count="$(cat "$state.previous")"; fi
     instance="$(printf '00000000-0000-4000-8000-%012d' "$count")"
+    gateway_health=',"gateway_health":{"catalog_ok":null,"inference_last_success_at":null,"breaker_state":"closed","privacy_eligible":true,"enforcement":"passive"}'
+    idempotency_ledger=',"idempotency_ledger":{"healthy":true,"error":null,"entries":0,"max_entries":10000,"remaining_capacity":10000}'
+    case "${FAKE_GATEWAY_HEALTH:-valid}" in
+      missing) gateway_health='';;
+      malformed) gateway_health=',"gateway_health":{"catalog_ok":"unknown","inference_last_success_at":null,"breaker_state":"closed","privacy_eligible":true,"enforcement":"passive"}';;
+    esac
+    case "${FAKE_IDEMPOTENCY_LEDGER:-valid}" in
+      missing) idempotency_ledger='';;
+      malformed) idempotency_ledger=',"idempotency_ledger":{"healthy":true,"error":null,"entries":1,"max_entries":10000,"remaining_capacity":10000}';;
+    esac
     if [ "${FAKE_PREVIOUS_503:-0}" = 1 ] && [ ! -f "$state.previous" ]; then
-      printf '{"schema_version":1,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","opencode":null,"error":"upstream recovering"}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}"
+      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","opencode":null,"error":"upstream recovering"%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "$gateway_health" "$idempotency_ledger"
       case "$*" in *-fsS*) exit 22;; esac
     else
-      printf '{"schema_version":1,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","opencode":{"healthy":true},"error":null}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}"
+      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","opencode":{"healthy":true},"error":null%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "$gateway_health" "$idempotency_ledger"
     fi;;
   *) [ "${FAKE_HEALTH_FAIL:-0}" = 1 ] && exit 1 || exit 0;;
 esac
@@ -636,6 +652,41 @@ chmod +x "$BRIDGE_FAKE"/*
 /bin/sleep 300 & fake_bridge_pid=$!
 export FAKE_LAUNCHD_PID="$fake_bridge_pid"
 applied_cmd=(python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" applied)
+# The shared bridge activation lock must reject a concurrent profile switch
+# before it renders/mutates runtime state. A matching token never bypasses it.
+ACTIVATION_LOCK_DIR="$TMP/bridge-activation.lock"; mkdir -p "$ACTIVATION_LOCK_DIR"
+printf 'parent-token\npid=%s\n' "$$" >"$ACTIVATION_LOCK_DIR/owner"
+LOCKED_STATE="$TMP/locked-state"; LOCKED_NATIVE="$TMP/locked-native/omo.jsonc"
+owner_matches_parent_contract() {
+  [[ "$(sed -n '1p' "$ACTIVATION_LOCK_DIR/owner")" == "parent-token" ]]
+  [[ "$(sed -n '2p' "$ACTIVATION_LOCK_DIR/owner")" == "pid=$$" ]]
+  [[ -z "$(sed -n '3p' "$ACTIVATION_LOCK_DIR/owner")" ]]
+}
+lock_contract_ok=1
+if PATH="$BRIDGE_FAKE:$PATH" OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR="$ACTIVATION_LOCK_DIR" FAKE_BRIDGE_STATE="$TMP/locked-bridge-state" OC_RUNTIME_STATE_DIR="$LOCKED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/locked-prompts" OC_NATIVE_OMO_PATH="$LOCKED_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+  lock_contract_ok=0
+fi
+owner_matches_parent_contract || lock_contract_ok=0
+[[ ! -e "$LOCKED_STATE" ]] || lock_contract_ok=0
+for owner_pid in 99999999 malformed; do
+  printf 'parent-token\npid=%s\n' "$owner_pid" >"$ACTIVATION_LOCK_DIR/owner"
+  if PATH="$BRIDGE_FAKE:$PATH" OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR="$ACTIVATION_LOCK_DIR" OPENCODE_BRIDGE_ACTIVATION_LOCK_TOKEN=parent-token FAKE_BRIDGE_STATE="$TMP/rejected-owner-bridge-state" OC_RUNTIME_STATE_DIR="$TMP/rejected-owner-state" OC_RUNTIME_PROMPT_DIR="$TMP/rejected-owner-prompts" OC_NATIVE_OMO_PATH="$TMP/rejected-owner-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+    lock_contract_ok=0
+  fi
+done
+/bin/sleep 30 & lock_sibling_pid=$!
+printf 'parent-token\npid=%s\n' "$lock_sibling_pid" >"$ACTIVATION_LOCK_DIR/owner"
+if PATH="$BRIDGE_FAKE:$PATH" OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR="$ACTIVATION_LOCK_DIR" OPENCODE_BRIDGE_ACTIVATION_LOCK_TOKEN=parent-token FAKE_BRIDGE_STATE="$TMP/sibling-owner-bridge-state" OC_RUNTIME_STATE_DIR="$TMP/sibling-owner-state" OC_RUNTIME_PROMPT_DIR="$TMP/sibling-owner-prompts" OC_NATIVE_OMO_PATH="$TMP/sibling-owner-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+  lock_contract_ok=0
+fi
+kill "$lock_sibling_pid" 2>/dev/null || true
+printf 'parent-token\npid=%s\n' "$$" >"$ACTIVATION_LOCK_DIR/owner"
+if PATH="$BRIDGE_FAKE:$PATH" OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR="$ACTIVATION_LOCK_DIR" OPENCODE_BRIDGE_ACTIVATION_LOCK_TOKEN=parent-token FAKE_BRIDGE_STATE="$TMP/inherited-bridge-state" OC_RUNTIME_STATE_DIR="$TMP/inherited-state" OC_RUNTIME_PROMPT_DIR="$TMP/inherited-prompts" OC_NATIVE_OMO_PATH="$TMP/inherited-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+  lock_contract_ok=0
+fi
+owner_matches_parent_contract || lock_contract_ok=0
+rm -f "$ACTIVATION_LOCK_DIR/owner"; rmdir "$ACTIVATION_LOCK_DIR"
+if [[ $lock_contract_ok -eq 1 ]]; then ok "bridge activation lock rejects races and preserves inherited ownership"; else bad "bridge activation lock ownership"; fi
 APPLIED_STATE="$TMP/applied-state"; APPLIED_NATIVE="$TMP/applied-native/omo.jsonc"
 APPLIED_BRIDGE_STATE="$TMP/applied-bridge-state"
 PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$APPLIED_BRIDGE_STATE" FAKE_HEALTH_FAIL=0 FAKE_KICKSTART_RC=0 OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null
@@ -692,6 +743,28 @@ if PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$TIMEOUT_BRIDGE_STATE" FAKE_HEAL
 elif [[ "$(OC_RUNTIME_STATE_DIR="$TIMEOUT_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/timeout-prompts" OC_NATIVE_OMO_PATH="$TIMEOUT_NATIVE" "${applied_cmd[@]}")" == null ]]; then
   ok "health timeout exits nonzero without applied marker"
 else bad "health timeout marker"; fi
+# Health metadata is a strict compatibility contract: a valid passive gateway
+# snapshot is required before runtime-profile writes its applied proof.
+GATEWAY_STATE="$TMP/gateway-schema-state"; GATEWAY_NATIVE="$TMP/gateway-schema-native/omo.jsonc"; GATEWAY_BRIDGE_STATE="$TMP/gateway-schema-bridge"
+gateway_env=(PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$GATEWAY_BRIDGE_STATE" OC_RUNTIME_STATE_DIR="$GATEWAY_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/gateway-schema-prompts" OC_NATIVE_OMO_PATH="$GATEWAY_NATIVE")
+gateway_schema_ok=1
+for gateway_case in missing malformed; do
+  env "${gateway_env[@]}" "$REPO/runtime-profile.sh" normal >/dev/null || gateway_schema_ok=0
+  if env "${gateway_env[@]}" FAKE_GATEWAY_HEALTH="$gateway_case" OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS=1 "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then gateway_schema_ok=0; fi
+  [[ "$(OC_RUNTIME_STATE_DIR="$GATEWAY_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/gateway-schema-prompts" OC_NATIVE_OMO_PATH="$GATEWAY_NATIVE" "${applied_cmd[@]}")" == null ]] || gateway_schema_ok=0
+done
+if [[ $gateway_schema_ok -eq 1 ]]; then ok "bridge applied proof requires exact passive gateway health metadata"; else bad "bridge gateway health schema proof"; fi
+# The durable admission ledger is part of readiness, not optional diagnostic
+# decoration. Missing or internally inconsistent capacity must clear proof.
+LEDGER_STATE="$TMP/ledger-schema-state"; LEDGER_NATIVE="$TMP/ledger-schema-native/omo.jsonc"; LEDGER_BRIDGE_STATE="$TMP/ledger-schema-bridge"
+ledger_env=(PATH="$BRIDGE_FAKE:$PATH" FAKE_BRIDGE_STATE="$LEDGER_BRIDGE_STATE" OC_RUNTIME_STATE_DIR="$LEDGER_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/ledger-schema-prompts" OC_NATIVE_OMO_PATH="$LEDGER_NATIVE")
+ledger_schema_ok=1
+for ledger_case in missing malformed; do
+  env "${ledger_env[@]}" "$REPO/runtime-profile.sh" normal >/dev/null || ledger_schema_ok=0
+  if env "${ledger_env[@]}" FAKE_IDEMPOTENCY_LEDGER="$ledger_case" OPENCONFIG_BRIDGE_HEALTH_ATTEMPTS=1 "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then ledger_schema_ok=0; fi
+  [[ "$(OC_RUNTIME_STATE_DIR="$LEDGER_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/ledger-schema-prompts" OC_NATIVE_OMO_PATH="$LEDGER_NATIVE" "${applied_cmd[@]}")" == null ]] || ledger_schema_ok=0
+done
+if [[ $ledger_schema_ok -eq 1 ]]; then ok "bridge applied proof requires a consistent durable ledger"; else bad "bridge idempotency ledger health schema proof"; fi
 # A stale responder, a forged health pid, or a listener owned by another pid
 # must never be promoted to applied proof after an explicit profile switch.
 PROOF_STATE="$TMP/proof-state"; PROOF_NATIVE="$TMP/proof-native/omo.jsonc"; PROOF_BRIDGE_STATE="$TMP/proof-bridge-state"

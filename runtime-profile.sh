@@ -14,12 +14,12 @@ Usage:
   oc profile applied
   oc profile identity
   oc profile snapshot
-  oc profile normal|pentest
-  oc profile path [normal|pentest]
-  oc profile compat-path [normal|pentest]
-  oc profile xdg-path [normal|pentest]
-  oc profile env [normal|pentest] [--shell]
-  oc profile resolve <normal|pentest> <agents|categories> <name>
+  oc profile normal|normal-private|pentest
+  oc profile path [normal|normal-private|pentest]
+  oc profile compat-path [normal|normal-private|pentest]
+  oc profile xdg-path [normal|normal-private|pentest]
+  oc profile env [normal|normal-private|pentest] [--shell]
+  oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>
   oc profile ensure [--quiet]
   oc profile prepare-native-alias
 EOF
@@ -65,13 +65,51 @@ case "$MODE" in
     [[ $# -eq 1 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" prepare-native-alias
     ;;
-  normal|pentest)
+  normal|normal-private|pentest)
     [[ $# -eq 1 ]] || usage
     ;;
   *)
     usage
     ;;
 esac
+
+activation_state_dir="${OPENCODE_BRIDGE_STATE_DIR:-$HOME/.local/state/opencode-codex-bridge}"
+activation_lock_dir="${OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR:-$activation_state_dir/activation.lock}"
+activation_lock_owner="$activation_lock_dir/owner"
+activation_lock_token="${OPENCODE_BRIDGE_ACTIVATION_LOCK_TOKEN:-}"
+activation_lock_owned=0
+
+# This is deliberately the same mkdir lock as the bridge installer. Tokens are
+# diagnostics/release evidence only; no inherited environment bypasses mkdir.
+release_activation_lock() {
+  [[ "$activation_lock_owned" -eq 1 ]] || return 0
+  local recorded_token=""
+  [[ -f "$activation_lock_owner" ]] || return 0
+  IFS= read -r recorded_token < "$activation_lock_owner" || return 0
+  [[ "$recorded_token" == "$activation_lock_token" ]] || return 0
+  rm -f -- "$activation_lock_owner"
+  rmdir -- "$activation_lock_dir" 2>/dev/null || true
+}
+
+acquire_activation_lock() {
+  mkdir -p "$(dirname "$activation_lock_dir")"
+  if ! mkdir "$activation_lock_dir" 2>/dev/null; then
+    echo "bridge activation already in progress; refusing concurrent launchd mutation" >&2
+    return 1
+  fi
+  activation_lock_token="$$-${RANDOM}-$(date +%s)"
+  if ! (umask 077; printf '%s\npid=%s\n' "$activation_lock_token" "$$" > "$activation_lock_owner"); then
+    rmdir -- "$activation_lock_dir" 2>/dev/null || true
+    echo "could not record bridge activation lock ownership" >&2
+    return 1
+  fi
+  activation_lock_owned=1
+  export OPENCODE_BRIDGE_ACTIVATION_LOCK_DIR="$activation_lock_dir"
+  export OPENCODE_BRIDGE_ACTIVATION_LOCK_TOKEN="$activation_lock_token"
+}
+
+acquire_activation_lock
+trap release_activation_lock EXIT
 
 python3 "$PYTHON_TOOL" --repo "$REPO" activate "$MODE"
 echo "OpenConfig runtime profile: $MODE"
@@ -143,28 +181,60 @@ try:
     started = datetime.datetime.fromisoformat(body.get("started_at", "").replace("Z", "+00:00"))
 except Exception:
     raise SystemExit(1)
+def valid_gateway_health(value):
+    if not isinstance(value, dict) or set(value) != {"catalog_ok", "inference_last_success_at", "breaker_state", "privacy_eligible", "enforcement"}:
+        return False
+    if value.get("catalog_ok") is not None and type(value.get("catalog_ok")) is not bool:
+        return False
+    inference = value.get("inference_last_success_at")
+    if inference is not None:
+        if not isinstance(inference, str):
+            return False
+        try:
+            if datetime.datetime.fromisoformat(inference.replace("Z", "+00:00")).tzinfo is None:
+                return False
+        except Exception:
+            return False
+    return value.get("breaker_state") in {"closed", "open", "half-open"} and type(value.get("privacy_eligible")) is bool and value.get("enforcement") == "passive"
+def valid_idempotency_ledger(value):
+    return (
+        isinstance(value, dict)
+        and set(value) == {"healthy", "error", "entries", "max_entries", "remaining_capacity"}
+        and type(value.get("healthy")) is bool
+        and (value.get("error") is None or isinstance(value.get("error"), str))
+        and type(value.get("entries")) is int and value.get("entries") >= 0
+        and type(value.get("max_entries")) is int and value.get("max_entries") >= 0
+        and type(value.get("remaining_capacity")) is int
+        and value.get("remaining_capacity") == max(0, value.get("max_entries") - value.get("entries"))
+    )
 identity_ok = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error"}
-    and body.get("schema_version") == 1
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error", "gateway_health", "idempotency_ledger"}
+    and body.get("schema_version") == 2
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
     and instance.version == 4
     and started.tzinfo is not None
     and body.get("pid") == expected_pid
     and body.get("model") == "opencode/router"
+    and valid_gateway_health(body.get("gateway_health"))
+    and valid_idempotency_ledger(body.get("idempotency_ledger"))
 )
 ready_contract = (
     body.get("ok") is True
     and isinstance(body.get("opencode"), dict)
     and body["opencode"].get("healthy") is True
     and body.get("error") is None
+    and body["idempotency_ledger"].get("healthy") is True
 )
 unready_contract = (
     body.get("ok") is False
-    and body.get("opencode") is None
     and isinstance(body.get("error"), str)
     and bool(body["error"])
+    and (
+        body.get("opencode") is None
+        or (isinstance(body.get("opencode"), dict) and body["opencode"].get("healthy") is True and body["idempotency_ledger"].get("healthy") is False)
+    )
 )
 if not identity_ok or not (ready_contract or unready_contract):
     raise SystemExit(1)
@@ -188,10 +258,36 @@ try:
     started = datetime.datetime.fromisoformat(body.get("started_at", "").replace("Z", "+00:00"))
 except Exception:
     raise SystemExit(1)
+def valid_gateway_health(value):
+    if not isinstance(value, dict) or set(value) != {"catalog_ok", "inference_last_success_at", "breaker_state", "privacy_eligible", "enforcement"}:
+        return False
+    if value.get("catalog_ok") is not None and type(value.get("catalog_ok")) is not bool:
+        return False
+    inference = value.get("inference_last_success_at")
+    if inference is not None:
+        if not isinstance(inference, str):
+            return False
+        try:
+            if datetime.datetime.fromisoformat(inference.replace("Z", "+00:00")).tzinfo is None:
+                return False
+        except Exception:
+            return False
+    return value.get("breaker_state") in {"closed", "open", "half-open"} and type(value.get("privacy_eligible")) is bool and value.get("enforcement") == "passive"
+def valid_idempotency_ledger(value):
+    return (
+        isinstance(value, dict)
+        and set(value) == {"healthy", "error", "entries", "max_entries", "remaining_capacity"}
+        and type(value.get("healthy")) is bool
+        and (value.get("error") is None or isinstance(value.get("error"), str))
+        and type(value.get("entries")) is int and value.get("entries") >= 0
+        and type(value.get("max_entries")) is int and value.get("max_entries") >= 0
+        and type(value.get("remaining_capacity")) is int
+        and value.get("remaining_capacity") == max(0, value.get("max_entries") - value.get("entries"))
+    )
 healthy = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error"}
-    and body.get("schema_version") == 1
+    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "opencode", "error", "gateway_health", "idempotency_ledger"}
+    and body.get("schema_version") == 2
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
     and instance.version == 4
@@ -202,6 +298,9 @@ healthy = (
     and isinstance(body.get("opencode"), dict)
     and body["opencode"].get("healthy") is True
     and body.get("error") is None
+    and valid_gateway_health(body.get("gateway_health"))
+    and valid_idempotency_ledger(body.get("idempotency_ledger"))
+    and body["idempotency_ledger"].get("healthy") is True
     and (not previous or str(instance) != previous)
 )
 if not healthy:

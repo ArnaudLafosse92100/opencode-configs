@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 import uuid
 
 
-VALID_PROFILES = ("normal", "pentest")
+VALID_PROFILES = ("normal", "normal-private", "pentest")
 VALID_SECTIONS = ("agents", "categories")
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
@@ -61,7 +61,7 @@ def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
         before, remainder = text.split(PENTEST_PROMPT_OVERLAY_START, 1)
         _, after = remainder.split(PENTEST_PROMPT_OVERLAY_END, 1)
         text = before.rstrip() + "\n" + after.lstrip("\n")
-    if profile == "normal":
+    if profile in ("normal", "normal-private"):
         return text
     if profile != "pentest":
         raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
@@ -454,6 +454,10 @@ class RuntimeProfiles:
             selected = self.data.get(profile)
             if not isinstance(selected, dict):
                 raise SystemExit(f"missing runtime profile {profile!r} in {self.profile_path}")
+            if selected.get("compose") == "normal":
+                if profile != "normal-private" or not isinstance(selected.get("privacy"), dict):
+                    raise SystemExit(f"invalid composed runtime profile {profile!r} in {self.profile_path}")
+                continue
             for section in VALID_SECTIONS:
                 if not isinstance(selected.get(section), dict):
                     raise SystemExit(f"invalid {profile}.{section} in {self.profile_path}")
@@ -699,7 +703,25 @@ class RuntimeProfiles:
     def selected(self, profile: str) -> dict:
         if profile not in VALID_PROFILES:
             raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
-        return self.data[profile]
+        selected = self.data[profile]
+        if selected.get("compose") != "normal":
+            return selected
+
+        # `normal-private` is intentionally a render-time composition, never
+        # a hand-maintained duplicate route matrix.  Preserve normal route
+        # order while removing subscription-gateway rungs and promoting the
+        # first remaining OpenRouter rung when the normal primary was gateway.
+        private = copy.deepcopy(self.data["normal"])
+        for section in VALID_SECTIONS:
+            for name, route in private[section].items():
+                chain = [route.get("model"), *(route.get("fallback_models") or [])]
+                openrouter = [model for model in chain if isinstance(model, str) and model.startswith("openrouter/")]
+                if not openrouter:
+                    raise SystemExit(f"normal-private route has no OpenRouter model: {section}.{name}")
+                route["model"] = openrouter[0]
+                route["fallback_models"] = openrouter[1:]
+        private["privacy"] = copy.deepcopy(selected["privacy"])
+        return private
 
     def resolve(self, profile: str, section: str, name: str) -> dict:
         if section not in VALID_SECTIONS:
@@ -938,6 +960,19 @@ class RuntimeProfiles:
 
         opencode = load_json(self.repo / "opencode.json")
         omo = load_json(self.repo / "oh-my-openagent.json")
+        if profile == "normal-private":
+            # Privacy is rendered, not copied into a second route matrix.  Do
+            # not claim provider attestation: these are OpenRouter request
+            # constraints only, applied to every model that can be selected.
+            enabled = opencode.get("enabled_providers")
+            if isinstance(enabled, list):
+                opencode["enabled_providers"] = [name for name in enabled if name != "subscription-gateway"]
+            for model in ((opencode.get("provider") or {}).get("openrouter") or {}).get("models", {}).values():
+                if not isinstance(model, dict):
+                    raise SystemExit("invalid OpenRouter model definition for normal-private")
+                provider = ((model.setdefault("options", {})).setdefault("provider", {}))
+                provider["data_collection"] = "deny"
+                provider["zdr"] = True
         small_model = (
             selected.get("small_model")
             or ((selected.get("categories") or {}).get("quick") or {}).get("model")

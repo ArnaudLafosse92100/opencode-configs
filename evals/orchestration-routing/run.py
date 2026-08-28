@@ -98,9 +98,25 @@ def load_cases() -> dict:
     ).expanduser()
     active_path = state_root / "active-profile"
     active = active_path.read_text(encoding="utf-8").strip() if active_path.is_file() else profiles.get("default_profile", "normal")
-    if active not in ("normal", "pentest"):
+    if active not in ("normal", "normal-private", "pentest"):
         raise ValueError(f"invalid active profile state: {active!r}")
     selected = profiles.get(active) or {}
+    # normal-private is declarative composition, not a copied route matrix.
+    # Resolve just the route fields the evaluator grades and remove excluded
+    # providers so its expected terminal models match the rendered profile.
+    if selected.get("compose"):
+        base = profiles.get(selected["compose"])
+        if not isinstance(base, dict):
+            raise ValueError(f"active profile {active} has an invalid compose source")
+        selected = json.loads(json.dumps(base))
+        for section in ("agents", "categories"):
+            for route in (selected.get(section) or {}).values():
+                if isinstance(route, dict):
+                    chain = [route.get("model"), *(route.get("fallback_models") or [])]
+                    openrouter = [ref for ref in chain if isinstance(ref, str) and ref.startswith("openrouter/")]
+                    if not openrouter:
+                        raise ValueError(f"normal-private route has no OpenRouter model: {section}")
+                    route["model"], route["fallback_models"] = openrouter[0], openrouter[1:]
     categories = selected.get("categories") or {}
     for case in suite["cases"]:
         category = case.get("expected_category")

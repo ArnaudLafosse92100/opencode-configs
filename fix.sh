@@ -115,11 +115,67 @@ for mid, m in prov.get("models", {}).items():
             changes.append(f"[{mid}] removed provider.{key} (native provider routing owns selection)")
     fam = m.get("family")
     expected_require_parameters = fam in ("glm", "minimax")
+    pentest_throughput_policies = {
+        "deepseek/deepseek-v4-flash-0731-zdr-throughput": {"id": "deepseek/deepseek-v4-flash-0731", "max_price": {"prompt": 0.50, "completion": 1.50}, "require_parameters": True, "data_collection": "deny", "zdr": True},
+        "deepseek/deepseek-v4-pro-0813-zdr-throughput": {"id": "deepseek/deepseek-v4-pro-0813", "max_price": {"prompt": 1.50, "completion": 4.50}, "require_parameters": True, "data_collection": "deny", "zdr": True},
+    }
+    normal_price_policies = {
+        "z-ai/glm-5.3": {"max_price": {"prompt": 1.40, "completion": 4.40}, "require_parameters": True},
+        "google/gemini-3.1-pro-preview": {"max_price": {"prompt": 3.60, "completion": 21.60}, "require_parameters": False},
+        "google/gemini-3.7-flash": {"max_price": {"prompt": 1.35, "completion": 6.75}, "require_parameters": False},
+        "moonshotai/kimi-k2.7-code": {"max_price": {"prompt": 0.95, "completion": 4.00}, "require_parameters": False},
+        "minimax/minimax-m3": {"max_price": {"prompt": 0.30, "completion": 1.20}, "require_parameters": True},
+        "deepseek/deepseek-v4-pro-0813": {"max_price": {"prompt": 1.32, "completion": 3.96}, "require_parameters": False},
+        "deepseek/deepseek-v4-flash-0731": {"max_price": {"prompt": 0.10, "completion": 0.30}, "require_parameters": False},
+        "nousresearch/hermes-4-405b": {"max_price": {"prompt": 1.00, "completion": 3.00}, "require_parameters": False},
+    }
     want_only = {
         "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
         "minimax": ["gmicloud", "novita", "deepinfra", "together"],
     }.get(fam)
-    if want_only is not None:
+    is_pentest_throughput = mid in pentest_throughput_policies
+    if mid in normal_price_policies:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed provider.only (normal uses every eligible capped provider)")
+        for key, value in (
+            ("require_parameters", normal_price_policies[mid]["require_parameters"]),
+            ("data_collection", "allow"),
+            ("allow_fallbacks", True),
+            ("sort", "price"),
+            ("max_price", normal_price_policies[mid]["max_price"]),
+        ):
+            if pv.get(key) != value:
+                pv[key] = value
+                changes.append(f"[{mid}] provider.{key} -> {value!r}")
+        if "zdr" in pv:
+            del pv["zdr"]
+            changes.append(f"[{mid}] removed provider.zdr (normal remains collection-allowed)")
+    elif is_pentest_throughput:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed provider.only (pentest throughput route uses all eligible providers)")
+        if m.get("id") != pentest_throughput_policies[mid]["id"]:
+            m["id"] = pentest_throughput_policies[mid]["id"]
+            changes.append(f"[{mid}] id -> {m['id']!r}")
+        for key, value in (
+            ("require_parameters", pentest_throughput_policies[mid]["require_parameters"]),
+            ("data_collection", pentest_throughput_policies[mid]["data_collection"]),
+            ("allow_fallbacks", True),
+            ("sort", "throughput"),
+            ("max_price", pentest_throughput_policies[mid]["max_price"]),
+        ):
+            if pv.get(key) != value:
+                pv[key] = value
+                changes.append(f"[{mid}] provider.{key} -> {value!r}")
+        if pentest_throughput_policies[mid]["zdr"]:
+            if pv.get("zdr") is not True:
+                pv["zdr"] = True
+                changes.append(f"[{mid}] provider.zdr -> true")
+        elif "zdr" in pv:
+            del pv["zdr"]
+            changes.append(f"[{mid}] removed provider.zdr (pentest throughput route remains collection-allowed)")
+    elif want_only is not None:
         if pv.get("only") != want_only:
             pv["only"] = want_only
             changes.append(f"[{mid}] provider.only -> live {fam} roster")
@@ -392,7 +448,9 @@ if isinstance(bt, dict):
             "openrouter/google/gemini-3.7-flash": 10,
             "openrouter/moonshotai/kimi-k2.7-code": 5,
             "openrouter/deepseek/deepseek-v4-pro-0813": 5,
+            "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput": 5,
             "openrouter/deepseek/deepseek-v4-flash-0731": 10,
+            "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput": 6,
             "openrouter/nousresearch/hermes-4-405b": 2,
         }
         def _model_concurrency(model):

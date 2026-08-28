@@ -95,7 +95,7 @@ if ! printf '%s' "$profile_snapshot" | python3 -c '
 import json, sys
 body = json.load(sys.stdin)
 assert body.get("schema_version") == 1
-assert body.get("desiredProfile") in {"normal", "pentest"}
+assert body.get("desiredProfile") in {"normal", "normal-private", "pentest"}
 assert set(body) == {"schema_version", "desiredProfile", "applied", "runtimePath", "compatPath", "expectedIdentity"}
 ' >/dev/null 2>&1; then
   desired_profile="unknown"

@@ -101,7 +101,7 @@ def model_specs(names: str) -> list[dict]:
 
 
 def base_model_id(model_id: str) -> str:
-    return re.sub(r":(?:nitro|exacto)$", "", model_id)
+    return re.sub(r":(?:nitro|exacto|floor)$", "", model_id)
 
 
 def prices(specs: list[dict], key: str, online: bool) -> dict[str, tuple[float, float]]:

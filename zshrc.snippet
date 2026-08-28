@@ -128,7 +128,7 @@ opencode() {
   fi
   if ! eval "$_oc_runtime_snapshot" \
     || [[ "${OPENCODE_CONFIG_DIR:-}" != /* || "${XDG_CONFIG_HOME:-}" != /* \
-      || ( "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ) ]]; then
+      || ( "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal-private && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ) ]]; then
     unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
     print -u2 "OpenConfig runtime profile snapshot is invalid"
     return 1

@@ -74,7 +74,7 @@ class GradeTests(unittest.TestCase):
     def test_deepseek_alias_pins_0731(self) -> None:
         specs = runner.model_specs("deepseek")
         self.assertEqual(specs[0]["config_key"], "deepseek/deepseek-v4-flash-0731")
-        self.assertEqual(specs[0]["model"], "deepseek/deepseek-v4-flash-0731:nitro")
+        self.assertEqual(specs[0]["model"], "deepseek/deepseek-v4-flash-0731:floor")
 
 
 class ContentAwareFallbackTests(unittest.TestCase):
@@ -111,12 +111,9 @@ class ContentAwareFallbackTests(unittest.TestCase):
                     self.assertEqual(actual["model"], expected["model"], name)
                     self.assertEqual(actual["fallback_models"], expected["fallback_models"], name)
 
-    def test_pentest_profile_declared_routes_are_glm_deepseek_only(self) -> None:
-        allowed = {
-            "openrouter/z-ai/glm-5.3",
-            "openrouter/deepseek/deepseek-v4-flash-0731",
-            "openrouter/deepseek/deepseek-v4-pro-0813",
-        }
+    def test_pentest_profile_declared_routes_use_only_flash_then_pro_throughput(self) -> None:
+        flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
+        pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
         selected = self.profile_data["pentest"]
         for section in ("agents", "categories"):
             self.assertEqual(
@@ -125,17 +122,15 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 f"pentest profile must explicitly pin every {section[:-1]} route",
             )
             for name, expected in selected.get(section, {}).items():
-                models = [expected["model"], *expected["fallback_models"]]
-                bad = [model for model in models if model not in allowed]
-                self.assertEqual(bad, [], f"{section}.{name}")
+                self.assertEqual(expected, {"model": flash, "fallback_models": [pro]}, f"{section}.{name}")
 
-    def test_pentest_routes_remain_unchanged(self) -> None:
+    def test_pentest_routes_match_approved_zdr_manifest(self) -> None:
         canonical = json.dumps(
             self.profile_data["pentest"], sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
-            "94151e94f3b9fa1d108b82b2aac11ff12fc65001832e9d36a1b3f5f79b08a939",
+            "f81673a99cd78076806509df4e36b669093fd9cdcc093f7397281e0aaf677f60",
         )
 
     def test_removed_models_are_absent_from_active_config(self) -> None:
@@ -157,12 +152,11 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 with self.subTest(file=file_name, model=model):
                     self.assertNotIn(model, content)
 
-    def test_normal_quick_and_unspecified_low_use_flash_with_ordered_fallbacks(self) -> None:
+    def test_normal_quick_and_unspecified_low_use_flash_then_minimax(self) -> None:
         expected = {
             "model": "openrouter/deepseek/deepseek-v4-flash-0731",
             "fallback_models": [
                 "openrouter/minimax/minimax-m3",
-                "openrouter/z-ai/glm-5.3",
             ],
         }
         normal = self.profile_data["normal"]["categories"]
@@ -177,30 +171,114 @@ class ContentAwareFallbackTests(unittest.TestCase):
                     expected["fallback_models"],
                 )
 
-    def test_pentest_profile_separates_fast_deep_and_ultrabrain_lanes(self) -> None:
-        selected = self.profile_data["pentest"]
-        pro = "openrouter/deepseek/deepseek-v4-pro-0813"
-        flash = "openrouter/deepseek/deepseek-v4-flash-0731"
-        glm = "openrouter/z-ai/glm-5.3"
-        pro_routes = {
-            ("agents", "hephaestus"),
-            ("agents", "oracle"),
-            ("agents", "momus"),
-            ("agents", "content-aware-research"),
-            ("categories", "deep"),
-            ("categories", "unspecified-high"),
-            ("categories", "arch-review"),
-            ("categories", "content-aware-deep"),
+    def test_normal_profile_and_rendered_catalog_are_the_same_ssot(self) -> None:
+        """The tracked baseline must exactly match the bounded normal profile."""
+        current_opencode = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            rendered = json.loads(
+                (runtime_profile.RuntimeProfiles(REPO).render("normal") / "opencode.json").read_text(encoding="utf-8")
+            )
+        self.assertEqual(rendered, current_opencode)
+
+    def test_normal_routes_are_bounded_by_role_and_capability(self) -> None:
+        normal = self.profile_data["normal"]
+        glm_chain = ["openrouter/moonshotai/kimi-k2.7-code", "openrouter/deepseek/deepseek-v4-pro-0813"]
+        pro_glm = ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"]
+        for name in ("codex-router", "sisyphus", "prometheus", "atlas", "explore"):
+            self.assertEqual(normal["agents"][name]["fallback_models"], glm_chain, name)
+        for name in ("bug-hunt", "refactor-safe", "unspecified-high"):
+            self.assertEqual(normal["categories"][name]["fallback_models"], glm_chain, name)
+        for name in ("oracle", "momus"):
+            self.assertEqual(normal["agents"][name]["fallback_models"], pro_glm, name)
+        for name in ("ultrabrain", "deep", "arch-review"):
+            self.assertEqual(normal["categories"][name]["fallback_models"], pro_glm, name)
+        self.assertEqual(normal["agents"]["hephaestus"]["fallback_models"], pro_glm)
+        self.assertEqual(normal["agents"]["metis"]["fallback_models"], ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k2.7-code"])
+        for section, names in (("agents", ("librarian", "sisyphus-junior")), ("categories", ("quick", "unspecified-low"))):
+            for name in names:
+                self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/minimax/minimax-m3"], name)
+        for section, names in (("agents", ("multimodal-looker",)), ("categories", ("visual-engineering", "artistry"))):
+            for name in names:
+                self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/google/gemini-3.7-flash", "openrouter/minimax/minimax-m3"], name)
+        self.assertEqual(normal["categories"]["writing"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-flash-0731"])
+        self.assertEqual(normal["categories"]["agentic-deep-kimi"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"])
+        self.assertEqual(normal["agents"]["content-aware-research"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813"])
+        self.assertEqual(normal["categories"]["content-aware-fast"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813"])
+        self.assertEqual(normal["categories"]["content-aware-deep"]["fallback_models"], ["openrouter/z-ai/glm-5.3"])
+
+    def test_every_normal_openrouter_family_is_price_first_capped_without_allowlists(self) -> None:
+        models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
+        expected = {
+            "z-ai/glm-5.3": (True, 1.40, 4.40),
+            "google/gemini-3.1-pro-preview": (False, 3.60, 21.60),
+            "google/gemini-3.7-flash": (False, 1.35, 6.75),
+            "moonshotai/kimi-k2.7-code": (False, 0.95, 4.00),
+            "minimax/minimax-m3": (True, 0.30, 1.20),
+            "deepseek/deepseek-v4-pro-0813": (False, 1.32, 3.96),
+            "deepseek/deepseek-v4-flash-0731": (False, 0.10, 0.30),
+            "nousresearch/hermes-4-405b": (False, 1.00, 3.00),
         }
+        for name, (requires_parameters, prompt, completion) in expected.items():
+            with self.subTest(name=name):
+                provider = models[name]["options"]["provider"]
+                self.assertEqual(provider.get("data_collection"), "allow")
+                self.assertTrue(provider.get("allow_fallbacks"))
+                self.assertEqual(provider.get("require_parameters"), requires_parameters)
+                self.assertEqual(provider.get("sort"), "price")
+                self.assertEqual(provider.get("max_price"), {"prompt": prompt, "completion": completion})
+                self.assertNotIn("only", provider)
+
+    def test_normal_price_caps_and_pentest_zdr_throughput_aliases_are_separate(self) -> None:
+        models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
+        normal = models["deepseek/deepseek-v4-flash-0731"]
+        throughput = models["deepseek/deepseek-v4-flash-0731-zdr-throughput"]
+        self.assertEqual(normal["id"], "deepseek/deepseek-v4-flash-0731:floor")
+        self.assertEqual(normal["options"]["provider"], {
+            "require_parameters": False,
+            "data_collection": "allow",
+            "allow_fallbacks": True,
+            "sort": "price",
+            "max_price": {"prompt": 0.10, "completion": 0.30},
+        })
+        self.assertEqual(throughput["id"], "deepseek/deepseek-v4-flash-0731")
+        self.assertEqual(
+            throughput["options"]["provider"],
+            {
+                "require_parameters": True,
+                "data_collection": "deny",
+                "zdr": True,
+                "allow_fallbacks": True,
+                "sort": "throughput",
+                "max_price": {"prompt": 0.50, "completion": 1.50},
+            },
+        )
+        pro_throughput = models["deepseek/deepseek-v4-pro-0813-zdr-throughput"]
+        self.assertEqual(pro_throughput["id"], "deepseek/deepseek-v4-pro-0813")
+        self.assertEqual(pro_throughput["name"], "DeepSeek V4 Pro 0813 ZDR Throughput")
+        self.assertEqual(
+            pro_throughput["options"]["provider"],
+            {
+                "require_parameters": True,
+                "data_collection": "deny",
+                "zdr": True,
+                "allow_fallbacks": True,
+                "sort": "throughput",
+                "max_price": {"prompt": 1.50, "completion": 4.50},
+            },
+        )
+
+    def test_pentest_profile_pins_every_route_to_flash_then_pro_throughput(self) -> None:
+        selected = self.profile_data["pentest"]
+        flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
+        pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
         for section in ("agents", "categories"):
             for name, route in selected[section].items():
                 with self.subTest(section=section, name=name):
-                    if (section, name) == ("categories", "ultrabrain"):
-                        self.assertEqual(route, {"model": glm, "fallback_models": [pro]})
-                    elif (section, name) in pro_routes:
-                        self.assertEqual(route, {"model": pro, "fallback_models": [glm]})
-                    else:
-                        self.assertEqual(route, {"model": flash, "fallback_models": [glm]})
+                    self.assertEqual(route, {"model": flash, "fallback_models": [pro]})
+        self.assertEqual(selected["small_model"], flash)
+        self.assertEqual(selected["helper_model"], flash)
 
     def test_native_content_aware_surfaces_match_default_profile(self) -> None:
         expected = self._selected_profile()["agents"]["content-aware-research"]["model"]
@@ -254,7 +332,10 @@ class ContentAwareFallbackTests(unittest.TestCase):
             state_path = pathlib.Path(state)
             runtime = (state_path / "runtime/current").resolve()
             rendered = json.loads((runtime / "opencode.json").read_text(encoding="utf-8"))
-            self.assertEqual(rendered["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
+            self.assertEqual(rendered["model"], "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")
+            self.assertEqual(rendered["small_model"], "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")
+            for helper_name in ("title", "summary", "compaction"):
+                self.assertEqual(rendered["agent"][helper_name]["model"], "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")
             self.assertEqual((state_path / "active-profile").read_text().strip(), "pentest")
             self.assertEqual((state_path / "runtime/current").resolve(), runtime.resolve())
             legacy_omo = json.loads((runtime / "oh-my-openagent.json").read_text(encoding="utf-8"))
@@ -394,7 +475,7 @@ class PentestPromptOverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as state, mock.patch.dict(
             os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
         ):
-            with self.assertRaisesRegex(SystemExit, "profile must be one of normal, pentest"):
+            with self.assertRaisesRegex(SystemExit, "profile must be one of normal, normal-private, pentest"):
                 runtime_profile.RuntimeProfiles(REPO).selected("unknown")
 
     def test_overlay_helper_is_idempotent(self) -> None:

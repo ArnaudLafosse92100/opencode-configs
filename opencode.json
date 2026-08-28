@@ -73,7 +73,9 @@
         "google/gemini-3.7-flash",
         "moonshotai/kimi-k2.7-code",
         "deepseek/deepseek-v4-pro-0813",
+        "deepseek/deepseek-v4-pro-0813-zdr-throughput",
         "deepseek/deepseek-v4-flash-0731",
+        "deepseek/deepseek-v4-flash-0731-zdr-throughput",
         "nousresearch/hermes-4-405b"
       ],
       "options": {
@@ -105,10 +107,15 @@
             "output": 131072
           },
           "options": {
-            "provider": {
-              "require_parameters": true,
-              "data_collection": "allow",
-              "allow_fallbacks": true
+      "provider": {
+        "require_parameters": true,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 1.4,
+          "completion": 4.4
+        }
             }
           },
           "variants": {
@@ -148,10 +155,15 @@
             "output": 65536
           },
           "options": {
-            "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
-              "allow_fallbacks": true
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 3.6,
+          "completion": 21.6
+        }
             },
             "reasoning": {
               "effort": "high"
@@ -194,16 +206,15 @@
             "output": 512000
           },
           "options": {
-            "provider": {
-              "require_parameters": true,
-              "data_collection": "allow",
-              "allow_fallbacks": true,
-              "only": [
-                "gmicloud",
-                "novita",
-                "deepinfra",
-                "together"
-              ]
+      "provider": {
+        "require_parameters": true,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 0.3,
+          "completion": 1.2
+        }
             },
             "reasoning": {
               "effort": "high"
@@ -249,10 +260,15 @@
             "reasoning": {
               "effort": "low"
             },
-            "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
-              "allow_fallbacks": true
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 0.95,
+          "completion": 4
+        }
             }
           },
           "variants": {
@@ -292,10 +308,15 @@
             "output": 65536
           },
           "options": {
-            "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
-              "allow_fallbacks": true
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 1.35,
+          "completion": 6.75
+        }
             },
             "reasoning": {
               "effort": "medium"
@@ -325,8 +346,8 @@
           }
         },
         "deepseek/deepseek-v4-pro-0813": {
-          "id": "deepseek/deepseek-v4-pro-0813",
-          "name": "DeepSeek V4 Pro 0813",
+    "id": "deepseek/deepseek-v4-pro-0813:floor",
+    "name": "DeepSeek V4 Pro 0813 Floor",
           "family": "deepseek",
           "reasoning": true,
           "tool_call": true,
@@ -341,20 +362,15 @@
             "reasoning": {
               "effort": "low"
             },
-            "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
-              "allow_fallbacks": true,
-              "only": [
-                "gmicloud",
-                "novita",
-                "siliconflow",
-                "parasail",
-                "deepinfra",
-                "baidu",
-                "fireworks",
-                "digitalocean"
-              ]
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 1.32,
+          "completion": 3.96
+        }
             }
           },
           "variants": {
@@ -381,8 +397,108 @@
           }
         },
         "deepseek/deepseek-v4-flash-0731": {
-          "id": "deepseek/deepseek-v4-flash-0731:nitro",
-          "name": "DeepSeek V4 Flash 0731 Nitro",
+    "id": "deepseek/deepseek-v4-flash-0731:floor",
+    "name": "DeepSeek V4 Flash 0731 Floor",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1310720,
+            "output": 384000
+          },
+          "options": {
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 0.1,
+          "completion": 0.3
+        }
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "deepseek/deepseek-v4-pro-0813-zdr-throughput": {
+          "id": "deepseek/deepseek-v4-pro-0813",
+          "name": "DeepSeek V4 Pro 0813 ZDR Throughput",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1048576,
+            "output": 384000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "low"
+            },
+            "provider": {
+              "require_parameters": true,
+              "data_collection": "deny",
+              "zdr": true,
+              "allow_fallbacks": true,
+              "sort": "throughput",
+              "max_price": {
+                "prompt": 1.5,
+                "completion": 4.5
+              }
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "deepseek/deepseek-v4-flash-0731-zdr-throughput": {
+          "id": "deepseek/deepseek-v4-flash-0731",
+          "name": "DeepSeek V4 Flash 0731 ZDR Throughput",
           "family": "deepseek",
           "reasoning": true,
           "tool_call": true,
@@ -395,19 +511,15 @@
           },
           "options": {
             "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
+              "require_parameters": true,
+              "data_collection": "deny",
+              "zdr": true,
               "allow_fallbacks": true,
-              "only": [
-                "gmicloud",
-                "novita",
-                "siliconflow",
-                "parasail",
-                "deepinfra",
-                "baidu",
-                "fireworks",
-                "digitalocean"
-              ]
+              "sort": "throughput",
+              "max_price": {
+                "prompt": 0.5,
+                "completion": 1.5
+              }
             }
           },
           "variants": {
@@ -447,10 +559,15 @@
             "output": 131072
           },
           "options": {
-            "provider": {
-              "require_parameters": false,
-              "data_collection": "allow",
-              "allow_fallbacks": true
+      "provider": {
+        "require_parameters": false,
+        "data_collection": "allow",
+        "allow_fallbacks": true,
+        "sort": "price",
+        "max_price": {
+          "prompt": 1,
+          "completion": 3
+        }
             }
           },
           "variants": {
