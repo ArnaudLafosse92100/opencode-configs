@@ -40,6 +40,7 @@ jobs:
           bun_fixture="$HOME/.bun/install/cache/oh-my-openagent@4.19.4"
           mkdir -p "$bun_fixture/dist"
           cp "$omo_root/node_modules/oh-my-openagent/dist/index.js" "$bun_fixture/dist/index.js"
+          node scripts/patch-omo-runtime-fallback.mjs --apply
       - name: Run deterministic routing and patch tests
         run: |
           python3 tests/test_model_routing_eval.py
