@@ -288,7 +288,7 @@ seed_key_from_env() {
 
 # Canonical distribution + upstream source, encoded to keep bootstrap portable.
 _OC_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdz'
-_OC_GIT_REF='codex/buzz-openconfig-routing'
+_OC_GIT_REF='main'
 _OC_UPSTREAM_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M='
 _oc_decode_b64() {
   local encoded="$1"

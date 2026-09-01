@@ -5,12 +5,12 @@ Pinned global config for [OpenCode](https://opencode.ai) + [OpenRouter](https://
 **v1.5.60** · CLI **`oc`** · identity `openconfig/opencode-configs`
 
 ```bash
-git clone --branch codex/buzz-openconfig-routing https://github.com/ArnaudLafosse92100/opencode-configs.git
+git clone --branch main https://github.com/ArnaudLafosse92100/opencode-configs.git
 cd opencode-configs
 oc install --quick          # or: ./install.sh --yes
 
 # Fresh machine
-curl -fsSL https://raw.githubusercontent.com/ArnaudLafosse92100/opencode-configs/codex/buzz-openconfig-routing/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ArnaudLafosse92100/opencode-configs/main/install.sh | bash
 source ~/.zshrc && oc doctor && oc launch
 ```
 
@@ -23,7 +23,7 @@ source ~/.zshrc && oc doctor && oc launch
 | **Projects home** | `oc new` → `~/Projects/<name>` |
 | **Health** | `oc doctor` · `oc versions` · `oc test` |
 
-Canonical distribution: `ArnaudLafosse92100/opencode-configs@codex/buzz-openconfig-routing`.
+Canonical distribution: `ArnaudLafosse92100/opencode-configs@main`.
 
 Upstream comparison reference: `jesseoue/opencode-configs@a63966fd2788a85a8c3b6773fdc7d48399cd1940` (OpenConfig 1.5.60). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, subscription-gateway and retry-policy extensions.
 
