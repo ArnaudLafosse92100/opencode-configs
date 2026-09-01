@@ -186,7 +186,7 @@ fi
 dist_url="$(oc_github_url "$REPO/signature.json" 2>/dev/null || true)"
 dist_ref="$(oc_github_ref "$REPO/signature.json" 2>/dev/null || true)"
 if [[ "$dist_url" == "https://github.com/ArnaudLafosse92100/opencode-configs" \
-  && "$dist_ref" == "codex/buzz-openconfig-routing" ]]; then
+  && "$dist_ref" == "main" ]]; then
   ok "distribution helpers resolve canonical repository + ref"
 else
   bad "distribution helper drift (url=$dist_url ref=$dist_ref)"
