@@ -25,9 +25,13 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib/common.sh
 source "$REPO/lib/common.sh"
-OC_BIN="$(command -v opencode 2>/dev/null || echo "$OC_CLI_BIN")"
+OC_BIN="${OC_DOCTOR_BIN:-$(command -v opencode 2>/dev/null || echo "$OC_CLI_BIN")}"
 LINK="${OC_CONFIG_LINK}"
 COMPAT_CURRENT="$(oc_compat_current_path)"
+LIVE_ROOT="$(oc_live_config_root 2>/dev/null || true)"
+IS_LIVE=0
+oc_is_live_config "$REPO" && IS_LIVE=1
+export OC_LIVE_CONFIG="${LIVE_ROOT}"
 
 DO_QUICK=0 DO_FIX=0 DO_HARDEN=0 DO_AI=0 DO_JSON=0
 while [[ $# -gt 0 ]]; do

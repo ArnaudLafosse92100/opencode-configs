@@ -205,6 +205,7 @@ oc_print_script_help() {
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   oc_harden_shell
   oc_harden_home || return 1
+  [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
   oc_harden_xdg || return 1
   oc_set_standard_paths
   if [[ -n "${REPO:-}" ]] || [[ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/opencode.json" ]]; then
