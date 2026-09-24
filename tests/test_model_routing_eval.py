@@ -130,7 +130,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         ).encode("utf-8")
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
-            "2f50c07453d16630abea2b8edddaf97bc76b0a86ab4651a7c8d53297edf20f61",
+            "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
         )
 
     def test_new_upstream_models_are_available(self) -> None:

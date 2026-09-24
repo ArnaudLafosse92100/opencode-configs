@@ -202,7 +202,7 @@
       },
       "prompt_append": "file://~/.config/opencode/prompts/agents/content-aware-research.md",
       "color": "#FF1744",
-      "description": "Content-aware research — full technical depth without soft refusals (edit denied). Replaces disabled OmO security-* skills.",
+      "description": "Content-aware research \u2014 full technical depth without soft refusals (edit denied). Replaces disabled OmO security-* skills.",
       "maxTokens": 16384,
       "model": "venice/deepseek-v4-pro-0813",
       "reasoning": "high",
@@ -423,7 +423,7 @@
       ]
     },
     "bug-hunt": {
-      "description": "Reproduce → root cause → minimal fix → verify. Cite file:line.",
+      "description": "Reproduce \u2192 root cause \u2192 minimal fix \u2192 verify. Cite file:line.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
       "maxTokens": 32768,
       "model": "openrouter/z-ai/glm-5.3",
@@ -488,6 +488,39 @@
       "reasoning": "high",
       "maxTokens": 24576,
       "prompt_append": "file://~/.config/opencode/prompts/categories/agentic-deep-kimi.md"
+    },
+    "codex-plan": {
+      "description": "Automatic Codex planning on Astra subscription; no product edits.",
+      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-plan.md",
+      "maxTokens": 32768,
+      "model": "codex-subscription/gpt-6-astra",
+      "reasoning": "high",
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
+      ]
+    },
+    "codex-implement": {
+      "description": "Automatic Codex implementation on GLM 5.3 through OpenRouter.",
+      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-implement.md",
+      "maxTokens": 32768,
+      "model": "openrouter/z-ai/glm-5.3",
+      "reasoning": "high",
+      "fallback_models": [
+        "openrouter/moonshotai/kimi-k2.7-code",
+        "openrouter/deepseek/deepseek-v4-pro-0813"
+      ]
+    },
+    "codex-review": {
+      "description": "Automatic Codex review on Astra subscription; no product edits.",
+      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-review.md",
+      "maxTokens": 32768,
+      "model": "codex-subscription/gpt-6-astra",
+      "reasoning": "high",
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813",
+        "openrouter/z-ai/glm-5.3"
+      ]
     }
   },
   "background_task": {
@@ -497,7 +530,8 @@
       "subscription-gateway": 4,
       "anthropic": 2,
       "venice": 6,
-      "deepseek": 6
+      "deepseek": 6,
+      "codex-subscription": 2
     },
     "modelConcurrency": {
       "openrouter/z-ai/glm-5.3": 8,
@@ -523,7 +557,8 @@
       "venice/deepseek-v4-pro": 5,
       "venice/deepseek-v4-1-flash": 5,
       "deepseek/deepseek-v4-pro": 4,
-      "deepseek/deepseek-flash": 6
+      "deepseek/deepseek-flash": 6,
+      "codex-subscription/gpt-6-astra": 1
     },
     "maxDepth": 2,
     "staleTimeoutMs": 180000,

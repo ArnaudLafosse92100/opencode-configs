@@ -234,6 +234,27 @@
           "venice/deepseek-v4-pro",
           "venice/deepseek-v4-1-flash"
         ]
+      },
+      "codex-plan": {
+        "model": "codex-subscription/gpt-6-astra",
+        "fallback_models": [
+          "openrouter/deepseek/deepseek-v4-pro-0813",
+          "openrouter/z-ai/glm-5.3"
+        ]
+      },
+      "codex-implement": {
+        "model": "openrouter/z-ai/glm-5.3",
+        "fallback_models": [
+          "openrouter/moonshotai/kimi-k2.7-code",
+          "openrouter/deepseek/deepseek-v4-pro-0813"
+        ]
+      },
+      "codex-review": {
+        "model": "codex-subscription/gpt-6-astra",
+        "fallback_models": [
+          "openrouter/deepseek/deepseek-v4-pro-0813",
+          "openrouter/z-ai/glm-5.3"
+        ]
       }
     }
   },
@@ -245,7 +266,8 @@
         "zdr": true
       },
       "exclude_providers": [
-        "subscription-gateway"
+        "subscription-gateway",
+        "codex-subscription"
       ]
     }
   },
@@ -448,6 +470,24 @@
         ]
       },
       "content-aware-deep": {
+        "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+        "fallback_models": [
+          "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+        ]
+      },
+      "codex-plan": {
+        "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+        "fallback_models": [
+          "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+        ]
+      },
+      "codex-implement": {
+        "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+        "fallback_models": [
+          "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+        ]
+      },
+      "codex-review": {
         "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
         "fallback_models": [
           "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"

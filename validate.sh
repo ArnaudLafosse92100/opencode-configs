@@ -371,10 +371,10 @@ if oc:
             ok("core tools + bash allow-everything (catastrophic denies kept)")
     if not oc.get("enabled_providers"):
         warn("opencode.json: enabled_providers not set — all providers with credentials will load.")
-    elif oc.get("enabled_providers") != ["openrouter", "subscription-gateway", "venice", "deepseek"]:
-        err("opencode.json: enabled_providers must be ['openrouter', 'subscription-gateway', 'venice', 'deepseek']")
+    elif oc.get("enabled_providers") != ["openrouter", "subscription-gateway", "codex-subscription", "venice", "deepseek"]:
+        err("opencode.json: enabled_providers must be ['openrouter', 'subscription-gateway', 'codex-subscription', 'venice', 'deepseek']")
     else:
-        ok("enabled_providers = openrouter + subscription-gateway + venice + deepseek")
+        ok("enabled_providers = openrouter + subscription-gateway + codex-subscription + venice + deepseek")
     vmodels = set(((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}))
     if "deepseek-v4-pro-0813" not in vmodels:
         err("venice must expose deepseek-v4-pro-0813 (content-aware DeepSeek primary)")

@@ -277,6 +277,9 @@ Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Inv
 | `categories.arch-review` | `subscription-gateway/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.artistry` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.bug-hunt` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.codex-implement` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.codex-plan` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.codex-review` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.content-aware-deep` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.deep` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |

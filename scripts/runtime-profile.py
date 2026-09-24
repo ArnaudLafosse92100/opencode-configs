@@ -964,7 +964,10 @@ class RuntimeProfiles:
             # constraints only, applied to every model that can be selected.
             enabled = opencode.get("enabled_providers")
             if isinstance(enabled, list):
-                opencode["enabled_providers"] = [name for name in enabled if name != "subscription-gateway"]
+                opencode["enabled_providers"] = [
+                    name for name in enabled
+                    if name not in {"subscription-gateway", "codex-subscription"}
+                ]
             for model in ((opencode.get("provider") or {}).get("openrouter") or {}).get("models", {}).values():
                 if not isinstance(model, dict):
                     raise SystemExit("invalid OpenRouter model definition for normal-private")

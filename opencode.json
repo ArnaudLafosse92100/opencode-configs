@@ -18,6 +18,7 @@
   "enabled_providers": [
     "openrouter",
     "subscription-gateway",
+    "codex-subscription",
     "venice",
     "deepseek"
   ],
@@ -865,6 +866,60 @@
                 "fireworks",
                 "digitalocean"
               ]
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        }
+      }
+    },
+    "codex-subscription": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Codex Subscription via local OpenCodex",
+      "options": {
+        "baseURL": "http://127.0.0.1:10100/v1",
+        "apiKey": "local-loopback",
+        "timeout": 900000,
+        "headerTimeout": 900000,
+        "chunkTimeout": 900000
+      },
+      "models": {
+        "gpt-6-astra": {
+          "id": "openai/gpt-6-astra",
+          "name": "GPT-6 Astra (Codex subscription)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
             }
           },
           "variants": {
