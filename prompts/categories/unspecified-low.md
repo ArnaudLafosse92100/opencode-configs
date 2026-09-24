@@ -1,6 +1,6 @@
 # Category: unspecified-low (DeepSeek Flash 0731 Nitro)
 
-Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools.
+Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools. Escalates to GLM 5.3 → MiniMax → Qwen.
 
 ## Do
 

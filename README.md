@@ -1,8 +1,14 @@
 # OpenConfig
 
+```
+    ╭───╮
+    │oc │──── OpenConfig
+    ╰───╯     Pinned stack for OpenCode · OpenRouter · OmO
+```
+
 Pinned global config for [OpenCode](https://opencode.ai) + [OpenRouter](https://openrouter.ai) + [oh-my-openagent (OmO)](https://omo.vibetip.help/docs).
 
-**v1.5.60** · CLI **`oc`** · identity `openconfig/opencode-configs`
+**v1.5.80** · CLI **`oc`** · identity `openconfig/opencode-configs`
 
 ```bash
 git clone --branch main https://github.com/ArnaudLafosse92100/opencode-configs.git
@@ -16,7 +22,7 @@ source ~/.zshrc && oc doctor && oc launch
 
 | | |
 | --- | --- |
-| **Pins** | OpenConfig `1.5.60` · OpenCode `1.18.17+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.17` |
+| **Pins** | OpenConfig `1.5.80` · OpenCode `1.18.30+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.30` |
 | **Default lead** | `sisyphus` (runtime-profile routed; normal GLM 5.3, pentest DeepSeek) |
 | **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
 | **Public config path** | `~/.config/opencode` → `~/.local/state/openconfig/compat/current` (generated compatibility view) |
@@ -25,10 +31,10 @@ source ~/.zshrc && oc doctor && oc launch
 
 Canonical distribution: `ArnaudLafosse92100/opencode-configs@main`.
 
-Upstream comparison reference: `jesseoue/opencode-configs@a63966fd2788a85a8c3b6773fdc7d48399cd1940` (OpenConfig 1.5.60). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, subscription-gateway and retry-policy extensions.
+Upstream comparison reference: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, subscription-gateway and retry-policy extensions.
 
 > Plugin name must stay **`oh-my-openagent@…`** (not legacy `oh-my-opencode`).  
-> Schema URL basename stays `oh-my-opencode.schema.json` (the `oh-my-openagent.schema.json` path 404s).
+> Schema URL basename stays `omo.schema.json` (legacy `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` 404 — `oc validate` rejects both).
 
 Decision log: [`AGENTS.md`](./AGENTS.md) · Stance: [`prompts/core.md`](./prompts/core.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
@@ -98,7 +104,7 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 
 | Package | Source of truth | Current |
 | --- | --- | --- |
-| OpenConfig | `versions.json` → `opencode_configs` | `1.5.60` |
+| OpenConfig | `versions.json` → `opencode_configs` | `1.5.80` |
 | OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.17+` |
 | OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.4` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
@@ -206,7 +212,7 @@ OpenCode TUI sessions continue to use `sisyphus`.
 
 ## Teams
 
-Lead: **sisyphus**. Specs in `teams/` are **symlinked** to `~/.omo/teams/` by `oc setup`.
+Lead: **sisyphus**. Specs in `teams/` are **symlinked** to `~/.omo/teams/` by `oc setup` (targets the live `~/.config/opencode` tree, not a secondary checkout).
 
 Eligible: `sisyphus`, `atlas`, `sisyphus-junior`, `hephaestus` (`teammate: allow`), or `kind: category`.  
 Hard-rejected as teammates: explore · librarian · oracle · metis · momus · multimodal-looker · prometheus.
@@ -225,6 +231,21 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 ---
 
+## Agent matrix
+
+| Agent | Role | Provider / model | Key |
+| --- | --- | --- | --- |
+| `sisyphus` | **Default lead** | OpenRouter `z-ai/glm-5.3` | `OPENROUTER_API_KEY` |
+| `sisyphus-junior` | Team-eligible fast child | OpenRouter `z-ai/glm-5.3-flash` | `OPENROUTER_API_KEY` |
+| `sisyphus-deepseek` | Optional lead | Native `deepseek/deepseek-v4-pro` | `DEEPSEEK_API_KEY` |
+| `sisyphus-deepseek-junior` | Lane-only fast child | Native `deepseek/deepseek-flash` | `DEEPSEEK_API_KEY` |
+| `sisyphus-venice-deepseek` | Optional lead | Venice `deepseek-v4-pro-0813` | `VENICE_API_KEY` |
+| `sisyphus-venice-deepseek-flash-junior` | Lane-only fast child | Venice `deepseek-v4-1-flash` | `VENICE_API_KEY` |
+| `content-aware-research` / `-fast` / `-deep` | Edit-denied research | Venice DeepSeek only | `VENICE_API_KEY` |
+| `context-aware-hermes` | Edit-denied context analysis | OpenRouter Hermes 4 405B | `OPENROUTER_API_KEY` |
+
+Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Invoke optional Sisyphus leads explicitly — they do not replace GLM `sisyphus`.
+
 ## Model routing
 
 `runtime-profile.json` is the only hand-maintained route matrix. The table below is generated from it and `oc validate` rejects documentation drift.
@@ -235,7 +256,9 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | --- | --- | --- |
 | `agents.atlas` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.codex-router` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `agents.content-aware-research` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.context-aware-hermes` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.explore` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.hephaestus` | `subscription-gateway/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.librarian` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -245,13 +268,17 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `agents.oracle` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.prometheus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-deepseek` | `deepseek/deepseek-v4-pro` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-deepseek-junior` | `deepseek/deepseek-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus-junior` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-venice-deepseek` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-venice-deepseek-flash-junior` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.agentic-deep-kimi` | `openrouter/moonshotai/kimi-k2.7-code` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.arch-review` | `subscription-gateway/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.artistry` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.bug-hunt` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.content-aware-deep` | `openrouter/deepseek/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.content-aware-fast` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.content-aware-deep` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.deep` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.quick` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.refactor-safe` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -259,7 +286,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `categories.unspecified-high` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.unspecified-low` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.visual-engineering` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.writing` | `openrouter/google/gemini-3.7-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.writing` | `openrouter/google/gemini-3.8-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 
 Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with subscription-gateway removed and OpenRouter ZDR constraints.
 <!-- END GENERATED: runtime-routing -->
@@ -295,6 +322,12 @@ Runtime profiles can override this matrix without removing native OmO agents/cat
 
 Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`. `oc heal` / `fix.sh` re-apply caps if they drift.
 
+| Provider | Acceleration | `providerConcurrency` | Model caps | Docs |
+| --- | --- | --- | --- | --- |
+| OpenRouter | **Auto Exacto** (tool requests); no `:nitro` / `:exacto` slugs | **12** | GLM / Flash / OpenRouter DeepSeek Pro 0813 / Hermes **8 / 10 / 8 / 2** | [Auto Exacto](https://openrouter.ai/docs/guides/routing/auto-exacto) · [provider selection](https://openrouter.ai/docs/guides/routing/provider-selection) |
+| Venice | neither (direct API); pin `venice_parameters.disable_thinking` (top-level `disable_thinking` 400s) so Pro/Flash do not fill `max_tokens` with `reasoning_content` | **6** | all Venice DeepSeek slugs **5** | [per-key rate_limits](https://docs.venice.ai/api-reference/endpoint/api_keys/rate_limits) · [disable_thinking](https://docs.venice.ai/api-reference/endpoint/chat/completions) |
+| DeepSeek native | neither (direct API) | **6** | V4 Pro **4** · Flash **6** (platform allows 500 / 2500) | [DeepSeek concurrency](https://api-docs.deepseek.com/quick_start/rate_limit) |
+
 | Knob | Value |
 | --- | --- |
 | `background_task.defaultConcurrency` | **6** |
@@ -320,7 +353,7 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | `OC_PROJECTS_DIR` | optional | `oc new` home (default `~/Projects`) |
 
 Copy `.env.example` → `.env` (`chmod 600`). Never commit `.env`.  
-`oc setup --sync-env` imports **allowlisted keys only** from Infisical/Doppler — never a full vault dump.
+`vault.json` is a **public template** (`op://Vault/Item/field` examples). Copy it to **`vault.local.json`** (gitignored) and put your own 1Password account / vault / item refs there. `oc secrets sync` (or `oc setup --sync-env`) merges local over public and imports **allowlisted keys only** from 1Password, then Infisical (`INFISICAL_DIR`), then Doppler — never a full vault dump, never `op run` / `infisical run`. Empty or example refs no-op.
 
 ---
 
@@ -332,8 +365,8 @@ Every OmO agent/category loads a `prompt_append` from `prompts/`. Profiles under
 | --- | --- |
 | `prompts/core.md` | Session-wide stance, tool matrix, team eligibility |
 | `prompts/goal.md` | Why `/goal` is off; use `/start-work` → Atlas |
-| `prompts/agents/*.md` | Agent appends |
-| `prompts/categories/*.md` | Category appends |
+| `prompts/agents/*.md` | Agent appends — **1:1** with OmO `agents` and `agents/*.md` |
+| `prompts/categories/*.md` | Category appends — **1:1** with OmO `categories` |
 | `prompts/profiles/*.md` | Profile briefs |
 | `agents/content-aware-research.md` | OpenCode primary-agent def (synced with prompts) |
 | `agents/codex-router.md` + `prompts/agents/codex-router.md` | Native definition + strict task-only OmO prompt for the Codex bridge |
@@ -359,7 +392,7 @@ oc projects --list
 | `research` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `debug` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `writing` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
-| `content-aware` | `content-aware-research` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `content-aware` | `content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 <!-- END GENERATED: scaffold-profiles -->
 
 Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to `.opencode/profile.json`.
@@ -417,6 +450,15 @@ oc plugin doctor                     # pin cache + OpenConfig OmO patch
 oc plugin doctor --upstream
 ```
 
+Hermetic checks (no API keys, no live `~/.config/opencode` — same as GitHub Actions `.github/workflows/check.yml`):
+
+```bash
+OC_VALIDATE_REPO="$PWD" OC_VALIDATE_OFFLINE=1 ./validate.sh --quiet
+bash -n oc && find . -name '*.sh' -not -path './.git/*' -exec bash -n {} +
+./signature.sh --json
+OC_CI=1 ./tests/smoke.sh
+```
+
 Idempotency: re-running install / setup / heal / fix on a healthy box must not clobber `.env`, rewrite correct symlinks, or bump clean config mtimes.
 
 ---
@@ -440,9 +482,11 @@ Installer pulls OpenCode from `https://opencode.ai/install` and OmO from npm `oh
 ## Anti-patterns
 
 - Don’t rename the plugin away from `oh-my-openagent`
+- Don’t pin `$schema` to `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` — runtime + `oc validate` require `omo.schema.json`
 - Don’t add Cloudflare / AI Gateway / OpenAI-compatible shims
-- Don’t put `plan` in `disabled_agents` (breaks hyperplan)
-- Don’t commit `.env`, `package.json`, `node_modules`, `.omo`, `.sisyphus`, or `plugins/` here
+- Don’t put `plan` in `disabled_agents` or `agent.plan.disable` (breaks hyperplan)
+- Don’t drop `chunkTimeout` back to 60s — OpenCode docs default is 300s; we pin 180s so reasoning streams don’t abort
+- Don’t commit `.env`, `vault.local.json`, `package.json`, `node_modules`, `.omo`, `.sisyphus`, or `plugins/` here
 - Don’t scaffold apps into this repo — use `oc new`
 - Don’t load `.opencode/profile.json` as `OPENCODE_CONFIG`
 - Don’t re-enable telemetry or OmO `security-*` skills

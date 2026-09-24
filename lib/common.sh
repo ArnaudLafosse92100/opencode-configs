@@ -220,10 +220,13 @@ OC_ENV_ALLOWLIST=(
   LLM_GATEWAY_OPENAI_BASE_URL
   EXA_API_KEY
   CONTEXT7_API_KEY
+  VENICE_API_KEY
+  DEEPSEEK_API_KEY
   OPENROUTER_MGMT_KEY
   OC_PROJECTS_DIR
   OC_DEFAULT_WORKSPACE
   OC_DEFAULT_PROFILE
+  INFISICAL_DIR
   DO_NOT_TRACK
   OMO_DISABLE_POSTHOG
   OMO_SEND_ANONYMOUS_TELEMETRY
@@ -248,6 +251,7 @@ OC_CONFIG_STRAYS=(
   bun.lock
   bun.lockb
   .omo
+  .runtime
   .sisyphus
   command
   .opencode
@@ -403,37 +407,50 @@ PY
 }
 
 # ── Branding (OpenConfig — `oc`) ─────────────────────────────────────
-# Shared banner for install / setup / oc help. Product name is OpenConfig;
+# Shared chrome for install / setup / oc help. Product name is OpenConfig;
 # repo folder remains opencode-configs.
+# Glyphs: Unicode box drawing only (╭ ╮ ╰ ╯ │ ─). Width ~60. No emoji.
+# Respects NO_COLOR and non-tty (same shapes, no escapes).
+
+# Soft ANSI when the caller has not already set the palette.
+# Honors a caller-set empty c_b (NO_COLOR / --json) — do not re-enable color.
+oc_ui_colors() {
+  if [[ ${c_b+x} == x ]]; then
+    return 0
+  fi
+  if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+    c_b=$'\033[36m'; c_p=$'\033[35m'; c_dim=$'\033[2m'; c_bold=$'\033[1m'; c_0=$'\033[0m'
+  else
+    c_b=""; c_p=""; c_dim=""; c_bold=""; c_0=""
+  fi
+}
+
+# Compact oc badge + wordmark. Do not call twice in one command path.
+# 3 lines, aligned at col 15, width ~58 (fits 80-col Ghostty). Keep README in sync.
+# Usage: oc_banner [version] [tagline]
 oc_banner() {
   local version="${1:-}"
   local tagline="${2:-}"
-  local c_b="${c_b:-}" c_p="${c_p:-}" c_dim="${c_dim:-}" c_bold="${c_bold:-}" c_0="${c_0:-}"
-  # Soft colors when caller hasn't defined them yet
-  if [[ -z "$c_b" && -t 1 && -z "${NO_COLOR:-}" ]]; then
-    c_b=$'\033[36m'; c_p=$'\033[35m'; c_dim=$'\033[2m'; c_bold=$'\033[1m'; c_0=$'\033[0m'
-  fi
-  printf '%b\n' "${c_b}${c_bold}"
-  cat <<'ASCII'
-   ___                   ____             __ _
-  / _ \ _ __  ___ _ __  / ___|___  _ __  / _(_) __ _
- | | | | '_ \/ _ \ '_ \ | |   / _ \| '_ \| |_| |/ _` |
- | |_| | |_) |  __/ | | | |__| (_) | | | |  _| | (_| |
-  \___/| .__/ \___|_| |_|\____\___/|_| |_|_| |_|\__, |
-       |_|                                      |___/
-ASCII
-  printf '%b' "${c_0}"
-  if [[ -n "$version" ]]; then
-    printf '  %bOpenConfig%b  %boc%b v%s\n' "${c_p}" "${c_0}" "${c_bold}" "${c_0}" "$version"
-  else
-    printf '  %bOpenConfig%b  %boc%b\n' "${c_p}" "${c_0}" "${c_bold}" "${c_0}"
-  fi
-  if [[ -n "$tagline" ]]; then
-    printf '  %b%s%b\n' "${c_dim}" "$tagline" "${c_0}"
-  else
-    printf '  %bPinned stack for OpenCode · OpenRouter · OmO%b\n' "${c_dim}" "${c_0}"
-  fi
-  printf '\n'
+  local ver_s=""
+  oc_ui_colors
+  [[ -n "$tagline" ]] || tagline="Pinned stack for OpenCode · OpenRouter · OmO"
+  [[ -n "$version" ]] && ver_s="  v${version}"
+  printf '%b\n' "${c_b:-}${c_bold:-}    ╭───╮${c_0:-}"
+  printf '%b%s%b%s%b%s%b\n' \
+    "${c_b:-}${c_bold:-}    │oc │──── ${c_0:-}" \
+    "${c_p:-}${c_bold:-}" "OpenConfig" "${c_0:-}" \
+    "${c_dim:-}" "${ver_s}" "${c_0:-}"
+  printf '%b%s%b\n' \
+    "${c_b:-}${c_bold:-}    ╰───╯     ${c_0:-}" \
+    "${c_dim:-}${tagline}${c_0:-}"
+}
+
+# Thin section rule. Callers that must stay silent (--json / --quiet) return first.
+# Usage: oc_section "CLI"
+oc_section() {
+  local title="${1:-}"
+  oc_ui_colors
+  printf '\n%b── %s ──%b\n' "${c_b:-}${c_bold:-}" "$title" "${c_0:-}"
 }
 
 # Read one KEY from a dotenv file without shell-eval. Prints value only.
@@ -884,6 +901,186 @@ oc_readlink_abs() {
   printf '%s\n' "$dir/$tgt"
 }
 
+# True if $1 is an OpenConfig tree (signature + opencode.json + teams/).
+oc_is_openconfig_tree() {
+  local root="${1:-}"
+  [[ -n "$root" && -f "$root/opencode.json" && -d "$root/teams" && -f "$root/signature.json" ]] || return 1
+  python3 -c '
+import json, sys
+try:
+    s = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if (
+    s.get("product") == "OpenConfig"
+    and s.get("cli") == "oc"
+    and s.get("id") == "jesseoue/opencode-configs"
+) else 1)
+' "$root/signature.json" 2>/dev/null
+}
+
+# Realpath of ~/.config/opencode when that tree is OpenConfig.
+# Empty + rc 1 if the link is missing or not this product.
+oc_live_config_root() {
+  local link="${OC_CONFIG_LINK:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}"
+  local root=""
+  if [[ -e "$link" || -L "$link" ]]; then
+    if command -v realpath >/dev/null 2>&1; then
+      root="$(realpath "$link" 2>/dev/null || true)"
+    else
+      root="$(cd "$link" 2>/dev/null && pwd -P || true)"
+    fi
+  fi
+  if [[ -n "$root" ]] && oc_is_openconfig_tree "$root"; then
+    printf '%s\n' "$root"
+    return 0
+  fi
+  return 1
+}
+
+# True if $1 (default REPO) is the live ~/.config/opencode tree.
+oc_is_live_config() {
+  local repo="${1:-${REPO:-}}" live
+  [[ -n "$repo" ]] || return 1
+  live="$(oc_live_config_root 2>/dev/null || true)"
+  [[ -n "$live" ]] || return 1
+  oc_same_path "$repo" "$live"
+}
+
+# OmO 4.19.4 always reads ~/.omo/omo.jsonc. Keep that as a symlink to a
+# sibling runtime dir — never inside the git worktree — so the clone stays
+# config-only. Live box: /Users/Shared/opencode-runtime next to opencode-configs.
+oc_omo_runtime_dir() {
+  local repo="${1:-${REPO:-}}" parent
+  [[ -n "$repo" ]] || return 1
+  repo="${repo%/}"
+  parent="$(dirname "$repo")"
+  if [[ "$(basename "$repo")" == "opencode-configs" && -n "$parent" && "$parent" != "/" ]]; then
+    printf '%s/opencode-runtime\n' "$parent"
+    return 0
+  fi
+  printf '%s/opencode-runtime\n' "${XDG_STATE_HOME:-$HOME/.local/state}"
+}
+
+# Collapse ~/.omo and leftover in-repo .runtime into the sibling runtime dir.
+oc_ensure_omo_runtime() {
+  local repo="${1:-${REPO:-}}" runtime home_omo shared_omo in_repo
+  repo="$(cd "$repo" && pwd -P)" || return 1
+  runtime="$(oc_omo_runtime_dir "$repo")"
+  home_omo="${HOME}/.omo"
+  shared_omo="/Users/Shared/.omo"
+  in_repo="$repo/.runtime"
+  mkdir -p "$runtime/tasks" "$runtime/teams"
+  if [[ ! -f "$runtime/DO-NOT-EDIT.txt" ]]; then
+    cat > "$runtime/DO-NOT-EDIT.txt" <<'EOF'
+Generated OmO runtime. Edit oh-my-openagent.json in the OpenConfig repo.
+~/.omo is a symlink here. Do not treat omo.jsonc as source of truth.
+This directory is not the git clone — keep opencode-configs config-only.
+EOF
+  fi
+  # Rescue files if we previously stored runtime inside the clone.
+  if [[ -d "$in_repo" && ! -L "$in_repo" ]]; then
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --exclude '.DS_Store' "$in_repo/" "$runtime/"
+    else
+      cp -Rp "$in_repo/." "$runtime/"
+    fi
+    rm -rf "$in_repo"
+  elif [[ -L "$in_repo" ]]; then
+    rm -f "$in_repo"
+  fi
+  if [[ -L "$home_omo" ]]; then
+    local got
+    got="$(oc_readlink_abs "$home_omo" 2>/dev/null || true)"
+    if ! oc_same_path "$got" "$runtime"; then
+      if [[ -n "$got" && -d "$got" && "$got" != "$runtime" ]]; then
+        if command -v rsync >/dev/null 2>&1; then
+          rsync -a --exclude '.DS_Store' "$got/" "$runtime/"
+        else
+          cp -Rp "$got/." "$runtime/"
+        fi
+      fi
+      rm -f "$home_omo"
+      ln -sfn "$runtime" "$home_omo"
+    fi
+  elif [[ -d "$home_omo" ]]; then
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --exclude '.DS_Store' "$home_omo/" "$runtime/"
+    else
+      cp -Rp "$home_omo/." "$runtime/"
+    fi
+    rm -rf "$home_omo"
+    ln -sfn "$runtime" "$home_omo"
+  else
+    ln -sfn "$runtime" "$home_omo"
+  fi
+  if [[ -e "$shared_omo" || -L "$shared_omo" ]]; then
+    rm -rf "$shared_omo"
+  fi
+  find "$runtime" -maxdepth 1 -type f \( -name 'omo.jsonc.bak' -o -name 'omo.jsonc.bak.*' \) -delete 2>/dev/null || true
+  return 0
+}
+
+# Canonical tree for ~/.omo/teams: live config if OpenConfig, else $1/REPO.
+oc_omo_teams_canonical() {
+  local repo="${1:-${REPO:-}}" live
+  live="$(oc_live_config_root 2>/dev/null || true)"
+  if [[ -n "$live" ]]; then
+    printf '%s\n' "$live"
+    return 0
+  fi
+  if [[ -n "$repo" ]] && oc_is_openconfig_tree "$repo"; then
+    printf '%s\n' "$repo"
+    return 0
+  fi
+  [[ -n "$repo" ]] || return 1
+  printf '%s\n' "$repo"
+}
+
+# True if every tracked team under canonical/teams is a symlink to that tree.
+# Compares ~/.omo/teams/<name> → realpath(live ~/.config/opencode)/teams/<name>
+# (or REPO when that *is* the config link). Missing / copies / foreign targets fail.
+oc_omo_teams_ok() {
+  local repo="${1:-${REPO:-}}" canonical tdir ldir name link got
+  canonical="$(oc_omo_teams_canonical "$repo")" || return 1
+  tdir="$canonical/teams"
+  ldir="${HOME}/.omo/teams"
+  [[ -d "$tdir" && -d "$ldir" ]] || return 1
+  for name in "$tdir"/*/; do
+    [[ -f "${name}config.json" ]] || continue
+    name="$(basename "$name")"
+    link="$ldir/$name"
+    [[ -L "$link" ]] || return 1
+    if command -v realpath >/dev/null 2>&1; then
+      got="$(realpath "$link" 2>/dev/null || true)"
+    else
+      got="$(cd "$link" 2>/dev/null && pwd -P || true)"
+    fi
+    oc_same_path "$got" "$tdir/$name" || return 1
+  done
+  return 0
+}
+
+# True if symlink $1 resolves to $canonical/$2 (live config, or REPO if that is live).
+# Usage: oc_runtime_conf_ok ~/.tmux.conf tmux.conf
+oc_runtime_conf_ok() {
+  local link="${1:?}" rel="${2:?}" live tgt
+  [[ -L "$link" ]] || return 1
+  if command -v realpath >/dev/null 2>&1; then
+    tgt="$(realpath "$link" 2>/dev/null || true)"
+  else
+    tgt="$(oc_readlink_abs "$link" 2>/dev/null || true)"
+  fi
+  [[ -n "$tgt" ]] || return 1
+  live="$(oc_live_config_root 2>/dev/null || true)"
+  if [[ -n "$live" ]]; then
+    oc_same_path "$tgt" "$live/$rel" && return 0
+    return 1
+  fi
+  [[ -n "${REPO:-}" ]] || return 1
+  oc_same_path "$tgt" "$REPO/$rel"
+}
+
 # Set KEY=value only when the key is missing or empty. Never clobbers a set value.
 # Prints "set" if written, "keep" if left alone. Returns 0 either way.
 # Usage: oc_set_env_key_if_unset "$file" KEY value
@@ -1170,7 +1367,7 @@ oc_scrub_env_to_allowlist() {
 oc_import_allowlisted_dotenv() {
   local dump="${1:?}" dest="${2:?}"
   [[ -f "$dump" ]] || return 1
-  oc_ensure_env_file "$dest" >/dev/null 2>&1 || true
+  oc_ensure_env_file "$dest" "${REPO}/.env.example" >/dev/null 2>&1 || true
   local key val imported=()
   for key in "${OC_ENV_ALLOWLIST[@]}"; do
     val="$(oc_get_env_key "$dump" "$key" 2>/dev/null || true)"
@@ -1190,6 +1387,357 @@ oc_import_allowlisted_dotenv() {
   if [[ ${#imported[@]} -gt 0 ]]; then
     printf '%s\n' "${imported[*]}"
   fi
+}
+
+# ── Secrets backends (1Password → Infisical → Doppler) ──────────────
+# vault.json is the public template (example op://Vault/Item/field refs).
+# vault.local.json (gitignored) overlays personal account/vault/item IDs.
+# Launch/run export allowlisted keys. Never `op run` / `infisical run`.
+
+oc_vault_json() {
+  printf '%s\n' "${REPO:-}/vault.json"
+}
+
+oc_vault_local_json() {
+  printf '%s\n' "${REPO:-}/vault.local.json"
+}
+
+# Public template, then vault.local.json overlay (local wins).
+oc_vault_merged_json() {
+  python3 - "${REPO:-}/vault.json" "${REPO:-}/vault.local.json" <<'PY'
+import json, sys
+
+def merge(base, overlay):
+    if isinstance(base, dict) and isinstance(overlay, dict):
+        out = dict(base)
+        for k, v in overlay.items():
+            out[k] = merge(out[k], v) if k in out else v
+        return out
+    return overlay
+
+cfg = {}
+for path in sys.argv[1:]:
+    try:
+        part = json.load(open(path, encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        continue
+    if isinstance(part, dict):
+        cfg = merge(cfg, part)
+print(json.dumps(cfg, separators=(",", ":")))
+PY
+}
+
+# Example placeholders in the public template — not live refs.
+oc_vault_ref_is_example() {
+  local ref="${1:-}"
+  [[ "$ref" == op://Vault/* ]]
+}
+
+# Print live onepassword.refs as KEY<TAB>op://… (allowlisted; skip examples).
+oc_vault_op_refs() {
+  ALLOW="$(IFS=,; echo "${OC_ENV_ALLOWLIST[*]}")" \
+  python3 - "${REPO:-}/vault.json" "${REPO:-}/vault.local.json" <<'PY'
+import json, os, sys
+
+def merge(base, overlay):
+    if isinstance(base, dict) and isinstance(overlay, dict):
+        out = dict(base)
+        for k, v in overlay.items():
+            out[k] = merge(out[k], v) if k in out else v
+        return out
+    return overlay
+
+cfg = {}
+for path in sys.argv[1:]:
+    try:
+        part = json.load(open(path, encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        continue
+    if isinstance(part, dict):
+        cfg = merge(cfg, part)
+allow = set(os.environ.get("ALLOW", "").split(","))
+refs = ((cfg.get("onepassword") or {}).get("refs") or {})
+for k, v in refs.items():
+    if k not in allow:
+        continue
+    if not isinstance(v, str) or not v.startswith("op://"):
+        continue
+    first = v[5:].split("/", 1)[0]
+    if first in ("", "Vault", "VAULT"):
+        continue
+    print(f"{k}\t{v}")
+PY
+}
+
+oc_vault_has_live_op_refs() {
+  oc_vault_op_refs | grep -q $'\t'
+}
+
+oc_secrets_1password_ready() {
+  command -v op >/dev/null 2>&1 || return 1
+  op account get >/dev/null 2>&1
+}
+
+# vault.json infisical.dir_env is the env var name (default INFISICAL_DIR). Path only.
+oc_infisical_dir_env_name() {
+  oc_vault_merged_json | python3 -c '
+import json, sys, re
+try:
+    name = ((json.load(sys.stdin).get("infisical") or {}).get("dir_env") or "INFISICAL_DIR").strip()
+except Exception:
+    name = "INFISICAL_DIR"
+if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
+    name = "INFISICAL_DIR"
+print(name)
+'
+}
+
+# Resolve Infisical project dir: $dir_env → repo/.env → live .env → vault infisical.dir.
+# Never dumps vault secrets.
+oc_infisical_dir() {
+  local name dir live
+  name="$(oc_infisical_dir_env_name)"
+  dir=""
+  if [[ -n "$name" ]]; then
+    dir="${!name:-}"
+  fi
+  if [[ -z "$dir" && -n "${REPO:-}" && -f "${REPO}/.env" ]]; then
+    dir="$(oc_get_env_key "${REPO}/.env" "$name" 2>/dev/null || true)"
+  fi
+  if [[ -z "$dir" ]]; then
+    live="$(oc_live_config_root 2>/dev/null || true)"
+    if [[ -n "$live" && -f "$live/.env" ]]; then
+      if [[ -z "${REPO:-}" ]] || ! oc_same_path "${REPO}/.env" "$live/.env"; then
+        dir="$(oc_get_env_key "$live/.env" "$name" 2>/dev/null || true)"
+      fi
+    fi
+  fi
+  if [[ -z "$dir" ]]; then
+    dir="$(oc_vault_merged_json | python3 -c '
+import json, sys
+try:
+    print(((json.load(sys.stdin).get("infisical") or {}).get("dir") or "").strip())
+except Exception:
+    print("")
+')"
+  fi
+  [[ "$dir" == ~* ]] && dir="${dir/#\~/$HOME}"
+  printf '%s' "$dir"
+}
+
+# True if OPENROUTER_API_KEY is in dest .env, live install .env, or a live vault overlay ref.
+# Never prints the value. Example op://Vault/… placeholders do not count.
+oc_openrouter_key_configured() {
+  local dest="${1:-${REPO:-}/.env}" live val key _ref
+  val="$(oc_get_env_key "$dest" OPENROUTER_API_KEY 2>/dev/null || true)"
+  [[ -n "$val" ]] && return 0
+  live="$(oc_live_config_root 2>/dev/null || true)"
+  if [[ -n "$live" && -f "$live/.env" ]]; then
+    if [[ ! -f "$dest" ]] || ! oc_same_path "$dest" "$live/.env"; then
+      val="$(oc_get_env_key "$live/.env" OPENROUTER_API_KEY 2>/dev/null || true)"
+      [[ -n "$val" ]] && return 0
+    fi
+  fi
+  while IFS=$'\t' read -r key _ref; do
+    [[ "$key" == "OPENROUTER_API_KEY" ]] && return 0
+  done < <(oc_vault_op_refs)
+  return 1
+}
+
+oc_secrets_infisical_ready() {
+  local dir
+  command -v infisical >/dev/null 2>&1 || return 1
+  dir="$(oc_infisical_dir)"
+  [[ -n "$dir" && -d "$dir" ]]
+}
+
+oc_secrets_doppler_ready() {
+  command -v doppler >/dev/null 2>&1 && doppler me >/dev/null 2>&1
+}
+
+# Chosen backend: vault.json backend=auto|1password|infisical|doppler|none
+# 1Password is selected only when the CLI is signed in AND live refs exist
+# (example op://Vault/… placeholders do not count — fall through to Infisical).
+# Prints one token. Exit 0 even when none (prints none).
+oc_secrets_backend() {
+  local want cfg
+  cfg="$(oc_vault_json)"
+  want="auto"
+  if [[ -f "$cfg" ]] || [[ -f "$(oc_vault_local_json)" ]]; then
+    want="$(oc_vault_merged_json | python3 -c 'import json,sys
+try:
+    print((json.load(sys.stdin).get("backend") or "auto").strip().lower())
+except Exception:
+    print("auto")
+')"
+  fi
+  case "$want" in
+    1password|op)
+      oc_secrets_1password_ready && oc_vault_has_live_op_refs && { echo 1password; return 0; }
+      echo none
+      return 0
+      ;;
+    infisical)
+      oc_secrets_infisical_ready && { echo infisical; return 0; }
+      echo none
+      return 0
+      ;;
+    doppler)
+      oc_secrets_doppler_ready && { echo doppler; return 0; }
+      echo none
+      return 0
+      ;;
+    none) echo none; return 0 ;;
+    auto|*)
+      oc_secrets_1password_ready && oc_vault_has_live_op_refs && { echo 1password; return 0; }
+      oc_secrets_infisical_ready && { echo infisical; return 0; }
+      oc_secrets_doppler_ready && { echo doppler; return 0; }
+      echo none
+      return 0
+      ;;
+  esac
+}
+
+# Merge allowlisted KEY=value lines from 1Password refs into dest (0600).
+# Never truncates dest (keeps existing keys). Never prints values.
+# Prints imported key names. Returns 0 if at least one key resolved.
+oc_secrets_export_1password() {
+  local dest="${1:?}" account="" key ref val imported=()
+  oc_ensure_env_file "$dest" "${REPO}/.env.example" >/dev/null 2>&1 || {
+    umask 077
+    : >>"$dest"
+    chmod 600 "$dest" 2>/dev/null || true
+  }
+  account="$(oc_vault_merged_json | python3 -c 'import json,sys
+try:
+    print(((json.load(sys.stdin).get("onepassword") or {}).get("account") or "").strip())
+except Exception:
+    print("")
+')"
+  account="${OP_ACCOUNT:-$account}"
+  if ! oc_vault_has_live_op_refs; then
+    return 1
+  fi
+  while IFS=$'\t' read -r key ref; do
+    [[ -n "$key" && -n "$ref" ]] || continue
+    val=""
+    if [[ -n "$account" ]]; then
+      val="$(op read --account "$account" "$ref" 2>/dev/null || true)"
+    else
+      val="$(op read "$ref" 2>/dev/null || true)"
+    fi
+    [[ -n "$val" ]] || continue
+    oc_set_env_key "$dest" "$key" "$val"
+    imported+=("$key")
+  done < <(oc_vault_op_refs)
+  if [[ ${#imported[@]} -gt 0 ]]; then
+    printf '%s\n' "${imported[*]}"
+    return 0
+  fi
+  return 1
+}
+
+oc_secrets_export_infisical() {
+  local dest="${1:?}" dir env_name
+  dir="$(oc_infisical_dir)"
+  env_name="${INFISICAL_ENV:-}"
+  if [[ -z "$env_name" ]]; then
+    env_name="$(oc_vault_merged_json | python3 -c 'import json,sys
+try:
+    print(((json.load(sys.stdin).get("infisical") or {}).get("env") or "dev").strip())
+except Exception:
+    print("dev")
+')"
+  fi
+  env_name="${env_name:-dev}"
+  [[ -n "$dir" && -d "$dir" ]] || return 1
+  ( cd "$dir" && infisical export --env="$env_name" --format=dotenv --silent >"$dest" ) || return 1
+  perl -i -pe "s/^([A-Z0-9_]+)='([^'\n]*)'$/\$1=\$2/g" "$dest" 2>/dev/null || true
+  chmod 600 "$dest" 2>/dev/null || true
+  [[ -s "$dest" ]]
+}
+
+oc_secrets_export_doppler() {
+  local dest="${1:?}"
+  doppler secrets download --no-file --format=env >"$dest" 2>/dev/null || return 1
+  chmod 600 "$dest" 2>/dev/null || true
+  [[ -s "$dest" ]]
+}
+
+# Import allowlisted keys from the active backend into dest .env.
+# Prints: backend|imported keys (names only)   or backend|  on empty.
+# Usage: oc_secrets_sync ["$REPO/.env"]
+oc_secrets_sync() {
+  local dest="${1:-${REPO}/.env}" backend tmp imported=""
+  backend="$(oc_secrets_backend)"
+  if [[ "$backend" == "none" ]]; then
+    echo "none|"
+    return 1
+  fi
+  if [[ -f "$dest" ]]; then
+    oc_backup_copy "$dest" "env" >/dev/null || true
+  fi
+  case "$backend" in
+    1password)
+      imported="$(oc_secrets_export_1password "$dest" 2>/dev/null || true)"
+      if [[ -z "$imported" ]]; then
+        echo "1password|"
+        return 1
+      fi
+      oc_set_env_key_if_unset "$dest" DO_NOT_TRACK 1 >/dev/null
+      oc_set_env_key_if_unset "$dest" OMO_DISABLE_POSTHOG 1 >/dev/null
+      oc_set_env_key_if_unset "$dest" OMO_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
+      oc_set_env_key_if_unset "$dest" OMO_CODEX_DISABLE_POSTHOG 1 >/dev/null
+      oc_set_env_key_if_unset "$dest" OMO_CODEX_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
+      oc_set_env_key_if_unset "$dest" CODEGRAPH_TELEMETRY 0 >/dev/null
+      oc_set_env_key_if_unset "$dest" OTEL_SDK_DISABLED true >/dev/null
+      chmod 600 "$dest" 2>/dev/null || true
+      printf '%s|%s\n' "$backend" "$imported"
+      return 0
+      ;;
+    infisical|doppler)
+      tmp="$(mktemp "${TMPDIR:-/tmp}/oc-vault.XXXXXX")"
+      if [[ "$backend" == "infisical" ]]; then
+        oc_secrets_export_infisical "$tmp" || { rm -f "$tmp"; echo "infisical|"; return 1; }
+      else
+        oc_secrets_export_doppler "$tmp" || { rm -f "$tmp"; echo "doppler|"; return 1; }
+      fi
+      imported="$(oc_import_allowlisted_dotenv "$tmp" "$dest" 2>/dev/null || true)"
+      rm -f "$tmp"
+      printf '%s|%s\n' "$backend" "$imported"
+      return 0
+      ;;
+    *) echo "none|"; return 1 ;;
+  esac
+}
+
+# Export allowlisted keys that are unset in the current process from 1Password.
+# Does not write .env. Safe to call after oc_export_env_file.
+oc_export_vault_allowlist() {
+  local key ref val account=""
+  oc_secrets_1password_ready || return 0
+  oc_vault_has_live_op_refs || return 0
+  account="$(oc_vault_merged_json | python3 -c 'import json,sys
+try:
+    print(((json.load(sys.stdin).get("onepassword") or {}).get("account") or "").strip())
+except Exception:
+    print("")
+')"
+  account="${OP_ACCOUNT:-$account}"
+  while IFS=$'\t' read -r key ref; do
+    [[ -n "$key" && -n "$ref" ]] || continue
+    if [[ -n "${!key:-}" ]]; then
+      continue
+    fi
+    val=""
+    if [[ -n "$account" ]]; then
+      val="$(op read --account "$account" "$ref" 2>/dev/null || true)"
+    else
+      val="$(op read "$ref" 2>/dev/null || true)"
+    fi
+    [[ -n "$val" ]] || continue
+    export "$key=$val"
+  done < <(oc_vault_op_refs)
 }
 
 # Count non-allowlisted keys in a .env (names only — never prints values).

@@ -5,23 +5,42 @@
 # cleanup --dry-run, setup --check. Safe on a live machine.
 #
 # Usage: ./tests/smoke.sh   |   oc test
+#        OC_CI=1 ./tests/smoke.sh   hermetic (no live install / no API keys)
 #
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=lib/common.sh
 source "$REPO/lib/common.sh"
 
+for arg in "$@"; do
+  case "$arg" in
+    --ci) export OC_CI=1 ;;
+    -h|--help)
+      sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *) echo "Unknown flag: $arg (try --ci)"; exit 2 ;;
+  esac
+done
+
+# GitHub Actions / OC_CI=1: skip doctor, setup, live team links, key-backed probes.
+if [[ "${OC_CI:-}" == "1" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  export OC_CI=1
+  export OC_VALIDATE_OFFLINE="${OC_VALIDATE_OFFLINE:-1}"
+  export OC_VALIDATE_REPO="${OC_VALIDATE_REPO:-$REPO}"
+fi
+
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  c_g=$'\033[32m'; c_r=$'\033[31m'; c_b=$'\033[36m'; c_bold=$'\033[1m'; c_0=$'\033[0m'
+  c_g=$'\033[32m'; c_r=$'\033[31m'; c_b=$'\033[36m'; c_dim=$'\033[2m'; c_bold=$'\033[1m'; c_0=$'\033[0m'
 else
-  c_g=""; c_r=""; c_b=""; c_bold=""; c_0=""
+  c_g=""; c_r=""; c_b=""; c_dim=""; c_bold=""; c_0=""
 fi
 
 pass=0; fail=0
 ok(){ printf "  ${c_g}✓${c_0} %s\n" "$*"; pass=$((pass+1)); }
 bad(){ printf "  ${c_r}✗${c_0} %s\n" "$*"; fail=$((fail+1)); }
 
-printf "\n${c_bold}${c_b}OpenConfig smoke tests${c_0} (read-mostly)\n\n"
+oc_section "oc test"
+printf "  ${c_dim}smoke (read-mostly)${c_0}\n\n"
 
 run_step() {
   local name="$1"; shift
@@ -60,6 +79,32 @@ if "$REPO/oc" help 2>&1 | grep -q 'health, ready'; then
   ok "oc help lists aliases"
 else
   bad "oc help missing aliases"
+fi
+if NO_COLOR=1 "$REPO/oc" help 2>&1 | grep -q $'\033'; then
+  bad "oc help leaks ANSI under NO_COLOR"
+else
+  ok "oc help respects NO_COLOR"
+fi
+if python3 - "$REPO" <<'PY'
+import os, subprocess, sys
+repo = sys.argv[1]
+env = {**os.environ, "NO_COLOR": "1"}
+help_out = subprocess.check_output([os.path.join(repo, "oc"), "help"], env=env, text=True)
+mark = [l for l in help_out.splitlines() if l.startswith("    ╭") or l.startswith("    │oc") or l.startswith("    ╰")]
+if len(mark) != 3:
+    raise SystemExit("mark lines != 3")
+if any(len(l) > 72 for l in mark):
+    raise SystemExit("mark wider than 72")
+if mark[1].find("OpenConfig") != 14 or mark[2].find("Pinned") != 14:
+    raise SystemExit("wordmark misaligned")
+readme = open(os.path.join(repo, "README.md"), encoding="utf-8").read()
+if "    │oc │──── OpenConfig\n    ╰───╯     Pinned stack for OpenCode · OpenRouter · OmO" not in readme:
+    raise SystemExit("README mark != CLI")
+PY
+then
+  ok "brand mark aligned · ≤72 cols · README match"
+else
+  bad "brand mark width/align/README"
 fi
 
 run_step "bash -n doctor.sh" bash -n "$REPO/doctor.sh"
@@ -109,8 +154,7 @@ run_step "locate --json" "$REPO/locate.sh" --json
 run_step "signature" "$REPO/signature.sh"
 run_step "fix --dry-run" "$REPO/fix.sh" --dry-run
 run_step "cleanup --dry-run" "$REPO/cleanup.sh" --dry-run
-run_step "setup --check" "$REPO/setup.sh" --check
-run_step "doctor --quick" "$REPO/doctor.sh" --quick
+run_step "oc secrets --help" "$REPO/oc" secrets --help
 run_step "versions --local" "$REPO/versions.sh" --local
 
 # OmO 4.19.4 native `models` arrays are valid only inside the [opencode]
@@ -216,7 +260,7 @@ ok=(bt.get("defaultConcurrency")==6
     and pc.get("openrouter")==8
     and pc.get("subscription-gateway")==4
     and pc.get("anthropic")==2
-    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==5
+    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==8
     and mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput")==5
     and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==10
     and mc.get("openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")==6
@@ -276,19 +320,34 @@ else
   bad "model fallback isolation drift"
 fi
 
-# doctor --json schema (machine summary for heal/check tooling)
-if "$REPO/doctor.sh" --quick --json 2>/dev/null | python3 -c '
+if [[ "${OC_CI:-}" == "1" ]]; then
+  ok "skipped setup/doctor/models probes (OC_CI=1 hermetic)"
+else
+  run_step "setup --check" "$REPO/setup.sh" --check
+  run_step "doctor --quick" "$REPO/doctor.sh" --quick
+  run_step "models --moderation" "$REPO/models.sh" --moderation
+
+  # doctor --json schema (machine summary for heal/check tooling)
+  if "$REPO/doctor.sh" --quick --json 2>/dev/null | python3 -c '
 import json,sys
-d=json.load(sys.stdin)
+raw=sys.stdin.read()
+if "──" in raw: raise SystemExit(4)
+d=json.loads(raw)
 need=("ok","ready","critical","optional","soft","verdict","version","repo")
 missing=[k for k in need if k not in d]
 if missing: raise SystemExit(1)
 if d.get("critical", 1) != 0: raise SystemExit(2)
 if d.get("verdict") not in ("ready", "core_ready"): raise SystemExit(3)
 '; then
-  ok "doctor --json schema"
+    ok "doctor --json schema"
+  else
+    bad "doctor --json schema"
+  fi
+fi
+if ! "$REPO/validate.sh" --quiet 2>/dev/null | grep -q '──'; then
+  ok "validate --quiet no chrome"
 else
-  bad "doctor --json schema"
+  bad "validate --quiet leaked section chrome"
 fi
 
 # locate JSON schema basics
@@ -305,7 +364,7 @@ else
 fi
 
 # Helpers exist
-for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature; do
+for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature oc_secrets_sync oc_export_vault_allowlist oc_vault_merged_json oc_vault_op_refs oc_live_config_root oc_is_live_config oc_omo_teams_canonical oc_omo_teams_ok oc_runtime_conf_ok oc_banner oc_section oc_infisical_dir oc_openrouter_key_configured oc_telemetry_off; do
   if grep -q "${fn}()" "$REPO/lib/common.sh"; then
     ok "helper $fn"
   else
@@ -352,25 +411,106 @@ if tm.get("enabled") is not True or any(k not in tm for k in need):
 tx = omo.get("tmux") or {}
 if tx.get("enabled") is not True or tx.get("layout") != "main-vertical":
     sys.exit(2)
+if os.environ.get("OC_CI") == "1":
+    sys.exit(0)
+
+def is_openconfig(path):
+    sig_p = os.path.join(path, "signature.json")
+    if not (os.path.isfile(os.path.join(path, "opencode.json")) and os.path.isdir(os.path.join(path, "teams")) and os.path.isfile(sig_p)):
+        return False
+    try:
+        sig = json.load(open(sig_p, encoding="utf-8"))
+    except Exception:
+        return False
+    return sig.get("product") == "OpenConfig" and sig.get("cli") == "oc" and sig.get("id") == "jesseoue/opencode-configs"
+
+xdg = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+link = os.path.join(xdg, "opencode")
+live = os.path.realpath(link) if os.path.lexists(link) else ""
+canonical = live if live and is_openconfig(live) else os.path.realpath(repo)
 base = tm.get("base_dir") or "~/.omo"
 if base.startswith("~/"):
     base = os.path.join(os.path.expanduser("~"), base[2:])
 ldir = os.path.join(base, "teams")
-tdir = os.path.join(repo, "teams")
+tdir = os.path.join(canonical, "teams")
 for name in os.listdir(tdir):
     if not os.path.isfile(os.path.join(tdir, name, "config.json")):
         continue
-    link = os.path.join(ldir, name)
-    if not os.path.islink(link):
+    linkp = os.path.join(ldir, name)
+    if not os.path.islink(linkp):
         sys.exit(3)
-    if os.path.realpath(link) != os.path.realpath(os.path.join(tdir, name)):
+    if os.path.realpath(linkp) != os.path.realpath(os.path.join(tdir, name)):
         sys.exit(4)
 sys.exit(0)
 PY
 then
-  ok "team mode schema + ~/.omo/teams symlinks"
+  if [[ "${OC_CI:-}" == "1" ]]; then
+    ok "team mode schema (live ~/.omo/teams skipped — OC_CI=1)"
+  else
+    ok "team mode schema + ~/.omo/teams → live config"
+  fi
 else
-  bad "team mode incomplete — run: oc fix && oc setup"
+  bad "team mode incomplete — run: oc setup from the live install"
+fi
+
+# signature.version must match versions.json (heal/test identity)
+if python3 - "$REPO" <<'PY'
+import json, sys
+repo = sys.argv[1]
+sig = json.load(open(f"{repo}/signature.json", encoding="utf-8"))
+ver = json.load(open(f"{repo}/versions.json", encoding="utf-8"))
+s, v = str(sig.get("version") or "").strip(), str(ver.get("opencode_configs") or "").strip()
+if not s or s != v:
+    raise SystemExit(f"{s!r} != {v!r}")
+asset = ((ver.get("oh_my_openagent") or {}).get("schema_asset") or "")
+if asset != "omo.schema.json":
+    raise SystemExit(f"schema_asset={asset!r}")
+PY
+then
+  ok "signature.version == versions.json + schema_asset=omo.schema.json"
+else
+  bad "signature.version / schema_asset drift — run: oc signature --refresh"
+fi
+
+# .env.example assignment names ⊆ OC_ENV_ALLOWLIST; allowlist names documented
+if python3 - "$REPO" <<'PY'
+import re, sys
+repo = sys.argv[1]
+common = open(f"{repo}/lib/common.sh", encoding="utf-8").read()
+m = re.search(r"OC_ENV_ALLOWLIST=\((.*?)\)", common, re.S)
+if not m:
+    raise SystemExit("allowlist missing")
+allow = set(re.findall(r"\b[A-Z][A-Z0-9_]+\b", m.group(1)))
+ex = open(f"{repo}/.env.example", encoding="utf-8").read()
+assigned = set()
+for raw in ex.splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        continue
+    if line.startswith("export "):
+        line = line[7:].lstrip()
+    if "=" in line:
+        assigned.add(line.split("=", 1)[0].strip())
+unknown = sorted(assigned - allow)
+if unknown:
+    raise SystemExit("example keys not in allowlist: " + ",".join(unknown))
+missing = sorted(k for k in allow if k not in ex)
+if missing:
+    raise SystemExit("allowlist names missing from .env.example: " + ",".join(missing))
+PY
+then
+  ok ".env.example names match OC_ENV_ALLOWLIST"
+else
+  bad ".env.example / allowlist mismatch"
+fi
+
+# Public vault.json must stay generic; personal refs live in vault.local.json
+if git -C "$REPO" check-ignore -q vault.local.json \
+  && grep -q 'vault.local.json' "$REPO/.gitignore" \
+  && ! grep -qE '[a-z0-9.-]+\.1password\.com|op://[a-z0-9]{20,}/' "$REPO/vault.json"; then
+  ok "vault.json generic + vault.local.json gitignored"
+else
+  bad "vault.json leaked personal 1Password ids or vault.local.json is trackable"
 fi
 
 printf "\n${c_bold}Result:${c_0} %d passed · %d failed\n\n" "$pass" "$fail"

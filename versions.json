@@ -1,15 +1,15 @@
 {
   "product": "OpenConfig",
   "cli": "oc",
-  "opencode_configs": "1.5.60",
+  "opencode_configs": "1.5.80",
   "tagline": "Pinned stack for OpenCode · OpenRouter · oh-my-openagent",
   "opencode": {
-    "min": "1.18.17",
-    "pin_note": "CLI from opencode.ai/install; doctor warns below min"
+    "min": "1.18.30",
+    "pin_note": "GitHub release v1.18.30 (npm latest can lag); verified with local and Railway T3. Runtime export records this compatibility floor."
   },
   "oh_my_openagent": {
     "pin": "4.19.4",
-    "schema_asset": "oh-my-opencode.schema.json"
+    "schema_asset": "omo.schema.json"
   },
   "codegraph": {
     "pin": "1.5.0",

@@ -7,6 +7,10 @@
 # Usage:
 #   ./validate.sh           full report
 #   ./validate.sh --quiet   summary only (exit code still set)
+#
+# ~/.omo/teams must symlink to the *live* install (realpath ~/.config/opencode)
+# when that tree is OpenConfig — not necessarily this checkout.
+# Related: oc setup · oc doctor · oc secrets
 
 set -euo pipefail
 
@@ -41,7 +45,8 @@ def load(path):
 # ---- 1. JSON syntax on every .json in the repo ----
 json_files = [os.path.join(repo, "opencode.json"),
               os.path.join(repo, "oh-my-openagent.json"),
-              os.path.join(repo, "tui.json")]
+              os.path.join(repo, "tui.json"),
+              os.path.join(repo, "t3-opencode.json")]
 json_files += sorted(glob.glob(os.path.join(repo, "profiles", "*.json")))
 parsed = {}
 for p in json_files:
@@ -326,16 +331,128 @@ if oc:
         err(f"team_* tools not allow: {missing_team} — run: oc fix")
     else:
         ok(f"{len(TEAM_TOOLS)} team_* tools allowed")
-    for t in ("task", "edit", "external_directory", "doom_loop", "question", "call_omo_agent"):
+    for t in ("task", "edit", "external_directory", "doom_loop", "question", "call_omo_agent",
+              "lsp", "grep_app", "webfetch", "websearch"):
         if perm.get(t) != "allow":
             err(f"permission.{t} must be allow (got {perm.get(t)!r})")
+    read_perm = perm.get("read")
+    if not (
+        isinstance(read_perm, dict)
+        and read_perm.get("*") == "allow"
+        and read_perm.get("*.env") == "deny"
+        and read_perm.get("*.env.*") == "deny"
+        and read_perm.get("*.env.example") == "allow"
+    ):
+        err("permission.read must allow * and deny .env / .env.* (OpenCode default). Run: oc fix")
+    else:
+        ok("permission.read denies .env (OpenCode docs default)")
+    if oc.get("subagent_depth") != 1:
+        err("opencode.json: subagent_depth must be 1 (OpenCode default; no nested Task storms).")
+    else:
+        ok("subagent_depth = 1")
+    compaction = oc.get("compaction") or {}
+    if compaction.get("auto") is not True or compaction.get("prune") is not True or compaction.get("reserved") != 24000:
+        err("opencode.json: compaction must be auto+prune with reserved 24000 (docs: auto/prune/reserved).")
+    else:
+        ok("compaction auto/prune/reserved=24000")
     bash = perm.get("bash")
     if not (isinstance(bash, dict) and bash.get("*") == "allow"):
         err("permission.bash['*'] must be allow (allow-everything mode)")
     else:
-        ok("core tools + bash allow-everything (catastrophic denies kept)")
+        want_deny = {
+            "rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf ~/*",
+            "mkfs*", "sudo *", "sudo",
+            "git push --force*", "git push -f*", "gh repo delete*",
+        }
+        missing_deny = sorted(p for p in want_deny if bash.get(p) != "deny")
+        if missing_deny:
+            err(f"permission.bash missing catastrophic deny: {missing_deny} — run: oc fix")
+        else:
+            ok("core tools + bash allow-everything (catastrophic denies kept)")
     if not oc.get("enabled_providers"):
         warn("opencode.json: enabled_providers not set — all providers with credentials will load.")
+    elif oc.get("enabled_providers") != ["openrouter", "subscription-gateway", "venice", "deepseek"]:
+        err("opencode.json: enabled_providers must be ['openrouter', 'subscription-gateway', 'venice', 'deepseek']")
+    else:
+        ok("enabled_providers = openrouter + subscription-gateway + venice + deepseek")
+    vmodels = set(((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}))
+    if "deepseek-v4-pro-0813" not in vmodels:
+        err("venice must expose deepseek-v4-pro-0813 (content-aware DeepSeek primary)")
+    else:
+        ok("venice exposes deepseek-v4-pro-0813 for content-aware")
+    if "deepseek-v4-1-flash" not in vmodels:
+        err("venice must expose deepseek-v4-1-flash (content-aware-fast / V4.1 Flash)")
+    else:
+        ok("venice exposes deepseek-v4-1-flash for content-aware-fast")
+    vwl = ((((oc.get("provider") or {}).get("venice") or {}).get("whitelist")) or [])
+    if set(vwl) != vmodels:
+        err("venice whitelist must match venice.models (keeps T3 Variant/Agent on curated slugs)")
+    else:
+        ok("venice whitelist matches curated models")
+    vprov = ((oc.get("provider") or {}).get("venice") or {})
+    vopts = vprov.get("options") or {}
+    if vprov.get("npm") != "@ai-sdk/openai-compatible":
+        err("provider.venice.npm must be @ai-sdk/openai-compatible (direct Venice API, not OpenRouter)")
+    elif str(vopts.get("baseURL") or "") != "https://api.venice.ai/api/v1":
+        err("provider.venice.options.baseURL must be https://api.venice.ai/api/v1")
+    elif "apiKey" in vprov or "apiKey" in vopts or "{env:VENICE" in json.dumps(vprov):
+        err("provider.venice must not embed apiKey / {env:VENICE} — use opencode auth + .env")
+    else:
+        ok("venice is a first-party provider (api.venice.ai, no key in JSON)")
+    venice_thinking_ok = True
+    for vm, vcfg in ((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}).items():
+        if not isinstance(vcfg, dict):
+            continue
+        vopts = vcfg.get("options") or {}
+        if vopts.get("disable_thinking") is True:
+            err(f"venice/{vm} options.disable_thinking is top-level — Venice 400s; nest under venice_parameters")
+            venice_thinking_ok = False
+        vp = vopts.get("venice_parameters") or {}
+        if vp.get("disable_thinking") is not True:
+            err(f"venice/{vm} options.venice_parameters.disable_thinking must be true (top-level disable_thinking is an unrecognized key)")
+            venice_thinking_ok = False
+        for vn, vv in (vcfg.get("variants") or {}).items():
+            if not isinstance(vv, dict):
+                continue
+            if vv.get("disable_thinking") is True:
+                err(f"venice/{vm} variants.{vn}.disable_thinking is top-level — Venice 400s; nest under venice_parameters")
+                venice_thinking_ok = False
+            if (vv.get("venice_parameters") or {}).get("disable_thinking") is not True:
+                err(f"venice/{vm} variants.{vn}.venice_parameters.disable_thinking must be true")
+                venice_thinking_ok = False
+    or_models_chk = (((oc.get("provider") or {}).get("openrouter") or {}).get("models")) or {}
+    for mid, m in or_models_chk.items() if isinstance(or_models_chk, dict) else []:
+        o = (m or {}).get("options") or {}
+        if o.get("disable_thinking") is True or (o.get("venice_parameters") or {}).get("disable_thinking") is True:
+            err(f"openrouter {mid}: disable_thinking is Venice-only — do not set it on OpenRouter/GLM")
+            venice_thinking_ok = False
+    ds_models_chk = (((oc.get("provider") or {}).get("deepseek") or {}).get("models")) or {}
+    for mid, m in ds_models_chk.items() if isinstance(ds_models_chk, dict) else []:
+        o = (m or {}).get("options") or {}
+        if o.get("disable_thinking") is True or (o.get("venice_parameters") or {}).get("disable_thinking") is True:
+            err(f"deepseek {mid}: disable_thinking is Venice-only — native DeepSeek stays separate")
+            venice_thinking_ok = False
+    if venice_thinking_ok:
+        ok("venice models pin venice_parameters.disable_thinking (OpenRouter/native DeepSeek do not)")
+    or_wl = set((((oc.get("provider") or {}).get("openrouter") or {}).get("whitelist")) or [])
+    venice_slugs = {"deepseek-v4-pro-0813", "deepseek-v4-pro", "deepseek-v4-1-flash"}
+    leaked_venice = sorted(x for x in or_wl if x in venice_slugs or str(x).startswith("venice/"))
+    if leaked_venice:
+        err(f"openrouter whitelist must not carry Venice slugs {leaked_venice} — Venice is its own provider")
+    dmodels = set(((((oc.get("provider") or {}).get("deepseek") or {}).get("models")) or {}))
+    dwl = ((((oc.get("provider") or {}).get("deepseek") or {}).get("whitelist")) or [])
+    if "deepseek-v4-pro" not in dmodels or "deepseek-flash" not in dmodels:
+        err("deepseek must expose deepseek-v4-pro and deepseek-flash (native sisyphus-deepseek lane)")
+    elif set(dwl) != dmodels:
+        err("deepseek whitelist must match deepseek.models")
+    else:
+        ok("deepseek exposes native V4 Pro + Flash")
+    for vm in vmodels:
+        vars_ = ((((oc.get("provider") or {}).get("venice") or {}).get("models") or {}).get(vm) or {}).get("variants") or {}
+        if set(vars_) != {"low", "medium", "high", "max"}:
+            err(f"venice/{vm} must define variants low/medium/high/max")
+        else:
+            ok(f"venice/{vm} variants low/medium/high/max")
     plug = oc.get("plugin", [])
     if not any("oh-my-opencode" in p or "oh-my-openagent" in p for p in plug):
         warn("opencode.json: oh-my-openagent plugin not pinned in the plugin array.")
@@ -422,6 +539,19 @@ if omo:
         err(f"opencode.json: default_agent must be 'sisyphus' (got {(oc or {}).get('default_agent')!r})")
     if omo.get("default_run_agent") != "sisyphus":
         err(f"oh-my-openagent.json: default_run_agent must be 'sisyphus' (got {omo.get('default_run_agent')!r})")
+    want_optional = {
+        "sisyphus-deepseek": "deepseek/deepseek-v4-pro",
+        "sisyphus-deepseek-junior": "deepseek/deepseek-flash",
+        "sisyphus-venice-deepseek": "venice/deepseek-v4-pro-0813",
+        "sisyphus-venice-deepseek-flash-junior": "venice/deepseek-v4-1-flash",
+        "context-aware-hermes": "openrouter/nousresearch/hermes-4-405b",
+    }
+    for name, mid in want_optional.items():
+        cfg = agents.get(name) or {}
+        if cfg.get("model") != mid:
+            err(f"oh-my-openagent.json agents.{name} must use {mid} (got {cfg.get('model')!r})")
+        else:
+            ok(f"optional {name} → {mid}")
     order = omo.get("agent_order") or []
     if not isinstance(order, list) or not order or order[0] != "sisyphus":
         err("oh-my-openagent.json: agent_order must start with 'sisyphus'")
@@ -446,6 +576,8 @@ if omo:
     else:
         ok("sisyphus_agent enabled")
     omo_jsonc = os.path.expanduser("~/.omo/omo.jsonc")
+    if os.environ.get("OC_CI") == "1":
+        omo_jsonc = ""
     if os.path.isfile(omo_jsonc):
         with open(omo_jsonc, encoding="utf-8") as f:
             migrated = f.read()
@@ -655,10 +787,10 @@ if omo:
                 err(f"runtime-profile.json[pentest.{field}]: must use {pentest_flash}")
         ok("pentest profile routes every lane from DeepSeek V4 Flash 0731 ZDR Throughput to Pro 0813 ZDR Throughput")
     normal_ca_deep = (((normal_profile or {}).get("categories") or {}).get("content-aware-deep") or {})
-    if normal_profile and normal_ca_deep.get("model") != pentest_pro:
-        err("runtime-profile.json[normal.categories.content-aware-deep]: primary must be DeepSeek V4 Pro 0813")
+    if normal_profile and normal_ca_deep.get("model") != "venice/deepseek-v4-pro-0813":
+        err("runtime-profile.json[normal.categories.content-aware-deep]: primary must be Venice DeepSeek V4 Pro 0813")
     elif normal_profile:
-        ok("normal content-aware-deep uses DeepSeek V4 Pro 0813")
+        ok("normal content-aware-deep uses Venice DeepSeek V4 Pro 0813")
     # Upstream 1.5.60 invariant: normal-mode vision chains must stay vision-capable
     # end-to-end. The pentest profile is a deliberate GLM/DeepSeek-only lane, so
     # validate the normal profile separately instead of flagging active pentest.
@@ -683,7 +815,7 @@ if omo:
     for profile_name, profile in capability_profiles:
         for section in ("agents", "categories"):
             for name, cfg in ((profile or {}).get(section) or {}).items():
-                if name == "content-aware-research":
+                if name in ("content-aware-research", "context-aware-hermes"):
                     continue
                 for ref in _route_refs(profile, section, name):
                     model_cfg = _model_config_for_ref(ref)
@@ -921,17 +1053,46 @@ if omo:
                 if isinstance(fb, str):
                     ref_ids.add(fb)
     mc_keys = set(mc)
-    if (mc.get("openrouter/deepseek/deepseek-v4-pro-0813") != 5
+    if (mc.get("openrouter/deepseek/deepseek-v4-pro-0813") != 8
             or mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput") != 5):
-        err("modelConcurrency DeepSeek V4 Pro 0813 and ZDR Throughput must be 5 — run: oc fix")
+        err("modelConcurrency DeepSeek V4 Pro 0813 must be 8 and ZDR Throughput must be 5 — run: oc fix")
     else:
-        ok("modelConcurrency DeepSeek V4 Pro 0813 and ZDR Throughput=5")
+        ok("modelConcurrency DeepSeek V4 Pro 0813=8 and ZDR Throughput=5")
     miss_mc = sorted(i for i in ref_ids if not (_mc_aliases(i) & mc_keys))
     if miss_mc:
         warn(f"modelConcurrency missing {len(miss_mc)} model(s): {', '.join(miss_mc[:5])}"
              + ("…" if len(miss_mc) > 5 else ""))
     elif ref_ids:
         ok(f"modelConcurrency covers {len(ref_ids)} referenced models")
+    ds_pro = mc.get("openrouter/deepseek/deepseek-v4-pro-0813")
+    if ds_pro != 8:
+        err(
+            "modelConcurrency openrouter/deepseek/deepseek-v4-pro-0813 must be 8 "
+            f"(explore+librarian+deep share it; got {ds_pro!r}) — run: oc fix"
+        )
+    else:
+        ok("modelConcurrency DeepSeek Pro 0813=8")
+    if mc.get("deepseek/deepseek-v4-pro") != 4:
+        err(
+            "modelConcurrency deepseek/deepseek-v4-pro must be 4 "
+            f"(native key stampede guard; got {mc.get('deepseek/deepseek-v4-pro')!r})"
+        )
+    else:
+        ok("modelConcurrency native DeepSeek V4 Pro=4")
+    if mc.get("deepseek/deepseek-flash") != 6:
+        err(
+            "modelConcurrency deepseek/deepseek-flash must be 6 "
+            f"(native flash cap; got {mc.get('deepseek/deepseek-flash')!r})"
+        )
+    else:
+        ok("modelConcurrency native DeepSeek Flash=6")
+    if mc.get("venice/deepseek-v4-pro-0813") != 5:
+        err(
+            "modelConcurrency venice/deepseek-v4-pro-0813 must be 5 "
+            f"(Venice key share; got {mc.get('venice/deepseek-v4-pro-0813')!r})"
+        )
+    else:
+        ok("modelConcurrency Venice DeepSeek Pro=5")
 
     # team specs (~/.omo/teams via repo teams/) — OmO hard-rejects read-only agents as members
     # https://omo.vibetip.help/docs + docs/guide/team-mode.md
@@ -940,6 +1101,9 @@ if omo:
     TEAM_HARD_REJECT = {
         "oracle", "librarian", "explore", "multimodal-looker",
         "metis", "momus", "prometheus", "plan",
+        "context-aware-hermes",
+        "content-aware-research",
+        "content-aware-fast",
     }
     TEAM_KEYS = {"version", "name", "description", "lead", "members"}
     LEAD_KEYS = {"kind", "subagent_type", "category", "prompt"}
@@ -1096,29 +1260,60 @@ if omo:
                 else:
                     ownership[scope] = m.get("name")
         ok(f"{len(team_cfgs)} team spec(s) checked against OmO eligibility and lifecycle rules")
-        # Provisioned ~/.omo/teams entries must be symlinks into this repo
+        # Provisioned ~/.omo/teams must symlink to the live OpenConfig tree
+        # (realpath ~/.config/opencode), not "must equal this checkout".
+        def _is_openconfig_tree(path):
+            if not path or not os.path.isdir(path):
+                return False
+            sig_p = os.path.join(path, "signature.json")
+            if not (
+                os.path.isfile(os.path.join(path, "opencode.json"))
+                and os.path.isdir(os.path.join(path, "teams"))
+                and os.path.isfile(sig_p)
+            ):
+                return False
+            try:
+                sig = json.load(open(sig_p, encoding="utf-8"))
+            except Exception:
+                return False
+            return (
+                sig.get("product") == "OpenConfig"
+                and sig.get("cli") == "oc"
+                and sig.get("id") == "jesseoue/opencode-configs"
+            )
+
+        live = os.environ.get("OC_LIVE_CONFIG") or ""
+        if live:
+            live = os.path.realpath(live)
+        repo_real = os.path.realpath(repo)
+        if live and _is_openconfig_tree(live):
+            canonical = live
+        elif _is_openconfig_tree(repo_real):
+            canonical = repo_real
+        else:
+            canonical = repo_real
         base = (tm.get("base_dir") or "~/.omo")
         if isinstance(base, str) and base.startswith("~/"):
             base = os.path.join(os.path.expanduser("~"), base[2:])
         elif isinstance(base, str) and base == "~":
             base = os.path.expanduser("~")
         ldir = os.path.join(base, "teams") if isinstance(base, str) else ""
-        if ldir and os.path.isdir(ldir):
+        if os.environ.get("OC_CI") != "1" and ldir and os.path.isdir(ldir):
             bad_links = []
             for cfg_path in team_cfgs:
                 name = os.path.basename(os.path.dirname(cfg_path))
                 link = os.path.join(ldir, name)
-                want = os.path.realpath(os.path.dirname(cfg_path))
+                want = os.path.realpath(os.path.join(canonical, "teams", name))
                 if not os.path.lexists(link):
-                    bad_links.append(f"{name} (missing — run oc setup)")
+                    bad_links.append(f"{name} (missing — run oc setup from the live install)")
                 elif not os.path.islink(link):
-                    bad_links.append(f"{name} (directory copy — run oc setup)")
+                    bad_links.append(f"{name} (directory copy — run oc setup from the live install)")
                 elif os.path.realpath(link) != want:
-                    bad_links.append(f"{name} (symlink drift — run oc setup)")
+                    bad_links.append(f"{name} (want {want})")
             if bad_links:
-                err(f"~/.omo/teams provision drift: {', '.join(bad_links)}")
+                err(f"~/.omo/teams provision drift (live {canonical}): {', '.join(bad_links)}")
             else:
-                ok(f"{len(team_cfgs)} team specs symlinked under {ldir}")
+                ok(f"{len(team_cfgs)} team specs → live {canonical}/teams")
 
     # cross-file: every agent/category model + fallback resolves to a defined model
     if oc:
@@ -1152,7 +1347,7 @@ present = [s for s in STRAYS if os.path.lexists(os.path.join(repo, s))]
 if present:
     err(f"config-only violation — remove install/runtime strays: {present} (run ./cleanup.sh or ./fix.sh)")
 else:
-    ok("config dir clean (no node_modules/package.json/.omo/.sisyphus/command/plugins)")
+    ok("config dir clean (no node_modules/package.json/.omo/.runtime/.sisyphus/command/plugins)")
 
 # Structural questions need a clear CodeGraph-first route without forcing the
 # graph for a trivial direct read.  Keep the marker testable across overlays.
@@ -1169,8 +1364,9 @@ except OSError as exc:
 # git must ignore the common install paths (even when absent)
 ignore_targets = [
     "node_modules", "node_modules/pkg", "package.json", "package-lock.json",
-    "bun.lock", ".omo", ".sisyphus", ".codegraph", "command", ".opencode",
+    "bun.lock", ".omo", ".runtime", ".sisyphus", ".codegraph", "command", ".opencode",
     ".cursor", "plugins", "stray-not-in-allowlist.txt", "opencode.log", "logs/x.log",
+    "vault.local.json",
 ]
 try:
     r = subprocess.run(
@@ -1179,9 +1375,10 @@ try:
     )
     ignored = {line.split("\t")[-1] for line in r.stdout.splitlines() if "\t" in line}
     required = {
-        "node_modules", "package.json", ".omo", ".sisyphus", ".codegraph",
+        "node_modules", "package.json", ".omo", ".runtime", ".sisyphus", ".codegraph",
         "command", ".opencode", ".cursor", "plugins",
         "stray-not-in-allowlist.txt", "opencode.log",
+        "vault.local.json",
     }
     missing_ignore = sorted(required - ignored)
     if missing_ignore:
@@ -1195,8 +1392,15 @@ try:
         err(".gitignore missing root deny-all '/*' (config-only allowlist required)")
     elif "!prompts/" not in gi_noncomment and "!prompts/**" not in gi_noncomment:
         err(".gitignore deny-all missing prompts/ allowlist entries")
+    elif "!.github/" not in gi_noncomment and "!.github/**" not in gi_noncomment:
+        err(".gitignore deny-all missing .github/ allowlist (CI workflows would be untracked)")
     else:
         ok(".gitignore is deny-all + allowlist (config-only)")
+    wf = os.path.join(repo, ".github", "workflows", "check.yml")
+    if not os.path.isfile(wf):
+        err(".github/workflows/check.yml missing — hermetic CI required")
+    else:
+        ok("GitHub Actions check.yml present")
 except FileNotFoundError:
     warn("git not available — skipped ignore coverage check")
 
@@ -1211,7 +1415,10 @@ def resolve_prompt_uri(uri):
     except Exception:
         pass
     if raw.startswith("~/"):
-        raw = os.path.join(os.path.expanduser("~"), raw[2:])
+        if os.environ.get("OC_CI") == "1" and raw.startswith("~/.config/opencode/"):
+            raw = os.path.join(repo, raw[len("~/.config/opencode/"):])
+        else:
+            raw = os.path.join(os.path.expanduser("~"), raw[2:])
     elif raw.startswith("./") or not os.path.isabs(raw):
         raw = os.path.normpath(os.path.join(repo, raw.lstrip("./")))
     return raw
@@ -1325,6 +1532,78 @@ else:
             ok("profiles/content-aware.json → default content-aware-research route (edit deny)")
     except Exception as e:
         err(f"profiles/content-aware.json: invalid JSON ({e})")
+if omo:
+    ca_want = {
+        ("agents", "content-aware-research"): "venice/deepseek-v4-pro-0813",
+        ("agents", "content-aware-fast"): "venice/deepseek-v4-1-flash",
+        ("categories", "content-aware-fast"): "venice/deepseek-v4-1-flash",
+        ("categories", "content-aware-deep"): "venice/deepseek-v4-pro-0813",
+    }
+    for (sec, ca_name), want in ca_want.items():
+        ca = ((omo.get(sec) or {}).get(ca_name) or {})
+        cm = str(ca.get("model") or "")
+        if not cm.startswith("venice/"):
+            err(f"oh-my-openagent.json[{sec}.{ca_name}] must be venice/<model> (got {cm!r})")
+        elif want and cm != want:
+            err(f"{sec}.{ca_name} must be {want} (got {cm!r})")
+        else:
+            ok(f"{sec}.{ca_name} → {cm}")
+        for fb in (ca.get("fallback_models") or []):
+            if "openrouter/" in str(fb).lower() or not str(fb).startswith("venice/"):
+                err(f"{sec}.{ca_name} fallback {fb!r} must be venice/<model> (never OpenRouter)")
+        if "openrouter/" in cm.lower():
+            err(f"{sec}.{ca_name} primary {cm!r} must never be OpenRouter — Venice only")
+    for vname in ("sisyphus-venice-deepseek", "sisyphus-venice-deepseek-flash-junior"):
+        vcfg = ((omo.get("agents") or {}).get(vname) or {})
+        vm = str(vcfg.get("model") or "")
+        if not vm.startswith("venice/"):
+            err(f"agents.{vname} must be venice/<model> (got {vm!r})")
+        for fb in (vcfg.get("fallback_models") or []):
+            if "openrouter/" in str(fb).lower() or not str(fb).startswith("venice/"):
+                err(f"agents.{vname} fallback {fb!r} must be venice/<model> (never OpenRouter)")
+        uw = vcfg.get("ultrawork") or {}
+        uwm = uw.get("model") if isinstance(uw, dict) else None
+        if uwm and not str(uwm).startswith("venice/"):
+            err(f"agents.{vname} ultrawork.model must be venice/<model> (got {uwm!r})")
+    hermes = ((omo.get("agents") or {}).get("context-aware-hermes") or {})
+    hm = str(hermes.get("model") or "")
+    if hm != "openrouter/nousresearch/hermes-4-405b":
+        err(f"agents.context-aware-hermes must be openrouter/nousresearch/hermes-4-405b (got {hm!r})")
+    else:
+        ok("agents.context-aware-hermes → openrouter/nousresearch/hermes-4-405b")
+    if (hermes.get("permission") or {}).get("edit") != "deny":
+        err("agents.context-aware-hermes.permission.edit must be deny")
+    else:
+        ok("agents.context-aware-hermes edit deny")
+    # Official OmO tool boundaries: https://omo.vibetip.help/docs/agents
+    for ro in ("oracle", "librarian", "explore", "multimodal-looker"):
+        rp = ((omo.get("agents") or {}).get(ro) or {}).get("permission") or {}
+        if rp.get("edit") != "deny" or rp.get("task") != "deny":
+            err(f"agents.{ro} must deny edit+task (OmO read-only / no-delegation boundary)")
+        else:
+            ok(f"agents.{ro} edit+task deny (OmO docs)")
+    for fb in hermes.get("fallback_models") or []:
+        if "hermes" in str(fb).lower():
+            err(f"context-aware-hermes fallback {fb!r} must be tool-capable (not Hermes)")
+    hermes_md = os.path.join(repo, "agents", "context-aware-hermes.md")
+    if not os.path.isfile(hermes_md):
+        err("agents/context-aware-hermes.md missing")
+    else:
+        body = open(hermes_md, encoding="utf-8").read()
+        if re.search(r"(?m)^\s*edit:\s*deny\s*$", body) is None:
+            err("agents/context-aware-hermes.md: permission.edit must be deny")
+        md_model = re.search(r"(?m)^model:\s*(\S+)", body)
+        if not md_model or md_model.group(1) != "openrouter/nousresearch/hermes-4-405b":
+            err("agents/context-aware-hermes.md model must be openrouter/nousresearch/hermes-4-405b")
+        else:
+            ok("agents/context-aware-hermes.md present (edit deny, Hermes 405B)")
+    for sec, items in (("agents", omo.get("agents") or {}), ("categories", omo.get("categories") or {})):
+        for ca_name, ca in items.items():
+            if not str(ca_name).startswith("content-aware") or not isinstance(ca, dict):
+                continue
+            for slot, ref in [("model", ca.get("model"))] + [("fallback", fb) for fb in (ca.get("fallback_models") or [])]:
+                if "openrouter/" in str(ref or "").lower():
+                    err(f"{sec}.{ca_name} {slot} {ref!r} must never be OpenRouter — Venice only")
 
 # ---- 4c1b. Kimi must remain an explicit, evaluated escalation lane ----
 cats = omo.get("categories") or {}
@@ -1415,6 +1694,14 @@ else:
                 pin = p.split("@", 1)[1]
                 break
         want = ((vdata.get("oh_my_openagent") or {}).get("pin") or "")
+        asset = ((vdata.get("oh_my_openagent") or {}).get("schema_asset") or "")
+        if asset != "omo.schema.json":
+            err(
+                f"versions.json oh_my_openagent.schema_asset={asset!r} — "
+                "expected omo.schema.json (validate rejects legacy basenames)"
+            )
+        else:
+            ok("versions.json schema_asset=omo.schema.json")
         if pin and want and pin != want:
             err(f"oh-my-openagent pin {pin!r} ≠ versions.json {want!r}")
         elif pin and want:
@@ -1489,14 +1776,49 @@ if nonexec:
 elif not missing_scripts:
     ok("required scripts are executable")
 
+for leftover in ("cursor.sh", "cursor-openrouter.json", "cursor-venice.json"):
+    if os.path.isfile(os.path.join(repo, leftover)):
+        err(f"{leftover} must not exist — OpenConfig does not wire Cursor IDE")
+
+t3_spec_path = os.path.join(repo, "t3-opencode.json")
+if not os.path.isfile(t3_spec_path):
+    err("t3-opencode.json missing")
+else:
+    try:
+        t3 = json.load(open(t3_spec_path, encoding="utf-8"))
+        if t3.get("serverUrl") != "http://127.0.0.1:4097":
+            err("t3-opencode.json serverUrl must be http://127.0.0.1:4097")
+        blob = json.dumps(t3)
+        if "sk-" in blob or "VENICE_" in blob or "apiKey" in blob:
+            err("t3-opencode.json must not contain keys or apiKey fields")
+        or_wl = set((((oc.get("provider") or {}).get("openrouter") or {}).get("whitelist")) or [])
+        venice_models = set(((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}))
+        extras = []
+        for m in (t3.get("catalogModels") or []) + (t3.get("customModels") or []):
+            if m.startswith("openrouter/"):
+                if m.split("/", 1)[1] not in or_wl:
+                    extras.append(m)
+            elif m.startswith("venice/"):
+                if m.split("/", 1)[1] not in venice_models:
+                    extras.append(m)
+            else:
+                extras.append(m)
+        if extras:
+            err(f"t3-opencode.json customModels not on curated providers: {extras}")
+        else:
+            ok(f"t3-opencode.json ({len(t3.get('customModels') or [])} models → 4097)")
+    except json.JSONDecodeError as e:
+        err(f"t3-opencode.json invalid JSON: {e}")
+
 common_sh = open(os.path.join(repo, "lib/common.sh"), encoding="utf-8").read()
 missing_helpers = [fn for fn in (
-    "oc_banner", "oc_projects_dir", "oc_ensure_launch_workspace", "oc_resolve_launch_dir",
+    "oc_banner", "oc_section", "oc_projects_dir", "oc_ensure_launch_workspace", "oc_resolve_launch_dir",
     "oc_prune_stale_omo_plugin_caches", "oc_ensure_omo_plugin_cache",
     "oc_version_ge", "oc_write_project_opencode_json", "oc_expand_path",
     "oc_set_env_key_if_unset", "oc_ensure_env_file", "oc_link_points_to", "oc_ensure_symlink",
     "oc_verify_signature", "oc_signature_compute", "oc_signature_refresh",
     "oc_scrub_env_to_allowlist", "oc_import_allowlisted_dotenv", "oc_env_foreign_key_count",
+    "oc_secrets_sync", "oc_secrets_backend", "oc_export_vault_allowlist", "oc_vault_op_refs",
     "oc_backup_copy",
 ) if f"{fn}()" not in common_sh]
 if missing_helpers:
@@ -1504,7 +1826,7 @@ if missing_helpers:
 elif "OpenConfig" in common_sh:
     ok("lib/common.sh has OpenConfig banner + path/version helpers")
 
-# Secrets hygiene: .env must never be tracked; launch must not Infisical-wrap
+# Secrets hygiene: .env must never be tracked; launch must not wrap vault CLIs
 env_tracked = subprocess.run(
     ["git", "-C", repo, "ls-files", "--error-unmatch", ".env"],
     capture_output=True, text=True,
@@ -1513,17 +1835,53 @@ if env_tracked:
     err(".env is tracked by git — remove it immediately (secrets leak)")
 else:
     ok(".env is not tracked by git")
-for rel in ("opencode.sh", "run.sh", "oc"):
+wrap_needles = (
+    "infisical run --",
+    "op run --",
+    "doppler run --",
+)
+for rel in ("opencode.sh", "run.sh", "oc", "launch-desktop.sh", "serve-desktop.sh", "setup.sh", "lib/common.sh"):
     body = open(os.path.join(repo, rel), encoding="utf-8").read()
-    if "infisical run --env=ops" in body or "infisical run --env=prod" in body:
-        err(f"{rel}: Infisical process wrap injects vault secrets — remove (use oc setup --sync-env)")
-if not any(
-    "infisical run --env=ops" in open(os.path.join(repo, rel), encoding="utf-8").read()
-    for rel in ("opencode.sh", "run.sh", "oc")
-):
-    ok("launch/run paths do not Infisical-wrap the agent process")
+    hits = [n.strip() for n in wrap_needles if n in body]
+    if hits:
+        err(f"{rel}: vault process wrap ({', '.join(hits)}) — use oc secrets sync")
+vault_path = os.path.join(repo, "vault.json")
+if not os.path.isfile(vault_path):
+    err("vault.json missing (1Password / Infisical refs)")
 else:
-    err("lib/common.sh missing OpenConfig branding")
+    try:
+        vault = json.load(open(vault_path, encoding="utf-8"))
+        refs = ((vault.get("onepassword") or {}).get("refs") or {})
+        bad_refs = [k for k, v in refs.items() if not isinstance(v, str) or not v.startswith("op://")]
+        leaked = []
+        raw = open(vault_path, encoding="utf-8").read()
+        if re.search(r"sk-or-v1-|sk-[A-Za-z0-9]{20,}", raw):
+            leaked.append("looks like a live API key")
+        if re.search(r"[a-z0-9.-]+\.1password\.com", raw):
+            leaked.append("1Password account hostname")
+        if re.search(r"op://[a-z0-9]{20,}/", raw):
+            leaked.append("live vault/item id")
+        vault_id = ((vault.get("onepassword") or {}).get("vault_id") or "")
+        if isinstance(vault_id, str) and re.fullmatch(r"[a-z0-9]{16,}", vault_id):
+            leaked.append("live vault_id")
+        if bad_refs:
+            err(f"vault.json refs must be op://… ({bad_refs})")
+        elif leaked:
+            err(f"vault.json must stay generic — put personal refs in vault.local.json ({', '.join(leaked)})")
+        elif not refs:
+            ok("vault.json has empty 1Password refs (fill vault.local.json or example op://Vault/Item/field)")
+        else:
+            ok(f"vault.json ({len(refs)} example 1Password refs, no personal ids)")
+    except Exception as e:
+        err(f"vault.json invalid: {e}")
+if not any(
+    needle in open(os.path.join(repo, rel), encoding="utf-8").read()
+    for rel in ("opencode.sh", "run.sh", "oc", "launch-desktop.sh", "serve-desktop.sh")
+    for needle in ("infisical run --", "op run --", "doppler run --")
+):
+    ok("launch/run paths do not wrap op/infisical/doppler")
+else:
+    err("launch/run still wraps a secrets CLI")
 
 oc_cli = open(os.path.join(repo, "oc"), encoding="utf-8").read()
 if "OpenConfig" not in oc_cli:
@@ -1538,8 +1896,10 @@ elif "locate" not in oc_cli:
     err("oc CLI missing locate command")
 elif "signature" not in oc_cli:
     err("oc CLI missing signature command")
+elif "do_secrets" not in oc_cli:
+    err("oc CLI missing secrets command")
 else:
-    ok("oc CLI branded OpenConfig with install + heal + locate + test + signature")
+    ok("oc CLI branded OpenConfig with install + heal + locate + test + signature + secrets")
 
 # ---- 4c7. docs / env example / bunfig / zshrc ----
 for rel, label in (
@@ -1549,6 +1909,7 @@ for rel, label in (
     ("bunfig.toml", "bunfig.toml"),
     ("zshrc.snippet", "zshrc.snippet"),
     ("projects.json", "projects.json"),
+    ("vault.json", "vault.json"),
 ):
     if not os.path.isfile(os.path.join(repo, rel)):
         err(f"{label} missing")
@@ -1559,7 +1920,7 @@ env_ex = open(os.path.join(repo, ".env.example"), encoding="utf-8").read()
 for key in ("OPENROUTER_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "EXA_API_KEY", "CONTEXT7_API_KEY", "OC_PROJECTS_DIR", "OC_DEFAULT_WORKSPACE"):
     if key not in env_ex:
         err(f".env.example missing {key}")
-if "OPENROUTER_API_KEY" in env_ex and "OC_PROJECTS_DIR" in env_ex and "OC_DEFAULT_WORKSPACE" in env_ex:
+if "OPENROUTER_API_KEY" in env_ex and "OC_PROJECTS_DIR" in env_ex and "OC_DEFAULT_PROFILE" in env_ex:
     ok(".env.example has required/optional key placeholders")
 
 readme = open(os.path.join(repo, "README.md"), encoding="utf-8").read()
@@ -1567,6 +1928,50 @@ if "# OpenConfig" not in readme and "OpenConfig" not in readme[:500]:
     warn("README.md should lead with OpenConfig branding")
 else:
     ok("README.md branded OpenConfig")
+if "github.com/openconfig/opencode-configs" in readme or "githubusercontent.com/openconfig/opencode-configs" in readme:
+    err("README install URL uses wrong org openconfig — must be jesseoue/opencode-configs")
+elif "https://github.com/jesseoue/opencode-configs" not in readme:
+    err("README must include https://github.com/jesseoue/opencode-configs")
+else:
+    ok("README install/clone URL is jesseoue/opencode-configs")
+if "oh-my-opencode.schema.json" in readme and "omo.schema.json" not in readme:
+    err("README schema basename must be omo.schema.json (validate rejects oh-my-opencode.schema.json)")
+elif "omo.schema.json" in readme:
+    ok("README schema basename is omo.schema.json")
+
+install_sh = open(os.path.join(repo, "install.sh"), encoding="utf-8").read()
+if "githubusercontent.com/openconfig/opencode-configs" in install_sh or "github.com/openconfig/opencode-configs" in install_sh:
+    err("install.sh still points at github.com/openconfig/opencode-configs")
+else:
+    ok("install.sh distribution URL is jesseoue/opencode-configs")
+
+zshrc = open(os.path.join(repo, "zshrc.snippet"), encoding="utf-8").read()
+if re.search(r"export OPENAI_API_KEY|OPENAI_API_KEY\|", zshrc):
+    err("zshrc.snippet must not export OPENAI_API_KEY")
+elif "OC_DEFAULT_PROFILE" not in zshrc:
+    err("zshrc.snippet missing OC_DEFAULT_PROFILE")
+elif "VENICE_API_KEY" not in zshrc or "DEEPSEEK_API_KEY" not in zshrc:
+    err("zshrc.snippet must allowlist VENICE_API_KEY and DEEPSEEK_API_KEY")
+elif "TERM=xterm-256color" not in zshrc:
+    err("zshrc.snippet must launch OpenCode with TERM=xterm-256color")
+elif "1049l" in zshrc:
+    err("zshrc.snippet must not send \\033[?1049l (clears the visible terminal)")
+else:
+    ok("zshrc.snippet allowlist + TERM + no alt-screen teardown")
+
+docs_team = os.path.join(repo, "teams/docs-team/config.json")
+if os.path.isfile(docs_team):
+    try:
+        dt = json.load(open(docs_team, encoding="utf-8"))
+        desc = str(dt.get("description") or "")
+        if "Nitro" in desc:
+            err("teams/docs-team still says Gemini Nitro — use current writing model")
+        elif "Gemini 3.8 Flash" in desc:
+            ok("docs-team writing model is Gemini 3.8 Flash")
+        else:
+            warn(f"teams/docs-team description has no Gemini 3.8 Flash: {desc}")
+    except Exception as e:
+        err(f"teams/docs-team/config.json: {e}")
 
 routing_docs = os.path.join(repo, "scripts", "render-routing-docs.py")
 if not os.path.isfile(routing_docs):
@@ -1656,6 +2061,10 @@ for key in ("DO_NOT_TRACK=1", "OMO_DISABLE_POSTHOG=1", "OMO_SEND_ANONYMOUS_TELEM
 common_body = open(os.path.join(repo, "lib/common.sh"), encoding="utf-8").read()
 if "oc_telemetry_off()" not in common_body or "OTEL_SDK_DISABLED" not in common_body:
     tel_issues.append("lib/common.sh oc_telemetry_off incomplete")
+for rel in ("opencode.sh", "run.sh", "launch-desktop.sh", "serve-desktop.sh"):
+    body = open(os.path.join(repo, rel), encoding="utf-8").read()
+    if "oc_telemetry_off" not in body:
+        tel_issues.append(f"{rel} missing oc_telemetry_off")
 if tel_issues:
     err("telemetry not fully disabled: " + "; ".join(tel_issues))
 else:
@@ -1675,6 +2084,11 @@ if os.path.isfile(versions_cfg):
         pass
 
 # ---- 4c10. Project identity signature ----
+v_ver = ""
+try:
+    v_ver = str((json.load(open(os.path.join(repo, "versions.json"), encoding="utf-8")).get("opencode_configs") or "")).strip()
+except Exception:
+    v_ver = ""
 sig_path = os.path.join(repo, "signature.json")
 sig_sh = os.path.join(repo, "signature.sh")
 if not os.path.isfile(sig_path):
@@ -1690,6 +2104,8 @@ else:
             err(f"signature.json id={sig.get('id')!r} — expected openconfig/opencode-configs")
         elif not (sig.get("fingerprint") or "").strip():
             err("signature.json fingerprint empty — run: oc signature --refresh")
+        elif v_ver and str(sig.get("version") or "").strip() != v_ver:
+            err(f"signature.json version={sig.get('version')!r} ≠ versions.json {v_ver!r}")
         else:
             import base64
             import re
@@ -1794,13 +2210,16 @@ for md in sorted(glob.glob(os.path.join(repo, "agents", "*.md"))):
 # ---- report ----
 color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 G = "\033[32m" if color else ""; Y = "\033[33m" if color else ""
-R = "\033[31m" if color else ""; Z = "\033[0m" if color else ""
+R = "\033[31m" if color else ""; C = "\033[36m" if color else ""
+B = "\033[1m" if color else ""; Z = "\033[0m" if color else ""
 q = os.environ.get("VALIDATE_QUIET") == "1"
 if not q:
     for m in oks: print(f"  {G}✓{Z} {m}")
 for m in warns: print(f"  {Y}⚠{Z} {m}")
 for m in errors: print(f"  {R}✗{Z} {m}")
 print()
+if not q:
+    print(f"  {C}{B}── summary ──{Z}")
 print(f"  {len(oks)} ok · {len(warns)} warnings · {len(errors)} errors")
 sys.exit(1 if errors else 0)
 PY
