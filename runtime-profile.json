@@ -260,6 +260,12 @@
   },
   "normal-private": {
     "compose": "normal",
+    "non_openrouter_route": {
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+      "fallback_models": [
+        "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+      ]
+    },
     "privacy": {
       "openrouter": {
         "data_collection": "deny",

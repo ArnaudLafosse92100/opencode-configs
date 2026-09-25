@@ -133,6 +133,40 @@ class ContentAwareFallbackTests(unittest.TestCase):
             "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
         )
 
+    def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
+        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
+        for section in ("agents", "categories"):
+            for name, route in selected[section].items():
+                with self.subTest(section=section, name=name):
+                    chain = [route["model"], *route["fallback_models"]]
+                    self.assertTrue(all(model.startswith("openrouter/") for model in chain))
+
+    def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
+        replacement = self.profile_data["normal-private"]["non_openrouter_route"]
+        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
+        expected = {
+            "agents": {
+                "content-aware-research",
+                "sisyphus-venice-deepseek",
+                "sisyphus-venice-deepseek-flash-junior",
+                "content-aware-fast",
+            },
+            "categories": {"content-aware-fast", "content-aware-deep"},
+        }
+        for section, names in expected.items():
+            for name in names:
+                with self.subTest(section=section, name=name):
+                    self.assertEqual(selected[section][name], replacement)
+
+    def test_normal_private_rejects_an_invalid_replacement_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            data = json.loads(json.dumps(self.profile_data))
+            data["normal-private"]["non_openrouter_route"]["model"] = "venice/deepseek-v4-pro"
+            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "invalid normal-private.non_openrouter_route"):
+                runtime_profile.RuntimeProfiles(repo)
+
     def test_new_upstream_models_are_available(self) -> None:
         models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
         for model in (
