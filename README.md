@@ -257,7 +257,7 @@ Hephaestus uses local Codex Terra; Prometheus, Atlas, and the OpenRouter consult
 | `agents.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.context-aware-hermes` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `agents.explore` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.explore` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.hephaestus` | `codex-subscription/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.librarian` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.metis` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -275,7 +275,7 @@ Hephaestus uses local Codex Terra; Prometheus, Atlas, and the OpenRouter consult
 | `categories.arch-review` | `codex-subscription/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.artistry` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.bug-hunt` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.codex-implement` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.codex-implement` | `openrouter/z-ai/glm-5.3-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.codex-plan` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.codex-review` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.content-aware-deep` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |

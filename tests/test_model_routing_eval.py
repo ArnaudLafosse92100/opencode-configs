@@ -230,7 +230,9 @@ class ContentAwareFallbackTests(unittest.TestCase):
         normal = self.profile_data["normal"]
         glm_chain = ["openrouter/moonshotai/kimi-k2.7-code", "openrouter/deepseek/deepseek-v4-pro-0813"]
         pro_glm = ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"]
-        for name in ("codex-router", "sisyphus", "prometheus", "atlas", "explore"):
+        self.assertEqual(normal["agents"]["explore"]["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
+        self.assertEqual(normal["categories"]["codex-implement"]["model"], "openrouter/z-ai/glm-5.3-flash")
+        for name in ("codex-router", "sisyphus", "prometheus", "atlas"):
             self.assertEqual(normal["agents"][name]["fallback_models"], glm_chain, name)
         for name in ("bug-hunt", "refactor-safe", "unspecified-high"):
             self.assertEqual(normal["categories"][name]["fallback_models"], glm_chain, name)
@@ -240,7 +242,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
             self.assertEqual(normal["categories"][name]["fallback_models"], pro_glm, name)
         self.assertEqual(normal["agents"]["hephaestus"]["fallback_models"], pro_glm)
         self.assertEqual(normal["agents"]["metis"]["fallback_models"], ["codex-subscription/gpt-5.6-sol", "openrouter/moonshotai/kimi-k2.7-code"])
-        for section, names in (("agents", ("librarian", "sisyphus-junior")), ("categories", ("quick", "unspecified-low"))):
+        for section, names in (("agents", ("librarian", "sisyphus-junior", "explore")), ("categories", ("quick", "unspecified-low"))):
             for name in names:
                 self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/minimax/minimax-m3"], name)
         for section, names in (("agents", ("multimodal-looker",)), ("categories", ("visual-engineering", "artistry"))):

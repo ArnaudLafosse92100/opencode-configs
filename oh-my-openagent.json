@@ -129,11 +129,10 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/explore.md",
       "color": "#FFD400",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
-      "reasoning": "high",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "reasoning": "low",
       "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
+        "openrouter/minimax/minimax-m3"
       ]
     },
     "multimodal-looker": {
@@ -501,10 +500,10 @@
       ]
     },
     "codex-implement": {
-      "description": "Automatic Codex implementation on GLM 5.3 through OpenRouter.",
+      "description": "Automatic Codex implementation on GLM 5.3 Flash through OpenRouter.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/codex-implement.md",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "openrouter/z-ai/glm-5.3-flash",
       "reasoning": "high",
       "fallback_models": [
         "openrouter/moonshotai/kimi-k2.7-code",
