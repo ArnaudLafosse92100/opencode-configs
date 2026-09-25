@@ -116,7 +116,7 @@ class GradeTests(unittest.TestCase):
         }
         self.assertTrue(runner.grade(case, evidence)["passed"])
 
-    def test_normal_private_composes_normal_routes_without_subscription_gateway(self) -> None:
+    def test_normal_private_composes_normal_routes_without_subscription_models(self) -> None:
         with tempfile.TemporaryDirectory() as state, mock.patch.dict(
             os.environ, {"OC_RUNTIME_STATE_DIR": state}, clear=False
         ):
@@ -124,7 +124,7 @@ class GradeTests(unittest.TestCase):
             suite = runner.load_cases()
         self.assertEqual(suite["active_profile"], "normal-private")
         for case in suite["cases"]:
-            self.assertNotIn("subscription-gateway", [route["provider"] for route in case["expected_routes"]])
+            self.assertNotIn("codex-subscription", [route["provider"] for route in case["expected_routes"]])
 
     def test_service_role_recovery_case_requires_content_aware_deep(self) -> None:
         case = next(case for case in runner.load_cases()["cases"] if case["id"] == "security-recovery-deep")

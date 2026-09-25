@@ -17,7 +17,6 @@
   },
   "enabled_providers": [
     "openrouter",
-    "subscription-gateway",
     "codex-subscription",
     "venice",
     "deepseek"
@@ -944,26 +943,9 @@
               }
             }
           }
-        }
-      }
-    },
-    "subscription-gateway": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Subscription Gateway (Codex)",
-      "env": [
-        "LLM_GATEWAY_API_KEY",
-        "LLM_GATEWAY_OPENAI_BASE_URL"
-      ],
-      "options": {
-        "baseURL": "{env:LLM_GATEWAY_OPENAI_BASE_URL}",
-        "apiKey": "{env:LLM_GATEWAY_API_KEY}",
-        "timeout": 900000,
-        "headerTimeout": 900000,
-        "chunkTimeout": 900000
-      },
-      "models": {
+        },
         "gpt-5.6-sol": {
-          "id": "llm-agent-planning",
+          "id": "openai/gpt-5.6-sol",
           "name": "GPT-5.6 Sol (subscription planning)",
           "family": "gpt",
           "reasoning": true,
@@ -1004,7 +986,7 @@
           }
         },
         "gpt-5.6-terra": {
-          "id": "llm-agent-implementation",
+          "id": "openai/gpt-5.6-terra",
           "name": "GPT-5.6 Terra (subscription implementation)",
           "family": "gpt",
           "reasoning": true,
@@ -1045,7 +1027,7 @@
           }
         },
         "gpt-5.6-sol-review": {
-          "id": "llm-agent-review",
+          "id": "openai/gpt-5.6-sol",
           "name": "GPT-5.6 Sol (subscription review)",
           "family": "gpt",
           "reasoning": true,

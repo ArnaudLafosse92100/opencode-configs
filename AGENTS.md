@@ -21,7 +21,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | Runtime | [OpenCode](https://opencode.ai) | Provider-agnostic coding agent TUI/CLI; config-as-code; LSP; MCP |
 | Orchestration | [oh-my-openagent (OmO)](https://omo.vibetip.help/docs) | Multi-model agents, categories, team mode, ultrawork, hyperplan — docs on VibeTip |
 | Model gateway | [OpenRouter](https://openrouter.ai) | One key for GLM, DeepSeek Flash/Pro, Gemini, Kimi, Hermes, MiniMax |
-| GPT lane | Shared subscription gateway | GPT roles use provider-neutral planning/implementation/review aliases; GPT is not routed through OpenRouter |
+| GPT lane | Local OpenCodex | GPT roles use the Codex subscription on `127.0.0.1:10100`; GPT is not routed through OpenRouter |
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
 | GitHub code | OmO `grep_app` | Real call-site examples across public repos |
@@ -36,12 +36,12 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 - **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
 - **Orchestration / tool loops** → normal uses GLM 5.3 (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) for tool-call quality.
 - **Economy / recon routes** → `runtime-profile.json` decides each agent/category primary. In normal mode this deliberately distinguishes GLM exploration and Flash delegation/quick work.
-- **Deep implement / critique** → normal uses subscription gateway aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review), with DeepSeek Pro 0813 as the first OpenRouter depth fallback.
+- **Deep implement / critique** → normal uses local Codex subscription aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review), with DeepSeek Pro 0813 as the first OpenRouter depth fallback.
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash).
-- **Hard ceiling** → subscription-gateway Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
+- **Hard ceiling** → codex-subscription Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
-- **Content-aware research** → normal uses Hermes 4 405B with Pro 0813 / Flash 0731 / GLM / MiniMax fallbacks. `content-aware-deep` uses Pro 0813 first and stays tool-capable end-to-end; it must not fall back to Hermes.
-- **Runtime profile override** → `runtime-profile.json` is the routing SSoT; do not duplicate an exact route table in this file. Use `oc profile resolve <normal|pentest> <agents|categories> <name>` or the generated README matrix. In `pentest`, every agent and category starts on **DeepSeek V4 Flash 0731 ZDR Throughput**, makes exactly three Flash retries, then makes exactly one **DeepSeek V4 Pro 0813 ZDR Throughput** attempt; that failure is terminal. Pentest never dispatches GLM, GPT/subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or another model. Profile state and generated configs live under `~/.local/state/openconfig`; switching must never rewrite tracked source files.
+- **Content-aware research** → normal uses Venice DeepSeek V4 Pro 0813 with Venice Pro/Flash fallbacks. `content-aware-deep` follows the same tool-capable Venice family; Hermes 4 405B remains an explicit pasted-context consult with tools and edits denied.
+- **Runtime profile override** → `runtime-profile.json` is the routing SSoT; do not duplicate an exact route table in this file. Use `oc profile resolve <normal|pentest> <agents|categories> <name>` or the generated README matrix. In `pentest`, every agent and category starts on **DeepSeek V4 Flash 0731 ZDR Throughput**, makes exactly three Flash retries, then makes exactly one **DeepSeek V4 Pro 0813 ZDR Throughput** attempt; that failure is terminal. Pentest never dispatches GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or another model. Profile state and generated configs live under `~/.local/state/openconfig`; switching must never rewrite tracked source files.
 - **Model promotion gate** → `oc eval` is plan-only; `oc eval --execute` runs the bounded DeepSeek/Kimi/GLM canary. Do not promote Kimi globally without its measured quality, latency, and spend evidence.
 - **Orchestration gate** → `./eval-orchestration.sh` is plan-only; `--execute` proves `codex-router → category → child model` from local session metadata under an explicit spend cap.
 
@@ -99,7 +99,7 @@ is never proof of the active profile, provider, model, deployment or success.
 - Allow-everything on this trusted local box (no interactive prompts for normal tools).
 - Hard-deny catastrophic bash: `rm -rf /`, `rm -rf ~`, `mkfs`, `sudo`, `git push --force`, `gh repo delete`.
 - External directories, team tools, LSP, MCP allowed: Context7 · Exa websearch · grep_app · codegraph · lsp (OmO builtins + `opencode.json` Context7).
-- Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `LLM_GATEWAY_OPENAI_BASE_URL`, `LLM_GATEWAY_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.
+- Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.
 
 ## Commands
 
@@ -122,7 +122,7 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Lead: **sisyphus**. Eligible: sisyphus, atlas, sisyphus-junior, hephaestus (`teammate: allow`), or `kind: category`.
 - Teams: explorers, ship-feature, debug-team, review-panel, refactor-team, docs-team, content-aware-audit → `~/.omo/teams/` (symlinks to the live `~/.config/opencode` tree).
 - Hyperplan (`hyperplan` / `hpp` / `/hyperplan`): **sisyphus only**, not prometheus. Needs team mode + demoted `plan` agent for Phase 6. Do not put `plan` in `disabled_agents`.
-- Ultrawork (`ulw`): GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` for subscription-gateway Sol reasoning in normal mode.
+- Ultrawork (`ulw`): GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` for codex-subscription Sol reasoning in normal mode.
 
 ## What not to do
 

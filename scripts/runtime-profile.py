@@ -67,8 +67,8 @@ def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
         raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
 
     policies = {
-        "agents/codex-router.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
-        "prompts/categories/content-aware-deep.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
+        "agents/codex-router.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
+        "prompts/categories/content-aware-deep.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
     }
     policy = policies.get(path.as_posix())
     if policy is None:
@@ -422,7 +422,7 @@ def update_sisyphus_prompt(text: str, profile: str) -> str:
         "every agent/category starts on DeepSeek V4 Flash 0731 ZDR Throughput, "
         "retries Flash exactly three times, then makes exactly one DeepSeek V4 Pro 0813 "
         "ZDR Throughput attempt; that failure is terminal. Do not dispatch GLM, GPT/"
-        "subscription-gateway, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other "
+        "codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other "
         "model for pentest work."
     )
     lines = [
@@ -988,7 +988,7 @@ class RuntimeProfiles:
             if isinstance(enabled, list):
                 opencode["enabled_providers"] = [
                     name for name in enabled
-                    if name not in {"subscription-gateway", "codex-subscription"}
+                    if name != "codex-subscription"
                 ]
             for model in ((opencode.get("provider") or {}).get("openrouter") or {}).get("models", {}).values():
                 if not isinstance(model, dict):

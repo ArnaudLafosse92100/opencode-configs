@@ -231,7 +231,7 @@ if oc:
         fam = m.get("family")
         expected_require_parameters = fam in ("glm", "minimax")
         # Live-provider pins ported from upstream 1.5.60, adapted for the local
-        # mixed OpenRouter + subscription-gateway stack. GLM 5.3 intentionally
+        # mixed OpenRouter + codex-subscription stack. GLM 5.3 intentionally
         # remains unpinned: a stale GLM provider.only roster blackholes it.
         is_pentest_throughput = mid in {"deepseek/deepseek-v4-flash-0731-zdr-throughput", "deepseek/deepseek-v4-pro-0813-zdr-throughput"}
         is_normal_price_capped = mid in normal_price_caps
@@ -371,10 +371,10 @@ if oc:
             ok("core tools + bash allow-everything (catastrophic denies kept)")
     if not oc.get("enabled_providers"):
         warn("opencode.json: enabled_providers not set — all providers with credentials will load.")
-    elif oc.get("enabled_providers") != ["openrouter", "subscription-gateway", "codex-subscription", "venice", "deepseek"]:
-        err("opencode.json: enabled_providers must be ['openrouter', 'subscription-gateway', 'codex-subscription', 'venice', 'deepseek']")
+    elif oc.get("enabled_providers") != ["openrouter", "codex-subscription", "venice", "deepseek"]:
+        err("opencode.json: enabled_providers must be ['openrouter', 'codex-subscription', 'venice', 'deepseek']")
     else:
-        ok("enabled_providers = openrouter + subscription-gateway + codex-subscription + venice + deepseek")
+        ok("enabled_providers = openrouter + codex-subscription + venice + deepseek")
     vmodels = set(((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}))
     if "deepseek-v4-pro-0813" not in vmodels:
         err("venice must expose deepseek-v4-pro-0813 (content-aware DeepSeek primary)")
@@ -725,7 +725,7 @@ if omo:
         ok(f"source defaults to runtime profile {default_profile!r}")
 
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
-    # subscription gateway only. Runtime profiles are the authority for routes
+    # local Codex subscription only. Runtime profiles are the authority for routes
     # they list. Normal keeps broad fallbacks where useful; pentest keeps all
     # listed agents/categories inside the GLM/DeepSeek-only lane.
     forbidden_paid_gpt = (
@@ -901,11 +901,11 @@ if omo:
                     )
                 continue
             if primary.startswith("openrouter/") and (
-                not fallbacks or not fallbacks[0].startswith("subscription-gateway/")
+                not fallbacks or not fallbacks[0].startswith("codex-subscription/")
             ):
                 err(
                     f"oh-my-openagent.json[{section}.{name}]: OpenRouter primary must use "
-                    "subscription-gateway as first fallback"
+                    "codex-subscription as first fallback"
                 )
     whitelist = (((oc or {}).get("provider") or {}).get("openrouter") or {}).get("whitelist") or []
     paid_gpt_whitelist = [str(x) for x in whitelist if str(x).startswith("openai/gpt-")]
@@ -956,7 +956,7 @@ if omo:
         err(f"background_task.defaultConcurrency must be 6 (got {dc!r}) — run: oc fix")
     else:
         ok(f"background_task.defaultConcurrency={dc}")
-    for prov, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
+    for prov, cap in (("openrouter", 8), ("codex-subscription", 4), ("anthropic", 2)):
         v = pc.get(prov)
         if v != cap:
             err(f"providerConcurrency.{prov} must be {cap} (got {v!r}) — run: oc fix")
@@ -1021,12 +1021,12 @@ if omo:
     else:
         ok("goal footgun documented (prompts/goal.md in instructions)")
     allow = set(omo.get("mcp_env_allowlist") or [])
-    need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"}
+    need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "OPENROUTER_API_KEY"}
     miss_env = sorted(need_env - allow)
     if miss_env:
         warn(f"mcp_env_allowlist missing: {', '.join(miss_env)} — run: oc fix")
     else:
-        ok("mcp_env_allowlist covers Context7/Exa/subscription gateway/OpenRouter")
+        ok("mcp_env_allowlist covers Context7/Exa/OpenRouter")
     if not isinstance(omo.get("start_work"), dict):
         warn("start_work block missing — run: oc fix")
     else:
@@ -1917,7 +1917,7 @@ for rel, label in (
         ok(f"{label} present")
 
 env_ex = open(os.path.join(repo, ".env.example"), encoding="utf-8").read()
-for key in ("OPENROUTER_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "EXA_API_KEY", "CONTEXT7_API_KEY", "OC_PROJECTS_DIR", "OC_DEFAULT_WORKSPACE"):
+for key in ("OPENROUTER_API_KEY", "EXA_API_KEY", "CONTEXT7_API_KEY", "OC_PROJECTS_DIR", "OC_DEFAULT_WORKSPACE"):
     if key not in env_ex:
         err(f".env.example missing {key}")
 if "OPENROUTER_API_KEY" in env_ex and "OC_PROJECTS_DIR" in env_ex and "OC_DEFAULT_PROFILE" in env_ex:

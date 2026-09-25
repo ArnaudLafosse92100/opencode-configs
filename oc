@@ -111,7 +111,7 @@ ${c_bold}Models & Admin:${c_0}
   ${c_g}versions${c_0}  [--check|--local|--fix|--json]
                                          Package pins vs npm + GitHub (+ other repos)
   ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO pin cache + OpenConfig patch health
-  ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + subscription gateway admin
+  ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + local Codex subscription health
   ${c_g}deploy${c_0}    [--dry-run|--force]           Guarded production config deployment
 
 ${c_b}${c_bold}── Run & launch ──${c_0}
@@ -166,7 +166,7 @@ ${c_b}${c_bold}── Examples ──${c_0}
   oc fix                         Restore agent colors + footguns
   oc validate                    Structural / footgun checks
   oc run "Fix the failing tests" Headless: run to completion
-  oc admin health                Live OpenRouter + subscription gateway probes
+  oc admin health                Live OpenRouter + local Codex subscription probes
   oc launch                      Launch OpenCode (cwd, or ~/Projects if config repo)
   oc new myapp                   Scaffold → ~/Projects/myapp
   oc projects --list             List projects home
@@ -867,7 +867,7 @@ Options:
 
 Examples:
   oc install --quick
-  OPENROUTER_API_KEY=sk-… LLM_GATEWAY_API_KEY=… oc install --yes
+  OPENROUTER_API_KEY=sk-… oc install --yes
   oc install --full
 
 After install:

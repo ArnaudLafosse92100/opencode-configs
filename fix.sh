@@ -441,11 +441,19 @@ if isinstance(bt, dict):
         bt["defaultConcurrency"] = 6; changes.append("background_task.defaultConcurrency -> 6")
     pc = bt.setdefault("providerConcurrency", {})
     if isinstance(pc, dict):
-        for provider, cap in (("openrouter", 8), ("subscription-gateway", 4), ("venice", 6), ("deepseek", 6), ("anthropic", 2)):
+        if "subscription-gateway" in pc:
+            del pc["subscription-gateway"]; changes.append("removed retired providerConcurrency.subscription-gateway")
+        for provider, cap in (("openrouter", 8), ("codex-subscription", 4), ("venice", 6), ("deepseek", 6), ("anthropic", 2)):
             if pc.get(provider) != cap:
                 pc[provider] = cap; changes.append(f"providerConcurrency.{provider} -> {cap}")
     mc = bt.setdefault("modelConcurrency", {})
     if isinstance(mc, dict):
+        for old_model in [name for name in mc if name.startswith("subscription-gateway/")]:
+            new_model = old_model.replace("subscription-gateway/", "codex-subscription/", 1)
+            if new_model not in mc:
+                mc[new_model] = mc[old_model]
+            del mc[old_model]
+            changes.append(f"migrated modelConcurrency.{old_model} -> {new_model}")
         pinned_model_concurrency = {
             "openrouter/z-ai/glm-5.3": 8,
             "openrouter/z-ai/glm-5.3-flash": 10,
@@ -523,7 +531,10 @@ if isinstance(dm, dict) and dm.get("goal") is not False:
 allow = omo.setdefault("mcp_env_allowlist", [])
 if not isinstance(allow, list):
     allow = []; omo["mcp_env_allowlist"] = allow
-for must in ("CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"):
+for retired in ("LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL"):
+    if retired in allow:
+        allow.remove(retired); changes.append(f"mcp_env_allowlist -= {retired}")
+for must in ("CONTEXT7_API_KEY", "EXA_API_KEY", "OPENROUTER_API_KEY"):
     if must not in allow:
         allow.append(must); changes.append(f"mcp_env_allowlist += {must}")
 

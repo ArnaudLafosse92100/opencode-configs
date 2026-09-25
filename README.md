@@ -31,7 +31,7 @@ source ~/.zshrc && oc doctor && oc launch
 
 Canonical distribution: `ArnaudLafosse92100/opencode-configs@main`.
 
-Upstream comparison reference: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, subscription-gateway and retry-policy extensions.
+Upstream comparison reference: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, codex-subscription and retry-policy extensions.
 
 > Plugin name must stay **`oh-my-openagent@…`** (not legacy `oh-my-opencode`).  
 > Schema URL basename stays `omo.schema.json` (legacy `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` 404 — `oc validate` rejects both).
@@ -44,8 +44,6 @@ Decision log: [`AGENTS.md`](./AGENTS.md) · Stance: [`prompts/core.md`](./prompt
 
 ```bash
 export OPENROUTER_API_KEY=…     # required
-export LLM_GATEWAY_OPENAI_BASE_URL=https://proxy.unbeatn.ai/v1
-export LLM_GATEWAY_API_KEY=…    # GPT subscription lane (Hephaestus / Oracle / Momus / …)
 export EXA_API_KEY=…            # OmO websearch
 export CONTEXT7_API_KEY=…       # library docs
 
@@ -73,7 +71,7 @@ oc heal                # probe-first self-repair
 oc launch [dir]        # TUI (never starts in the config repo)
 oc new myapp           # scaffold under ~/Projects
 oc run "…"             # headless to completion
-oc admin health        # live OpenRouter + subscription-gateway probes
+oc admin health        # live OpenRouter + codex-subscription probes
 oc models --providers  # OpenRouter provider health for routed models
 oc versions            # pins vs npm + GitHub (+ other opencode.json)
 oc versions --fix       # align ~/.opencode @opencode-ai/plugin to CLI
@@ -244,7 +242,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `content-aware-research` / `-fast` / `-deep` | Edit-denied research | Venice DeepSeek only | `VENICE_API_KEY` |
 | `context-aware-hermes` | Edit-denied context analysis | OpenRouter Hermes 4 405B | `OPENROUTER_API_KEY` |
 
-Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Invoke optional Sisyphus leads explicitly — they do not replace GLM `sisyphus`.
+Hephaestus uses local Codex Terra; Prometheus, Atlas, and the OpenRouter consult subagents keep their configured heterogeneous routes. Invoke optional Sisyphus leads explicitly — they do not replace GLM `sisyphus`.
 
 ## Model routing
 
@@ -260,12 +258,12 @@ Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Inv
 | `agents.content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.context-aware-hermes` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.explore` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `agents.hephaestus` | `subscription-gateway/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.hephaestus` | `codex-subscription/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.librarian` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.metis` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `agents.momus` | `subscription-gateway/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.momus` | `codex-subscription/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.multimodal-looker` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `agents.oracle` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.oracle` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.prometheus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus-deepseek` | `deepseek/deepseek-v4-pro` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -274,7 +272,7 @@ Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Inv
 | `agents.sisyphus-venice-deepseek` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus-venice-deepseek-flash-junior` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.agentic-deep-kimi` | `openrouter/moonshotai/kimi-k2.7-code` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.arch-review` | `subscription-gateway/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.arch-review` | `codex-subscription/gpt-5.6-sol-review` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.artistry` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.bug-hunt` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.codex-implement` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -282,19 +280,19 @@ Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Inv
 | `categories.codex-review` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.content-aware-deep` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.deep` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.deep` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.quick` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.refactor-safe` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
-| `categories.ultrabrain` | `subscription-gateway/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.ultrabrain` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.unspecified-high` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.unspecified-low` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.visual-engineering` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.writing` | `openrouter/google/gemini-3.8-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 
-Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with subscription-gateway removed and OpenRouter ZDR constraints.
+Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with codex-subscription removed and OpenRouter ZDR constraints.
 <!-- END GENERATED: runtime-routing -->
 
-OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Sol/Terra roles use the subscription gateway through `llm-agent-*` aliases; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
+OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol/Terra roles use the local OpenCodex service through the Codex subscription; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
 package cache so transient primary-provider glitches retry the same primary
@@ -334,7 +332,7 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | Knob | Value |
 | --- | --- |
 | `background_task.defaultConcurrency` | **6** |
-| OpenRouter / subscription gateway / Anthropic | **8 / 4 / 2** |
+| OpenRouter / Codex subscription / Anthropic | **8 / 4 / 2** |
 | DeepSeek Flash Floor / Gemini Flash | **10 / 10** |
 | GLM / MiniMax | **8 / 8** |
 | DeepSeek Pro / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 3** |
@@ -349,7 +347,7 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 | Key | Required | Enables |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | **yes** | OpenRouter models |
-| `LLM_GATEWAY_OPENAI_BASE_URL` + `LLM_GATEWAY_API_KEY` | **yes** for GPT subscription lane | Hephaestus / Oracle / Momus / deep / … |
+| Local OpenCodex on `127.0.0.1:10100` | **yes** for GPT subscription lane | Astra / Sol / Terra without a separate gateway key |
 | `EXA_API_KEY` | for websearch | OmO Exa |
 | `CONTEXT7_API_KEY` | recommended | Context7 |
 | `OPENROUTER_MGMT_KEY` | optional | `oc admin` |
@@ -391,7 +389,7 @@ oc projects --list
 | --- | --- | --- | --- |
 | `high` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `low` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
-| `fast` | `hephaestus` | `subscription-gateway/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `fast` | `hephaestus` | `codex-subscription/gpt-5.6-terra` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `research` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `debug` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
 | `writing` | `sisyphus` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731` |
@@ -406,7 +404,7 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 
 - Allow-everything locally for normal tools (trusted box).
 - Hard-deny bash: `rm -rf /|~`, `mkfs`, `sudo`, `git push --force*`, `gh repo delete*`.
-- Providers allowed: OpenRouter + subscription gateway; direct OpenAI is disabled in this fork.
+- Providers allowed: OpenRouter + local Codex subscription + Venice + native DeepSeek; direct paid OpenAI API routing is disabled in this fork.
 - Server: `127.0.0.1:4097` · share disabled · mdns off · Basic Auth via
   `~/.local/state/opencode-codex-bridge/opencode-server-password` when managed
   by the bridge.

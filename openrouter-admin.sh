@@ -186,38 +186,32 @@ for mid in sorted(models.keys()):
           echo "  $line" | tr -d '\r'
         done || true
 
-    # Shared subscription GPT lane. /models is non-billable and verifies the
+    # Local Codex subscription lane. /models is non-billable and verifies the
     # exact OpenAI-compatible transport used by the configured agent aliases.
     echo ""
-    echo -e "${c_b}── Subscription Gateway ──${c_0}"
-    GATEWAY_KEY="${LLM_GATEWAY_API_KEY:-}"
-    GATEWAY_URL="${LLM_GATEWAY_OPENAI_BASE_URL:-}"
-    if [[ -z "$GATEWAY_KEY" || -z "$GATEWAY_URL" ]]; then
-      opt "LLM gateway credentials not set — GPT subscription lane unavailable"
+    echo -e "${c_b}── Local Codex Subscription ──${c_0}"
+    CODEX_URL="http://127.0.0.1:10100/v1"
+    codex_models="$(curl -sS --connect-timeout 2 --max-time 5 \
+      "${CODEX_URL}/models" 2>/dev/null || true)"
+    if ! printf '%s' "$codex_models" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      bad "Local OpenCodex /models probe failed"
     else
-      gateway_models="$(curl -sS --connect-timeout 5 --max-time 15 \
-        -H "Authorization: Bearer $GATEWAY_KEY" \
-        "${GATEWAY_URL%/}/models" 2>/dev/null || true)"
-      if ! printf '%s' "$gateway_models" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
-        bad "Subscription gateway /models probe failed"
-      else
-        printf '%s' "$gateway_models" | python3 -c "
+      printf '%s' "$codex_models" | python3 -c "
 import json
 cfg = json.load(open('$REPO/opencode.json'))
 available = {m.get('id') for m in json.load(open('/dev/stdin')).get('data', []) if isinstance(m, dict)}
-expected = (cfg.get('provider') or {}).get('subscription-gateway', {}).get('models') or {}
+expected = (cfg.get('provider') or {}).get('codex-subscription', {}).get('models') or {}
 for name, spec in sorted(expected.items()):
-    remote_id = spec.get('id') or name
+    remote_id = str(spec.get('id') or name).removeprefix('openai/')
     state = 'available' if remote_id in available else 'MISSING'
     print(f'{name}|{remote_id}|{state}')
 " | while IFS='|' read -r name remote_id state; do
           if [[ "$state" == "available" ]]; then
-            printf "${c_g}✓${c_0} %-35s advertised as %s\n" "subscription-gateway/$name" "$remote_id"
+            printf "${c_g}✓${c_0} %-35s advertised as %s\n" "codex-subscription/$name" "$remote_id"
           else
-            printf "${c_r}✗${c_0} %-35s (%s) MISSING from /v1/models\n" "subscription-gateway/$name" "$remote_id"
+            printf "${c_r}✗${c_0} %-35s (%s) MISSING from /v1/models\n" "codex-subscription/$name" "$remote_id"
           fi
         done
-      fi
     fi
     ;;
 
