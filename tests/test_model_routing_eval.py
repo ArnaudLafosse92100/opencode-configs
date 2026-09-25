@@ -130,27 +130,54 @@ class ContentAwareFallbackTests(unittest.TestCase):
         ).encode("utf-8")
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
-            "f81673a99cd78076806509df4e36b669093fd9cdcc093f7397281e0aaf677f60",
+            "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
         )
 
-    def test_removed_models_are_absent_from_active_config(self) -> None:
-        removed = (
+    def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
+        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
+        for section in ("agents", "categories"):
+            for name, route in selected[section].items():
+                with self.subTest(section=section, name=name):
+                    chain = [route["model"], *route["fallback_models"]]
+                    self.assertTrue(all(model.startswith("openrouter/") for model in chain))
+
+    def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
+        replacement = self.profile_data["normal-private"]["non_openrouter_route"]
+        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
+        expected = {
+            "agents": {
+                "content-aware-research",
+                "sisyphus-venice-deepseek",
+                "sisyphus-venice-deepseek-flash-junior",
+                "content-aware-fast",
+            },
+            "categories": {"content-aware-fast", "content-aware-deep"},
+        }
+        for section, names in expected.items():
+            for name in names:
+                with self.subTest(section=section, name=name):
+                    self.assertEqual(selected[section][name], replacement)
+
+    def test_normal_private_rejects_an_invalid_replacement_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            data = json.loads(json.dumps(self.profile_data))
+            data["normal-private"]["non_openrouter_route"]["model"] = "venice/deepseek-v4-pro"
+            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "invalid normal-private.non_openrouter_route"):
+                runtime_profile.RuntimeProfiles(repo)
+
+    def test_new_upstream_models_are_available(self) -> None:
+        models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
+        for model in (
             "poolside/laguna-s-2.1",
             "meituan/longcat-2.0",
-            "qwen/qwen3.8-max",
-        )
-        active_files = (
-            "runtime-profile.json",
-            "oh-my-openagent.json",
-            "opencode.json",
-            "profiles/writing.json",
-            "fix.sh",
-        )
-        for file_name in active_files:
-            content = (REPO / file_name).read_text(encoding="utf-8")
-            for model in removed:
-                with self.subTest(file=file_name, model=model):
-                    self.assertNotIn(model, content)
+            "qwen/qwen3.8-max-0902",
+            "google/gemini-3.8-flash",
+        ):
+            with self.subTest(model=model):
+                self.assertIn(model, models)
+        self.assertNotIn("qwen/qwen3.8-max", models)
 
     def test_normal_quick_and_unspecified_low_use_flash_then_minimax(self) -> None:
         expected = {
@@ -204,9 +231,9 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/google/gemini-3.7-flash", "openrouter/minimax/minimax-m3"], name)
         self.assertEqual(normal["categories"]["writing"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-flash-0731"])
         self.assertEqual(normal["categories"]["agentic-deep-kimi"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"])
-        self.assertEqual(normal["agents"]["content-aware-research"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813"])
-        self.assertEqual(normal["categories"]["content-aware-fast"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813"])
-        self.assertEqual(normal["categories"]["content-aware-deep"]["fallback_models"], ["openrouter/z-ai/glm-5.3"])
+        self.assertEqual(normal["agents"]["content-aware-research"]["fallback_models"], ["venice/deepseek-v4-pro", "venice/deepseek-v4-1-flash"])
+        self.assertEqual(normal["categories"]["content-aware-fast"]["fallback_models"], ["venice/deepseek-v4-pro-0813", "venice/deepseek-v4-pro"])
+        self.assertEqual(normal["categories"]["content-aware-deep"]["fallback_models"], ["venice/deepseek-v4-pro", "venice/deepseek-v4-1-flash"])
 
     def test_every_normal_openrouter_family_is_price_first_capped_without_allowlists(self) -> None:
         models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]

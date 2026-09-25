@@ -17,6 +17,7 @@
 !ghostty.conf
 !projects.json
 !versions.json
+!vault.json
 !signature.json
 !runtime-profile.json
 !tui.json
@@ -57,6 +58,8 @@
 .env
 .env.*
 !.env.example
+vault.local.json
+**/vault.local.json
 *.pem
 *.key
 *.p12
@@ -75,6 +78,7 @@ pnpm-lock.yaml
 bun.lock
 bun.lockb
 .omo
+.runtime
 .sisyphus
 .cache
 .codegraph

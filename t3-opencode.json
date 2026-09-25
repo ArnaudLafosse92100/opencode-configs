@@ -1,0 +1,39 @@
+{
+  "docs": "T3 Code → Settings → Providers → OpenCode. Keys stay in ~/.config/opencode/.env + `opencode auth` — never in this file or T3 settings.",
+  "provider": "opencode",
+  "enabled": true,
+  "binaryPath": "~/.local/bin/opencode",
+  "serverUrl": "http://127.0.0.1:4097",
+  "serverPassword": "",
+  "default_model": "openrouter/z-ai/glm-5.3",
+  "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "customModels": [],
+  "notes": [
+    "T3 talks to the local OpenCode serve from serve-desktop.sh (port 4097).",
+    "OpenRouter + Venice credentials: `opencode auth` and/or launch-desktop.sh → launchd. No keys in JSON.",
+    "Qwen flagship catalog id is qwen/qwen3.8-max-0902 (bare qwen/qwen3.8-max is gone).",
+    "Run python3 sync-t3.py for local T3; export-t3.py generates the portable Railway runtime without credentials.",
+    "Models are discovered from OpenCode automatically; catalogModels is a reference list, not T3 custom entries."
+  ],
+  "catalogModels": [
+    "openrouter/z-ai/glm-5.3",
+    "openrouter/z-ai/glm-5.3-flash",
+    "openrouter/google/gemini-3.1-pro-preview",
+    "openrouter/minimax/minimax-m3",
+    "openrouter/moonshotai/kimi-k2.7-code",
+    "openrouter/google/gemini-3.7-flash",
+    "openrouter/deepseek/deepseek-v4-pro-0813",
+    "openrouter/deepseek/deepseek-v4-flash-0731",
+    "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput",
+    "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+    "openrouter/nousresearch/hermes-4-405b",
+    "openrouter/poolside/laguna-s-2.1",
+    "openrouter/meituan/longcat-2.0",
+    "openrouter/google/gemini-3.8-flash",
+    "openrouter/qwen/qwen3.8-max-0902",
+    "openrouter/deepseek/deepseek-v4.1-flash",
+    "venice/deepseek-v4-pro-0813",
+    "venice/deepseek-v4-pro",
+    "venice/deepseek-v4-1-flash"
+  ]
+}

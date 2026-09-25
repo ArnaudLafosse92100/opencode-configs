@@ -28,7 +28,7 @@
 #   ./fix.sh                       repair + format + validate
 #   ./fix.sh --dry-run             show what would change, write nothing
 #   ./fix.sh --set model=openrouter/z-ai/glm-5.3
-#   ./fix.sh --set default_agent=atlas --set small_model=openrouter/deepseek/deepseek-v4-flash-0731
+#   ./fix.sh --set default_agent=atlas --set small_model=openrouter/deepseek/deepseek-v4.1-flash
 
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -221,7 +221,7 @@ TEAM_TOOLS = (
     "team_task_create", "team_task_get", "team_task_list", "team_task_update",
 )
 CORE_TOOLS = (
-    "read", "edit", "glob", "grep", "list", "task", "call_omo_agent",
+    "edit", "glob", "grep", "list", "task", "call_omo_agent",
     "skill", "skill_mcp", "todowrite", "todoread",
     "webfetch", "websearch", "question", "doom_loop", "external_directory",
     "interactive_bash", "background_output", "background_cancel", "look_at",
@@ -238,6 +238,11 @@ for t in TEAM_TOOLS + CORE_TOOLS:
     if perm.get(t) != "allow":
         perm[t] = "allow"
         changes.append(f"permission.{t} -> allow")
+# Official OpenCode default: deny .env reads (https://opencode.ai/docs/permissions)
+READ_PERM = {"*": "allow", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow"}
+if perm.get("read") != READ_PERM:
+    perm["read"] = READ_PERM
+    changes.append("permission.read -> allow with .env deny (OpenCode default)")
 # bash: allow-everything with catastrophic denies kept
 bash = perm.get("bash")
 if not isinstance(bash, dict):
@@ -352,7 +357,7 @@ if isinstance(or_opts, dict):
             "HTTP-Referer": canonical_github,
             "X-Title": "OpenConfig",
             "X-OpenRouter-Title": "OpenConfig",
-            "X-OpenRouter-Categories": "cli,agent",
+            "X-OpenRouter-Categories": "cli-agent",
         }
         for hk, hv in want_hdrs.items():
             if hdrs.get(hk) != hv:
@@ -436,22 +441,33 @@ if isinstance(bt, dict):
         bt["defaultConcurrency"] = 6; changes.append("background_task.defaultConcurrency -> 6")
     pc = bt.setdefault("providerConcurrency", {})
     if isinstance(pc, dict):
-        for provider, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
+        for provider, cap in (("openrouter", 8), ("subscription-gateway", 4), ("venice", 6), ("deepseek", 6), ("anthropic", 2)):
             if pc.get(provider) != cap:
                 pc[provider] = cap; changes.append(f"providerConcurrency.{provider} -> {cap}")
     mc = bt.setdefault("modelConcurrency", {})
     if isinstance(mc, dict):
         pinned_model_concurrency = {
             "openrouter/z-ai/glm-5.3": 8,
+            "openrouter/z-ai/glm-5.3-flash": 10,
+            "openrouter/poolside/laguna-s-2.1": 10,
+            "openrouter/meituan/longcat-2.0": 8,
             "openrouter/minimax/minimax-m3": 8,
             "openrouter/google/gemini-3.1-pro-preview": 5,
             "openrouter/google/gemini-3.7-flash": 10,
+            "openrouter/google/gemini-3.8-flash": 10,
+            "openrouter/qwen/qwen3.8-max-0902": 5,
             "openrouter/moonshotai/kimi-k2.7-code": 5,
-            "openrouter/deepseek/deepseek-v4-pro-0813": 5,
+            "openrouter/deepseek/deepseek-v4-pro-0813": 8,
+            "openrouter/deepseek/deepseek-v4.1-flash": 5,
             "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput": 5,
             "openrouter/deepseek/deepseek-v4-flash-0731": 10,
             "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput": 6,
             "openrouter/nousresearch/hermes-4-405b": 2,
+            "venice/deepseek-v4-pro-0813": 5,
+            "venice/deepseek-v4-pro": 5,
+            "venice/deepseek-v4-1-flash": 5,
+            "deepseek/deepseek-v4-pro": 4,
+            "deepseek/deepseek-flash": 6,
         }
         def _model_concurrency(model):
             if model in pinned_model_concurrency:
@@ -565,6 +581,8 @@ AGENT_COLORS = {
     "momus": "#FF8A3D",
     "sisyphus-junior": "#7A8BFF",
     "content-aware-research": "#FF1744",
+    "content-aware-fast": "#FF9100",
+    "context-aware-hermes": "#B388FF",
 }
 for n, a in omo.get("agents", {}).items():
     c = a.get("color")

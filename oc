@@ -61,8 +61,8 @@ bad(){  printf "  ${c_r}✗${c_0} %s\n" "$*"; }
 tip(){  printf "  ${c_b}${c_bold}↳${c_0} ${c_dim}%s${c_0}\n" "$*"; }
 
 header() {
-  oc_banner "$OC_VERSION" "Pinned stack for OpenCode · OpenRouter · OmO"
-  printf "  ${c_dim}%s${c_0}\n\n" "$REPO"
+  oc_banner "$OC_VERSION"
+  printf '%b%s%b\n\n' "${c_dim}" "              ${REPO}" "${c_0}"
 }
 
 # ── Require a script exists before dispatching ──
@@ -79,11 +79,10 @@ dispatch() {
 # ── Help text ──
 show_help() {
   cat <<HELP
-${c_bold}OpenConfig${c_0} (${c_p}oc${c_0}) — pinned stack for OpenCode · OpenRouter · OmO
+${c_b}${c_bold}── Usage ──${c_0}
+  oc <command> [args...]
 
-${c_bold}Usage:${c_0}  oc <command> [args...]
-
-${c_bold}Install & self-heal (start here):${c_0}
+${c_b}${c_bold}── Install & self-heal ──${c_0}
   ${c_g}install${c_0}   [--quick|--yes|--full]       Full-stack install / refresh
   ${c_g}check${c_0}     [--fix]                      validate + doctor --quick
   ${c_g}heal${c_0}      [--ai|--no-ai]                 Unattended self-repair (AI when needed)
@@ -91,14 +90,14 @@ ${c_bold}Install & self-heal (start here):${c_0}
   ${c_g}signature${c_0} [--refresh|--json]           Prove this is the OpenConfig repo
   ${c_g}test${c_0}      [smoke|idempotency|runtime]   Self-test suite (safe)
 
-${c_bold}Setup & Health:${c_0}
-  ${c_g}setup${c_0}     [--check|--force|--sync-env]   Idempotent provision (teams, LSP, projects)
+${c_b}${c_bold}── Setup & health ──${c_0}
+  ${c_g}setup${c_0}     [--check|--force|--sync-env]   Idempotent provision (teams → live config, LSP, projects)
   ${c_g}doctor${c_0}    [--quick|--json|--fix|--harden|--ai-fix]
-                                         Full readiness (keys, skills, teams, MCP, …)
+                                         Full readiness. Keys via oc secrets. Teams follow ~/.config/opencode.
   ${c_g}validate${c_0}  [--quiet]                      Config validator + footgun detector
   ${c_g}diagnose${c_0}  [--no-ai|--fix|--agent-fix]    AI-assisted deep diagnostics
 
-${c_bold}Repair & Clean:${c_0}
+${c_b}${c_bold}── Repair & clean ──${c_0}
   ${c_g}fix${c_0}       [--dry-run|--set k=v]          Auto-repair configs (incl. agent/category colors)
   ${c_g}cleanup${c_0}   [--dry-run|--yes]              Reconcile to known-good state
   ${c_g}maintain${c_0}  [--check|--clean|--plans]      Clean sessions, caches, logs
@@ -115,11 +114,12 @@ ${c_bold}Models & Admin:${c_0}
   ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + subscription gateway admin
   ${c_g}deploy${c_0}    [--dry-run|--force]           Guarded production config deployment
 
-${c_bold}Run & Launch:${c_0}
+${c_b}${c_bold}── Run & launch ──${c_0}
   ${c_g}run${c_0}       "<msg>" [-a agent] [-d dir]    Headless runner (run to completion)
   ${c_g}launch${c_0}    [dir] [--here]                 Launch OpenCode (never config repo)
   ${c_g}opencode${c_0}  [dir]                          Same as oc launch (opencode.sh)
   ${c_g}env${c_0}       [--check|--scrub]               .env allowlist hygiene (never prints values)
+  ${c_g}secrets${c_0}   [status|sync|check]             1Password / Infisical → allowlisted .env
 
 ${c_bold}Scaffold:${c_0}
   ${c_g}new${c_0}       <name> [--profile|--dir|--here|--launch]
@@ -132,7 +132,7 @@ ${c_bold}Aliases:${c_0}
   ${c_dim}sig${c_0}             → signature      ${c_dim}pins${c_0} → versions
   ${c_dim}omo${c_0}             → plugin         ${c_dim}opencode${c_0} → launch
 
-${c_bold}Admin subcommands:${c_0}
+${c_b}${c_bold}── Admin subcommands ──${c_0}
   status       Account overview (credits, keys, spend)
   health       Live probe all models + rate limits
   ratelimit    Check rate limit headers
@@ -142,7 +142,7 @@ ${c_bold}Admin subcommands:${c_0}
   whoami       Account identity + plan
   alert [N]    Check if credits below \$N (default 50)
 
-${c_bold}Examples:${c_0}
+${c_b}${c_bold}── Examples ──${c_0}
   oc install --quick             Full stack, non-interactive, then validate + doctor
   oc install                     Interactive lazy install (Enter = defaults)
   oc install --full              Wizard (dir, keys, terminals, projects)
@@ -171,11 +171,11 @@ ${c_bold}Examples:${c_0}
   oc new myapp                   Scaffold → ~/Projects/myapp
   oc projects --list             List projects home
 
-${c_bold}One-liner (fresh machine):${c_0}
+${c_b}${c_bold}── One-liner ──${c_0}
   curl -fsSL "\$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3MvbWFpbi9pbnN0YWxsLnNo' | base64 -d)" | bash
   # Prefer after clone:  oc install --quick
 
-${c_bold}Auto/non-interactive:${c_0}
+${c_b}${c_bold}── Auto ──${c_0}
   oc install --quick · oc heal · oc locate · oc test · oc check --fix
 
 HELP
@@ -212,7 +212,7 @@ PLUGINHELP
     cache|status)
       pin="$(python3 -c "import json;p=[x for x in json.load(open('$REPO/opencode.json')).get('plugin',[]) if 'oh-my' in x];print(p[0] if p else '')" 2>/dev/null || true)"
       cdir="$(oc_omo_plugin_cache_dir "$pin" 2>/dev/null || true)"
-      printf "\n${c_b}${c_bold}== OmO plugin cache ==${c_0}\n"
+      oc_section "OmO plugin cache"
       info "pin: ${pin:-none}"
       info "path: ${cdir:-?}"
       if [[ -n "$cdir" && -f "$cdir/node_modules/oh-my-openagent/package.json" ]]; then
@@ -384,7 +384,7 @@ oc env — OpenConfig .env hygiene (never prints secret values)
   oc env --scrub   Rewrite .env to allowlisted keys only (copy-backup first)
 
 Foreign keys (company vault dumps) must not live in this public config tree.
-Use Infisical/Doppler for those; `oc setup --sync-env` imports allowlisted keys only.
+Use 1Password (`oc secrets sync`) or Infisical/Doppler — allowlisted keys only.
 ENVHELP
         return 0 ;;
       *) bad "unknown flag: $a"; return 2 ;;
@@ -411,6 +411,119 @@ ENVHELP
     return 1
   fi
   ok ".env allowlist-clean"
+  return 0
+}
+
+# ── 1Password / Infisical sync (never prints secret values) ──
+do_secrets() {
+  local mode="${1:-status}"
+  shift || true
+  case "$mode" in
+    -h|--help)
+      cat <<'SECRETSHELP'
+oc secrets — Pull allowlisted keys from 1Password or Infisical
+
+  oc secrets           Status (backend + which keys resolve — names only)
+  oc secrets status    Same
+  oc secrets check     Status; exit 1 if required OPENROUTER_API_KEY missing
+  oc secrets sync      Write allowlisted keys into .env (copy-backup first)
+
+vault.json is the public template (example op://Vault/Item/field refs).
+Put personal account/vault/item IDs in vault.local.json (gitignored overlay).
+Never `op run` / `infisical run`. Infisical: set INFISICAL_DIR.
+SECRETSHELP
+      return 0
+      ;;
+    status|check|sync) ;;
+    *) bad "unknown secrets command: $mode"; tip "oc secrets --help"; return 2 ;;
+  esac
+
+  local backend cfg envf
+  cfg="$(oc_vault_json)"
+  envf="$REPO/.env"
+  if [[ ! -f "$cfg" ]]; then
+    bad "vault.json missing"
+    return 1
+  fi
+  backend="$(oc_secrets_backend)"
+  info "backend: $backend"
+  if [[ -f "$(oc_vault_local_json)" ]]; then
+    info "overlay: vault.local.json (gitignored)"
+  fi
+  if command -v op >/dev/null 2>&1; then
+    if oc_secrets_1password_ready; then
+      ok "1Password CLI signed in"
+    else
+      opt "1Password CLI present but not signed in (op signin / app integration)"
+    fi
+  else
+    opt "1Password CLI (op) not on PATH"
+  fi
+  if command -v infisical >/dev/null 2>&1; then
+    if oc_secrets_infisical_ready; then
+      ok "Infisical CLI + INFISICAL_DIR"
+    else
+      opt "Infisical CLI present — set INFISICAL_DIR to a linked project"
+    fi
+  else
+    info "Infisical CLI not installed (optional fallback)"
+  fi
+
+  local key ref resolved=0 missing=0 acct="" live_n=0
+  acct="$(oc_vault_merged_json | python3 -c 'import json,sys
+try:
+    print(((json.load(sys.stdin).get("onepassword") or {}).get("account") or "").strip())
+except Exception:
+    print("")
+')"
+  acct="${OP_ACCOUNT:-$acct}"
+  while IFS=$'\t' read -r key ref; do
+    [[ -n "$key" ]] || continue
+    live_n=$((live_n + 1))
+    _val=""
+    if oc_secrets_1password_ready; then
+      if [[ -n "$acct" ]]; then
+        _val="$(op read --account "$acct" "$ref" 2>/dev/null || true)"
+      else
+        _val="$(op read "$ref" 2>/dev/null || true)"
+      fi
+    fi
+    if [[ -n "$_val" ]]; then
+      ok "$key (1Password ref resolves)"
+      resolved=$((resolved + 1))
+    else
+      opt "$key (ref not readable)"
+      missing=$((missing + 1))
+    fi
+    unset _val
+  done < <(oc_vault_op_refs)
+  if [[ "$live_n" -eq 0 ]]; then
+    opt "no live 1Password refs (public vault.json is example placeholders)"
+    tip "copy vault.json → vault.local.json and set your op:// refs (gitignored)"
+  fi
+
+  if [[ "$mode" == "sync" ]]; then
+    local out be keys
+    if ! out="$(oc_secrets_sync "$envf")"; then
+      bad "sync failed (backend=${out%%|*})"
+      tip "edit vault.local.json  ·  op signin  ·  INFISICAL_DIR=… oc secrets sync"
+      return 1
+    fi
+    be="${out%%|*}"
+    keys="${out#*|}"
+    ok "synced from $be → .env${keys:+ · $keys}"
+    return 0
+  fi
+
+  if [[ "$mode" == "check" ]]; then
+    if oc_openrouter_key_configured "$envf"; then
+      ok "OPENROUTER_API_KEY present (.env or vault overlay)"
+      return 0
+    fi
+    bad "OPENROUTER_API_KEY missing from .env and vault overlay"
+    tip "add OPENROUTER_API_KEY to .env  ·  or: oc secrets sync"
+    return 1
+  fi
   return 0
 }
 
@@ -943,7 +1056,7 @@ HEALHELP
 
   _heal_run() {
     local title="$1"; shift
-    printf "\n${c_b}${c_bold}== %s ==${c_0}\n" "$title" | tee -a "$log"
+    { oc_section "$title"; } | tee -a "$log"
     set +e
     "$@" 2>&1 | tee -a "$log"
     local step_rc=${PIPESTATUS[0]}
@@ -1208,6 +1321,9 @@ case "$cmd" in
   env)
     do_env "$@"
     ;;
+  secrets|vault)
+    do_secrets "$@"
+    ;;
 
   help|-h|--help)
     header
@@ -1228,6 +1344,7 @@ case "$cmd" in
       ver|versioning) tip "did you mean: ${c_g}oc versions${c_0}" ;;
       clean) tip "did you mean: ${c_g}oc cleanup${c_0}  or  ${c_g}oc maintain --clean${c_0}" ;;
       probe) tip "did you mean: ${c_g}oc models --probe${c_0}" ;;
+      cursor) tip "OpenConfig does not wire Cursor IDE" ;;
     esac
     printf '\n'
     show_help

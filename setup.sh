@@ -3,11 +3,14 @@
 #
 # Gets the generated compatibility view working as ~/.config/opencode.
 # Safe to run multiple times. Won't clobber existing .env or working symlinks.
+# From a secondary checkout: does NOT retarget a healthy live install
+# (~/.config/opencode → another OpenConfig tree). Team links heal to the live tree.
 #
 # Usage:
 #   ./setup.sh              # full setup (idempotent)
 #   ./setup.sh --check      # check only, don't change anything
-#   ./setup.sh --force      # overwrite broken symlinks
+#   ./setup.sh --force      # overwrite broken symlinks (never steals a healthy live link)
+#   ./setup.sh --sync-env   # pull allowlisted keys (oc secrets sync)
 
 set -euo pipefail
 
@@ -32,6 +35,9 @@ for arg in "$@"; do
 done
 
 SYNC_ENV="${SYNC_ENV:-false}"
+if ! $CHECK_ONLY; then
+  oc_ensure_omo_runtime "$REPO" || true
+fi
 
 # OmO can leave a migration journal that still references this canonical
 # checkout. Never render/sync native state around it: a resumed migration could
@@ -57,8 +63,17 @@ ok(){ printf "  ${c_g}✓${c_0} %s\n" "$*"; }
 opt(){ printf "  ${c_y}⚠${c_0} %s\n" "$*"; }
 bad(){ printf "  ${c_r}✗${c_0} %s\n" "$*"; }
 info(){ printf "  ${c_b}•${c_0} %s\n" "$*"; }
+tip(){ printf "  ${c_b}${c_bold}↳${c_0} ${c_dim}%s${c_0}\n" "$*"; }
 
-oc_banner "$OC_VERSION" "OpenConfig setup — OpenCode · OpenRouter · OmO"
+LIVE_ROOT="$(oc_live_config_root 2>/dev/null || true)"
+IS_LIVE=false
+oc_is_live_config "$REPO" && IS_LIVE=true
+TEAM_ROOT="$REPO"
+if ! $IS_LIVE && [[ -n "$LIVE_ROOT" ]]; then
+  TEAM_ROOT="$LIVE_ROOT"
+fi
+
+oc_banner "$OC_VERSION"
 
 # ─── 1. OpenCode CLI ──────────────────────────────────────────────
 echo "Step 1: OpenCode CLI"
@@ -103,7 +118,7 @@ elif [ -d "$LINK" ]; then
     fix ln -sfn "$COMPAT_CURRENT" "$LINK"
     ok "backed up to ${OC_BACKUP_PATH:-} and symlinked (sessions untouched at $OC_SESSIONS_DIR)"
   else
-    echo "  Run with --force to replace (backs up first; never deletes sessions)"
+    tip "run with --force to replace (backs up first; never deletes sessions)"
   fi
 elif [ ! -e "$LINK" ]; then
   fix ln -sfn "$COMPAT_CURRENT" "$LINK"
@@ -134,7 +149,7 @@ if ! $CHECK_ONLY; then
     ok ".env preserved (merged any new keys from .env.example; values never clobbered)"
   fi
   if [[ -z "$(oc_get_env_key "$ENV_FILE" OPENROUTER_API_KEY 2>/dev/null || true)" ]]; then
-    opt "OPENROUTER_API_KEY unset — add it to $ENV_FILE"
+    opt "OPENROUTER_API_KEY unset — oc secrets sync  or  edit $ENV_FILE"
   else
     ok "OPENROUTER_API_KEY set"
   fi
@@ -142,7 +157,7 @@ else
   if [[ -f "$ENV_FILE" ]]; then
     ok ".env exists"
   else
-    opt ".env missing (would create from .env.example without overwriting later)"
+    opt ".env missing (would create from .env.example; or: oc secrets sync)"
   fi
 fi
 echo ""
@@ -179,49 +194,60 @@ if ! $CHECK_ONLY; then
 fi
 
 # ─── 4. Team specs ────────────────────────────────────────────────
-echo "Step 4: Team mode specs"
+echo "Step 4: Team mode specs (~/.omo/teams → live config)"
+if $IS_LIVE; then
+  info "healing team links → $TEAM_ROOT/teams"
+elif [[ -n "$LIVE_ROOT" ]]; then
+  info "live install is $LIVE_ROOT — will not retarget teams to this checkout"
+fi
 mkdir -p "$OMO_TEAMS"
-# Prune stale/broken symlinks (e.g. retired build-crew)
+# Prune stale/broken symlinks (e.g. retired build-crew) against the live tree
 for existing in "$OMO_TEAMS"/*; do
   [ -e "$existing" ] || [ -L "$existing" ] || continue
   name="$(basename "$existing")"
-  if [ ! -d "$REPO/teams/$name" ]; then
+  if [ ! -d "$TEAM_ROOT/teams/$name" ]; then
     if [ -L "$existing" ]; then
       fix rm -f "$existing"
       ok "removed stale team link '$name'"
     else
-      opt "orphan path $existing (not a symlink to this repo — leave alone)"
+      opt "orphan path $existing (not a symlink — leave alone)"
     fi
   fi
 done
-for spec_dir in "$REPO"/teams/*/; do
+for spec_dir in "$TEAM_ROOT"/teams/*/; do
   [ -d "$spec_dir" ] || continue
   team_name="$(basename "$spec_dir")"
   team_link="$OMO_TEAMS/$team_name"
   target="${spec_dir%/}"
-  # Resolve desired link text (no trailing slash)
   if [ -L "$team_link" ]; then
-    _cur="$(readlink "$team_link" 2>/dev/null || true)"
-    if [ "$_cur" = "$target" ] || [ "$_cur" = "$spec_dir" ]; then
-      ok "team '$team_name' provisioned (symlink)"
-      unset _cur
+    _got=""
+    if command -v realpath >/dev/null 2>&1; then
+      _got="$(realpath "$team_link" 2>/dev/null || true)"
+    fi
+    if oc_same_path "${_got:-}" "$target" || [ "$(readlink "$team_link" 2>/dev/null || true)" = "$target" ]; then
+      ok "team '$team_name' → live"
+      unset _got
       continue
     fi
-    unset _cur
+    unset _got
   fi
   # Real directory copies (or wrong links) must be replaced — macOS ln -sfn
   # will nest a symlink *inside* an existing directory instead of replacing it.
   if [ -d "$team_link" ] && [ ! -L "$team_link" ]; then
     if $CHECK_ONLY; then
-      opt "team '$team_name' is a directory copy (not symlink) — run setup to replace"
+      opt "team '$team_name' is a directory copy (not symlink) — run oc setup from the live install"
       continue
     fi
     fix rm -rf "$team_link"
   elif [ -e "$team_link" ] || [ -L "$team_link" ]; then
+    if $CHECK_ONLY; then
+      opt "team '$team_name' drift — run oc setup from the live install"
+      continue
+    fi
     fix rm -f "$team_link"
   fi
   fix ln -sfn "$target" "$team_link"
-  ok "team '$team_name' symlinked → $target"
+  ok "team '$team_name' → $target"
 done
 echo ""
 
@@ -298,42 +324,47 @@ echo ""
 
 # ─── 7. Tmux + Ghostty + Zshrc ────────────────────────────────
 echo "Step 7: Terminal configs"
+_conf_src="$TEAM_ROOT"
 if command -v tmux >/dev/null 2>&1; then
   TMUX_CONF="$HOME/.tmux.conf"
-  if [ -L "$TMUX_CONF" ] && [ "$(readlink "$TMUX_CONF")" = "$REPO/tmux.conf" ]; then
-    ok "tmux.conf symlinked"
+  if oc_runtime_conf_ok "$TMUX_CONF" tmux.conf; then
+    ok "tmux.conf → live install"
+  elif ! $IS_LIVE && [[ -n "$LIVE_ROOT" ]]; then
+    opt "tmux.conf not linked to live install (not retargeting from this checkout)"
   elif [ -f "$TMUX_CONF" ] || [ -L "$TMUX_CONF" ]; then
     opt "tmux.conf exists (not our symlink — run --force to replace; backs up first)"
     if $FORCE; then
       oc_backup_path "$TMUX_CONF" "tmux" >/dev/null
-      fix ln -sfn "$REPO/tmux.conf" "$TMUX_CONF"
-      ok "tmux.conf symlinked (backup → ${OC_BACKUP_PATH:-})"
+      fix ln -sfn "$_conf_src/tmux.conf" "$TMUX_CONF"
+      ok "tmux.conf → live (backup → ${OC_BACKUP_PATH:-})"
     fi
   else
-    fix ln -sfn "$REPO/tmux.conf" "$TMUX_CONF"
-    ok "tmux.conf symlinked"
+    fix ln -sfn "$_conf_src/tmux.conf" "$TMUX_CONF"
+    ok "tmux.conf → live"
   fi
 else
   opt "tmux not installed (team mode tmux_visualization won't work)"
-  echo "  Install: brew install tmux"
+  tip "install: brew install tmux"
 fi
 echo ""
 
 # ─── Ghostty config (optional) ───────────────────────────────
 if [[ -d "$HOME/.config/ghostty" ]]; then
   GHOSTTY_CONF="$HOME/.config/ghostty/config"
-  if [ -L "$GHOSTTY_CONF" ] && [ "$(readlink "$GHOSTTY_CONF")" = "$REPO/ghostty.conf" ]; then
-    ok "ghostty.conf symlinked"
+  if oc_runtime_conf_ok "$GHOSTTY_CONF" ghostty.conf; then
+    ok "ghostty.conf → live install"
+  elif ! $IS_LIVE && [[ -n "$LIVE_ROOT" ]]; then
+    opt "ghostty config not linked to live install (not retargeting from this checkout)"
   elif [ -f "$GHOSTTY_CONF" ] || [ -L "$GHOSTTY_CONF" ]; then
     opt "ghostty config exists (not our symlink — run --force to replace; backs up first)"
     if $FORCE; then
       oc_backup_path "$GHOSTTY_CONF" "ghostty" >/dev/null
-      fix ln -sfn "$REPO/ghostty.conf" "$GHOSTTY_CONF"
-      ok "ghostty.conf symlinked (backup → ${OC_BACKUP_PATH:-})"
+      fix ln -sfn "$_conf_src/ghostty.conf" "$GHOSTTY_CONF"
+      ok "ghostty.conf → live (backup → ${OC_BACKUP_PATH:-})"
     fi
   else
-    fix ln -sfn "$REPO/ghostty.conf" "$GHOSTTY_CONF"
-    ok "ghostty.conf symlinked"
+    fix ln -sfn "$_conf_src/ghostty.conf" "$GHOSTTY_CONF"
+    ok "ghostty.conf → live"
   fi
 else
   info "Ghostty not detected — skip ghostty.conf"
@@ -383,20 +414,20 @@ fi
 echo ""
 
 # ─── 8. Sync env from secrets manager (optional) ───────────────
-# NEVER dump a whole Infisical/Doppler project into OpenConfig .env —
-# that spreads company secrets into the public config tree. Import
-# allowlisted OpenConfig keys only (see OC_ENV_ALLOWLIST).
+# 1Password first (vault.json op:// refs), then Infisical, then Doppler.
+# NEVER dump a whole project into OpenConfig .env. Allowlisted keys only.
 if $SYNC_ENV; then
-  echo "Step 8: Sync allowlisted .env keys from secrets manager"
-  if command -v infisical >/dev/null 2>&1 && [[ -n "${INFISICAL_DIR:-}" ]]; then
-    TMP_FILE="$(mktemp)"
-    INFISICAL_ENV="${INFISICAL_ENV:-prod}"
-    ( cd "$INFISICAL_DIR" && infisical export --env="$INFISICAL_ENV" --format=dotenv --silent 2>/dev/null > "$TMP_FILE" )
-    perl -i -pe "s/^([A-Z0-9_]+)='([^'\n]*)'$/\$1=\$2/g" "$TMP_FILE"
-    if [[ -f "$REPO/.env" ]]; then
-      oc_backup_copy "$REPO/.env" "env" >/dev/null || true
-    fi
-    imported="$(oc_import_allowlisted_dotenv "$TMP_FILE" "$REPO/.env" 2>/dev/null || true)"
+  echo "Step 8: Sync allowlisted .env keys (1Password / Infisical / Doppler)"
+  sync_out="$(oc_secrets_sync "$REPO/.env" 2>/dev/null || true)"
+  sync_be="${sync_out%%|*}"
+  sync_keys="${sync_out#*|}"
+  if [[ -z "$sync_be" || "$sync_be" == "none" ]]; then
+    opt "No secrets backend ready — install 1Password CLI (op) or Infisical, or set keys in .env"
+    echo "  1Password:  brew install 1password-cli  ·  then: oc secrets sync"
+    echo "  Infisical:  brew install infisical  ·  INFISICAL_DIR=/path oc setup --sync-env"
+    echo "  Doppler:    brew install doppler"
+    echo "  Note: sync imports OpenConfig allowlisted keys only — never the full vault."
+  else
     OR_KEY="$(oc_get_env_key "$REPO/.env" OPENROUTER_API_KEY 2>/dev/null || true)"
     if [[ -n "$OR_KEY" ]]; then
       HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -405,31 +436,15 @@ if $SYNC_ENV; then
         -d '{"model":"deepseek/deepseek-v4-flash-0731:nitro","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
         https://openrouter.ai/api/v1/chat/completions 2>/dev/null)
       if [[ "$HTTP_CODE" = "200" ]]; then
-        ok ".env allowlisted keys from Infisical (verified HTTP 200)${imported:+ · $imported}"
+        ok ".env allowlisted keys from $sync_be (OpenRouter HTTP 200)${sync_keys:+ · $sync_keys}"
       else
-        bad "OPENROUTER_API_KEY verification failed (HTTP $HTTP_CODE)"
+        ok ".env allowlisted keys from $sync_be${sync_keys:+ · $sync_keys}"
+        opt "OPENROUTER_API_KEY probe HTTP $HTTP_CODE (key present; network or credits)"
       fi
     else
-      bad "OPENROUTER_API_KEY not found in Infisical export (allowlist import)"
+      bad "OPENROUTER_API_KEY not imported from $sync_be"
+      tip "check vault.local.json refs · oc secrets status"
     fi
-    rm -f "$TMP_FILE"
-  elif command -v doppler >/dev/null 2>&1; then
-    TMP_FILE="$(mktemp)"
-    if [[ -f "$REPO/.env" ]]; then
-      oc_backup_copy "$REPO/.env" "env" >/dev/null || true
-    fi
-    if doppler secrets download --no-file --format=env > "$TMP_FILE" 2>/dev/null; then
-      imported="$(oc_import_allowlisted_dotenv "$TMP_FILE" "$REPO/.env" 2>/dev/null || true)"
-      ok ".env allowlisted keys from Doppler${imported:+ · $imported}"
-    else
-      bad "Doppler download failed"
-    fi
-    rm -f "$TMP_FILE"
-  else
-    opt "No secrets manager found (install Infisical or Doppler, or set keys manually)"
-    echo "  Infisical:  curl -sL https://infisical.com/install.sh | bash"
-    echo "  Doppler:    brew install doppler"
-    echo "  Note: sync imports OpenConfig allowlisted keys only — never the full vault."
   fi
   echo ""
 fi
@@ -499,6 +514,10 @@ if [ -x "$REPO/doctor.sh" ] && ! $CHECK_ONLY; then
 fi
 
 echo ""
-echo -e "${c_g}Setup complete.${c_0}"
-$CHECK_ONLY && echo "Run without --check to apply fixes."
+printf '%b\n' "${c_g}Setup complete.${c_0}"
+if $CHECK_ONLY; then
+  tip "run without --check to apply fixes  ·  oc secrets sync  ·  oc doctor --quick"
+else
+  tip "oc secrets sync  ·  oc doctor --quick --json"
+fi
 exit 0

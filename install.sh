@@ -188,7 +188,8 @@ die(){
   exit 1
 }
 
-# OpenConfig banner (common.sh not sourced yet for curl|bash bootstrap)
+# OpenConfig banner (common.sh not sourced yet for curl|bash bootstrap).
+# Keep in sync with oc_banner in lib/common.sh (3-line oc badge, ~58 cols).
 _install_banner() {
   printf '%b\n' "${c_b}${c_bold}"
   cat <<'ASCII'

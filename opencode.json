@@ -6,6 +6,7 @@
   "model": "openrouter/z-ai/glm-5.3",
   "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
   "default_agent": "sisyphus",
+  "subagent_depth": 1,
   "autoupdate": false,
   "share": "disabled",
   "snapshot": false,
@@ -16,7 +17,10 @@
   },
   "enabled_providers": [
     "openrouter",
-    "subscription-gateway"
+    "subscription-gateway",
+    "codex-subscription",
+    "venice",
+    "deepseek"
   ],
   "instructions": [
     "AGENTS.md",
@@ -62,33 +66,48 @@
       "disable": true,
       "options": {},
       "permission": {}
+    },
+    "hephaestus": {
+      "name": "Hephaestus - Implementer",
+      "description": "Deep implement / critique on GLM 5.3",
+      "mode": "primary",
+      "model": "openrouter/z-ai/glm-5.3",
+      "hidden": false,
+      "options": {},
+      "permission": {}
     }
   },
   "provider": {
     "openrouter": {
       "whitelist": [
         "z-ai/glm-5.3",
-        "minimax/minimax-m3",
+        "z-ai/glm-5.3-flash",
         "google/gemini-3.1-pro-preview",
-        "google/gemini-3.7-flash",
+        "minimax/minimax-m3",
         "moonshotai/kimi-k2.7-code",
+        "google/gemini-3.7-flash",
         "deepseek/deepseek-v4-pro-0813",
-        "deepseek/deepseek-v4-pro-0813-zdr-throughput",
         "deepseek/deepseek-v4-flash-0731",
+        "deepseek/deepseek-v4-pro-0813-zdr-throughput",
         "deepseek/deepseek-v4-flash-0731-zdr-throughput",
-        "nousresearch/hermes-4-405b"
+        "nousresearch/hermes-4-405b",
+        "poolside/laguna-s-2.1",
+        "meituan/longcat-2.0",
+        "google/gemini-3.8-flash",
+        "qwen/qwen3.8-max-0902",
+        "deepseek/deepseek-v4.1-flash"
       ],
       "options": {
         "baseURL": "{env:OPENROUTER_OBSERVER_BASE_URL}",
         "timeout": 600000,
         "headerTimeout": 600000,
-        "chunkTimeout": 60000,
+        "chunkTimeout": 180000,
         "setCacheKey": true,
         "headers": {
           "HTTP-Referer": "https://github.com/ArnaudLafosse92100/opencode-configs",
           "X-Title": "OpenConfig",
           "X-OpenRouter-Title": "OpenConfig",
-          "X-OpenRouter-Categories": "cli,agent"
+          "X-OpenRouter-Categories": "cli-agent"
         },
         "apiKey": "{env:OPENROUTER_API_KEY}"
       },
@@ -103,19 +122,67 @@
           "attachment": false,
           "status": "active",
           "limit": {
-            "context": 1048576,
+            "context": 1310720,
             "output": 131072
           },
           "options": {
-      "provider": {
-        "require_parameters": true,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 1.4,
-          "completion": 4.4
-        }
+            "provider": {
+              "require_parameters": true,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 1.4,
+                "completion": 4.4
+              }
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "z-ai/glm-5.3-flash": {
+          "id": "z-ai/glm-5.3-flash",
+          "name": "Z.ai GLM 5.3 Flash",
+          "family": "glm",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1310720,
+            "output": 131072
+          },
+          "options": {
+            "provider": {
+              "require_parameters": true,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 1.4,
+                "completion": 4.4
+              }
             }
           },
           "variants": {
@@ -155,15 +222,15 @@
             "output": 65536
           },
           "options": {
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 3.6,
-          "completion": 21.6
-        }
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 3.6,
+                "completion": 21.6
+              }
             },
             "reasoning": {
               "effort": "high"
@@ -206,15 +273,15 @@
             "output": 512000
           },
           "options": {
-      "provider": {
-        "require_parameters": true,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 0.3,
-          "completion": 1.2
-        }
+            "provider": {
+              "require_parameters": true,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 0.3,
+                "completion": 1.2
+              }
             },
             "reasoning": {
               "effort": "high"
@@ -260,15 +327,15 @@
             "reasoning": {
               "effort": "low"
             },
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 0.95,
-          "completion": 4
-        }
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 0.95,
+                "completion": 4
+              }
             }
           },
           "variants": {
@@ -308,15 +375,15 @@
             "output": 65536
           },
           "options": {
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 1.35,
-          "completion": 6.75
-        }
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 1.35,
+                "completion": 6.75
+              }
             },
             "reasoning": {
               "effort": "medium"
@@ -346,8 +413,8 @@
           }
         },
         "deepseek/deepseek-v4-pro-0813": {
-    "id": "deepseek/deepseek-v4-pro-0813:floor",
-    "name": "DeepSeek V4 Pro 0813 Floor",
+          "id": "deepseek/deepseek-v4-pro-0813:floor",
+          "name": "DeepSeek V4 Pro 0813 Floor",
           "family": "deepseek",
           "reasoning": true,
           "tool_call": true,
@@ -362,15 +429,15 @@
             "reasoning": {
               "effort": "low"
             },
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 1.32,
-          "completion": 3.96
-        }
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 1.32,
+                "completion": 3.96
+              }
             }
           },
           "variants": {
@@ -397,8 +464,8 @@
           }
         },
         "deepseek/deepseek-v4-flash-0731": {
-    "id": "deepseek/deepseek-v4-flash-0731:floor",
-    "name": "DeepSeek V4 Flash 0731 Floor",
+          "id": "deepseek/deepseek-v4-flash-0731:floor",
+          "name": "DeepSeek V4 Flash 0731 Floor",
           "family": "deepseek",
           "reasoning": true,
           "tool_call": true,
@@ -410,15 +477,15 @@
             "output": 384000
           },
           "options": {
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 0.1,
-          "completion": 0.3
-        }
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 0.1,
+                "completion": 0.3
+              }
             }
           },
           "variants": {
@@ -552,22 +619,307 @@
           "reasoning": true,
           "tool_call": false,
           "temperature": true,
-          "attachment": false,
+          "attachment": true,
           "status": "active",
           "limit": {
             "context": 131072,
             "output": 131072
           },
           "options": {
-      "provider": {
-        "require_parameters": false,
-        "data_collection": "allow",
-        "allow_fallbacks": true,
-        "sort": "price",
-        "max_price": {
-          "prompt": 1,
-          "completion": 3
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "sort": "price",
+              "max_price": {
+                "prompt": 1,
+                "completion": 3
+              }
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "poolside/laguna-s-2.1": {
+          "id": "poolside/laguna-s-2.1",
+          "name": "Poolside Laguna S 2.1",
+          "family": "poolside",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1048576,
+            "output": 131072
+          },
+          "options": {
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "meituan/longcat-2.0": {
+          "id": "meituan/longcat-2.0",
+          "name": "Meituan LongCat 2.0",
+          "family": "longcat",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1048756,
+            "output": 262144
+          },
+          "options": {
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "google/gemini-3.8-flash": {
+          "id": "google/gemini-3.8-flash",
+          "name": "Gemini 3.8 Flash",
+          "family": "gemini",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "options": {
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true
+            },
+            "reasoning": {
+              "effort": "medium"
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "qwen/qwen3.8-max-0902": {
+          "id": "qwen/qwen3.8-max-0902",
+          "name": "Qwen 3.8 Max",
+          "family": "qwen",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 131072
+          },
+          "options": {
+            "reasoning": {
+              "effort": "low"
+            },
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "deepseek/deepseek-v4.1-flash": {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1048576,
+            "output": 131072
+          },
+          "options": {
+            "provider": {
+              "require_parameters": false,
+              "data_collection": "allow",
+              "allow_fallbacks": true,
+              "only": [
+                "gmicloud",
+                "novita",
+                "siliconflow",
+                "parasail",
+                "deepinfra",
+                "baidu",
+                "fireworks",
+                "digitalocean"
+              ]
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
         }
+      }
+    },
+    "codex-subscription": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Codex Subscription via local OpenCodex",
+      "options": {
+        "baseURL": "http://127.0.0.1:10100/v1",
+        "apiKey": "local-loopback",
+        "timeout": 900000,
+        "headerTimeout": 900000,
+        "chunkTimeout": 900000
+      },
+      "models": {
+        "gpt-6-astra": {
+          "id": "openai/gpt-6-astra",
+          "name": "GPT-6 Astra (Codex subscription)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
             }
           },
           "variants": {
@@ -734,10 +1086,279 @@
           }
         }
       }
+    },
+    "venice": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Venice",
+      "whitelist": [
+        "deepseek-v4-pro-0813",
+        "deepseek-v4-pro",
+        "deepseek-v4-1-flash"
+      ],
+      "options": {
+        "baseURL": "https://api.venice.ai/api/v1",
+        "timeout": 300000,
+        "headerTimeout": 300000,
+        "chunkTimeout": 180000
+      },
+      "models": {
+        "deepseek-v4-pro-0813": {
+          "id": "deepseek-v4-pro-0813",
+          "name": "DeepSeek V4 Pro 0813",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            }
+          },
+          "options": {
+            "venice_parameters": {
+              "disable_thinking": true
+            }
+          }
+        },
+        "deepseek-v4-pro": {
+          "id": "deepseek-v4-pro",
+          "name": "DeepSeek V4 Pro",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            }
+          },
+          "options": {
+            "venice_parameters": {
+              "disable_thinking": true
+            }
+          }
+        },
+        "deepseek-v4-1-flash": {
+          "id": "deepseek-v4-1-flash",
+          "name": "DeepSeek V4.1 Flash",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "high"
+              },
+              "venice_parameters": {
+                "disable_thinking": true
+              }
+            }
+          },
+          "options": {
+            "venice_parameters": {
+              "disable_thinking": true
+            }
+          }
+        }
+      }
+    },
+    "deepseek": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek native",
+      "whitelist": [
+        "deepseek-v4-pro",
+        "deepseek-flash"
+      ],
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "timeout": 300000,
+        "headerTimeout": 300000,
+        "chunkTimeout": 180000
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "id": "deepseek-v4-pro",
+          "name": "DeepSeek V4 Pro (native)",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "high"
+              }
+            }
+          }
+        },
+        "deepseek-flash": {
+          "id": "deepseek-flash",
+          "name": "DeepSeek V4.1 Flash (native)",
+          "family": "deepseek",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": false,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "high"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "permission": {
-    "read": "allow",
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
     "glob": "allow",
     "grep": "allow",
     "list": "allow",
@@ -817,13 +1438,13 @@
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 48000,
+    "reserved": 24000,
     "tail_turns": 2,
-    "preserve_recent_tokens": 10000
+    "preserve_recent_tokens": 8000
   },
   "tool_output": {
-    "max_lines": 300,
-    "max_bytes": 12000
+    "max_lines": 200,
+    "max_bytes": 8000
   },
   "watcher": {
     "ignore": [
@@ -1051,6 +1672,16 @@
         "effect": "allow",
         "action": "provider.use",
         "resource": "openrouter"
+      },
+      {
+        "effect": "allow",
+        "action": "provider.use",
+        "resource": "venice"
+      },
+      {
+        "effect": "allow",
+        "action": "provider.use",
+        "resource": "deepseek"
       },
       {
         "effect": "deny",

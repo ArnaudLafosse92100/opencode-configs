@@ -40,6 +40,18 @@ When using `category`, do not also set `subagent_type`; those routes are mutuall
 - Architecture/adjudication: `arch-review`, `deep`, or `ultrabrain`.
 - Visual/writing: `artistry`, `visual-engineering`, or `writing`.
 
+## Automatic multi-model delivery
+
+For every non-trivial workspace implementation request, own the complete workflow without asking the user to change models or selectors:
+
+1. Delegate a synchronous `codex-plan` task to produce a concrete plan and acceptance checks. This is the Astra subscription planning lane.
+2. Delegate a synchronous `codex-implement` task to implement that plan and run the relevant checks. This is the GLM 5.3 OpenRouter implementation lane.
+3. Delegate a synchronous `codex-review` task to inspect the resulting diff and test evidence for correctness, regressions, security, and missed requirements. This is the Astra subscription review lane.
+4. If review reports actionable defects, delegate one synchronous `codex-implement` correction task with the findings, then one final synchronous `codex-review` verification task.
+5. Return one final answer based on the completed evidence. Never tell the user to switch the Codex model selector between phases.
+
+For a read-only question, tiny mechanical edit, pure code-location query, or a specialized security/visual/writing request, use the smallest fitting route below instead of forcing the full three-phase workflow.
+
 DO NOT / DO:
 - ❌ `subagent_type=explore` for "find leaked keys in the dump"
 - ❌ `subagent_type=explore` for "enumerate RLS-blocked tables"

@@ -37,7 +37,7 @@ for a in "$@"; do case "$a" in
 esac; done
 
 c_g=$'\033[32m'; c_y=$'\033[33m'; c_r=$'\033[31m'; c_b=$'\033[36m'; c_0=$'\033[0m'
-sec(){ printf "\n${c_b}== %s ==${c_0}\n" "$*"; }
+sec(){ oc_section "$*"; }
 ok(){ printf "  ${c_g}✓${c_0} %s\n" "$*"; }
 fix(){ printf "  ${c_g}⟳ fixed:${c_0} %s\n" "$*"; }
 warn(){ printf "  ${c_y}⚠${c_0} %s\n" "$*"; }
@@ -50,17 +50,28 @@ drift=0
 # ─── 1. Manifest: what MUST be here ──────────────────────────────────
 sec "Required files"
 REQUIRED=(
-  opencode.json oh-my-openagent.json tui.json tmux.conf ghostty.conf zshrc.snippet bunfig.toml README.md AGENTS.md CHANGELOG.md .env.example .gitignore projects.json versions.json signature.json
+  opencode.json oh-my-openagent.json tui.json tmux.conf ghostty.conf zshrc.snippet bunfig.toml README.md AGENTS.md CHANGELOG.md .env.example .gitignore projects.json versions.json signature.json t3-opencode.json vault.json
+  .github/workflows/check.yml
   validate.sh doctor.sh cleanup.sh fix.sh models.sh versions.sh diagnose.sh setup.sh install.sh maintain.sh
-# Add locate.sh to required list
-  opencode.sh run.sh openrouter-admin.sh oc locate.sh signature.sh
+  opencode.sh run.sh openrouter-admin.sh oc locate.sh signature.sh deploy-guard.sh
+  launch-desktop.sh serve-desktop.sh export-t3.py sync-t3.py
+  tests/smoke.sh tests/idempotency.sh tests/runtime-diagnostics.sh tests/prepare-ci-runtime.py
   lib/common.sh
   scripts/render-routing-docs.py
   agents/content-aware-research.md
+  agents/content-aware-fast.md
+  agents/context-aware-hermes.md
+  prompts/agents/content-aware-fast.md prompts/agents/content-aware-research.md
+  prompts/agents/context-aware-hermes.md
   prompts/core.md prompts/goal.md
   prompts/agents/sisyphus.md prompts/agents/hephaestus.md prompts/agents/prometheus.md prompts/agents/atlas.md
   prompts/agents/oracle.md prompts/agents/librarian.md prompts/agents/explore.md prompts/agents/multimodal-looker.md
   prompts/agents/metis.md prompts/agents/momus.md prompts/agents/sisyphus-junior.md
+  prompts/agents/sisyphus-deepseek.md prompts/agents/sisyphus-deepseek-junior.md
+  prompts/agents/sisyphus-venice-deepseek.md prompts/agents/sisyphus-venice-deepseek-flash-junior.md
+  agents/sisyphus-deepseek.md agents/sisyphus-deepseek-junior.md
+  agents/sisyphus-venice-deepseek.md agents/sisyphus-venice-deepseek-flash-junior.md
+  skills/content-aware-recon/SKILL.md skills/content-aware-audit/SKILL.md
   prompts/categories/content-aware-fast.md prompts/categories/content-aware-deep.md prompts/categories/bug-hunt.md
   prompts/categories/refactor-safe.md prompts/categories/arch-review.md
   prompts/categories/visual-engineering.md prompts/categories/ultrabrain.md prompts/categories/deep.md
@@ -108,6 +119,42 @@ else
   act "ln -sfn \"$COMPAT_CURRENT\" \"$LINK\""
   fix "symlink -> $COMPAT_CURRENT"
 fi
+
+# ─── 2b. OmO home is a symlink into this repo (.runtime) ─────────────
+sec "OmO runtime (sibling, not in git)"
+want_runtime="$(oc_omo_runtime_dir "$REPO")"
+if [[ $DRY -eq 1 ]]; then
+  if [[ -L "${HOME}/.omo" ]] && oc_same_path "$(oc_readlink_abs "${HOME}/.omo" 2>/dev/null || true)" "$want_runtime"; then
+    ok "~/.omo -> $want_runtime"
+  else
+    warn "[dry-run] would pin ~/.omo -> $want_runtime (outside the clone)"
+    drift=$((drift+1))
+  fi
+else
+  if oc_ensure_omo_runtime "$REPO"; then
+    ok "~/.omo -> $want_runtime (clone stays config-only)"
+  else
+    bad "failed to pin ~/.omo -> $want_runtime"; drift=$((drift+1))
+  fi
+fi
+if [[ -e "$REPO/.runtime" || -L "$REPO/.runtime" ]]; then
+  drift=$((drift+1))
+  if [[ $DRY -eq 1 ]]; then
+    warn "[dry-run] would remove in-repo .runtime"
+  else
+    act "rm -rf \"$REPO/.runtime\""; fix "removed in-repo .runtime (runtime is sibling)"
+  fi
+fi
+# Stale second checkout under /Users/Shared/configs
+for stale in /Users/Shared/configs/opencode-configs.stale-*; do
+  [[ -e "$stale" ]] || continue
+  drift=$((drift+1))
+  if [[ $DRY -eq 1 ]]; then
+    warn "[dry-run] would remove stale copy $stale"
+  else
+    act "rm -rf \"$stale\""; fix "removed stale copy $stale"
+  fi
+done
 
 # ─── 3. Plugin pin sanity (must load, not just parse) ────────────────
 sec "Plugin pin"
@@ -178,13 +225,31 @@ else
   ok "no backups"
 fi
 
+# ─── 6b. Stale OmO runtime (tasks + old migration backups) ───────────
+sec "OmO runtime leftovers"
+OMO_HOME="${HOME}/.omo"
+pruned_omo=0
+if [[ -d "$OMO_HOME/tasks" ]]; then
+  while IFS= read -r tf; do
+    [[ -z "$tf" ]] && continue
+    act "rm -f \"$tf\""; fix "pruned stale OmO task $(basename "$tf")"; pruned_omo=$((pruned_omo+1))
+  done < <(find "$OMO_HOME/tasks" -name 'T-*.json' -mtime +14 2>/dev/null)
+fi
+if [[ -d "$OMO_HOME" ]]; then
+  while IFS= read -r mb; do
+    [[ -z "$mb" ]] && continue
+    act "rm -rf \"$mb\""; fix "pruned OmO migration backup $(basename "$mb")"; pruned_omo=$((pruned_omo+1))
+  done < <(find "$OMO_HOME" -maxdepth 1 -type d -name 'migration-backup-*' -mtime +14 2>/dev/null)
+fi
+[[ $pruned_omo -eq 0 ]] && ok "no stale OmO tasks or migration backups (>14d)"
+
 # ─── 7. Repo cruft ───────────────────────────────────────────────────
 sec "Repo cruft"
 cruft=0
 while IFS= read -r junk; do
   [[ -z "$junk" ]] && continue
   act "rm -rf \"$junk\""; fix "removed $(echo "$junk" | sed "s#$REPO/##")"; cruft=$((cruft+1))
-done < <(find "$REPO" \( -name '.DS_Store' -o -name '*.bak' -o -name '*.bak.*' -o -name '*.log' \) 2>/dev/null)
+done < <(find "$REPO" \( -path "$REPO/.git" -prune -o \( -name '.DS_Store' -o -name '*.bak' -o -name '*.bak.*' -o -name '*.log' \) -print \) 2>/dev/null)
 # stray install/runtime artifacts (opencode may drop these into the config dir; keep repo config-only)
 if [[ $DRY -eq 1 ]]; then
   for stray in "${OC_CONFIG_STRAYS[@]}"; do

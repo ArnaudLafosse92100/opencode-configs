@@ -456,6 +456,24 @@ class RuntimeProfiles:
             if selected.get("compose") == "normal":
                 if profile != "normal-private" or not isinstance(selected.get("privacy"), dict):
                     raise SystemExit(f"invalid composed runtime profile {profile!r} in {self.profile_path}")
+                replacement = selected.get("non_openrouter_route")
+                if not isinstance(replacement, dict):
+                    raise SystemExit(f"missing {profile}.non_openrouter_route in {self.profile_path}")
+                replacement_chain = [
+                    replacement.get("model"),
+                    *(replacement.get("fallback_models") or []),
+                ]
+                if (
+                    not isinstance(replacement.get("fallback_models"), list)
+                    or not replacement_chain
+                    or any(
+                        not isinstance(model, str) or not model.startswith("openrouter/")
+                        for model in replacement_chain
+                    )
+                ):
+                    raise SystemExit(
+                        f"invalid {profile}.non_openrouter_route in {self.profile_path}"
+                    )
                 continue
             for section in VALID_SECTIONS:
                 if not isinstance(selected.get(section), dict):
@@ -708,15 +726,19 @@ class RuntimeProfiles:
 
         # `normal-private` is intentionally a render-time composition, never
         # a hand-maintained duplicate route matrix.  Preserve normal route
-        # order while removing subscription-gateway rungs and promoting the
-        # first remaining OpenRouter rung when the normal primary was gateway.
+        # order while removing non-OpenRouter rungs and promoting the first
+        # remaining OpenRouter rung when the normal primary was another
+        # provider. Routes with no OpenRouter rung use the single explicit
+        # private replacement rather than duplicating the normal matrix.
         private = copy.deepcopy(self.data["normal"])
+        replacement = selected["non_openrouter_route"]
         for section in VALID_SECTIONS:
             for name, route in private[section].items():
                 chain = [route.get("model"), *(route.get("fallback_models") or [])]
                 openrouter = [model for model in chain if isinstance(model, str) and model.startswith("openrouter/")]
                 if not openrouter:
-                    raise SystemExit(f"normal-private route has no OpenRouter model: {section}.{name}")
+                    private[section][name] = copy.deepcopy(replacement)
+                    continue
                 route["model"] = openrouter[0]
                 route["fallback_models"] = openrouter[1:]
         private["privacy"] = copy.deepcopy(selected["privacy"])
@@ -964,7 +986,10 @@ class RuntimeProfiles:
             # constraints only, applied to every model that can be selected.
             enabled = opencode.get("enabled_providers")
             if isinstance(enabled, list):
-                opencode["enabled_providers"] = [name for name in enabled if name != "subscription-gateway"]
+                opencode["enabled_providers"] = [
+                    name for name in enabled
+                    if name not in {"subscription-gateway", "codex-subscription"}
+                ]
             for model in ((opencode.get("provider") or {}).get("openrouter") or {}).get("models", {}).values():
                 if not isinstance(model, dict):
                     raise SystemExit("invalid OpenRouter model definition for normal-private")

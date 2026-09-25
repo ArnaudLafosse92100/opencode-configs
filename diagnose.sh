@@ -48,9 +48,9 @@ ask(){ [[ $YES -eq 1 ]] && return 0; tty || return 1; local r; read -r -p "  ${M
 askval(){ tty || { echo ""; return; }; local r; read -r -p "  ${M}? $1 ${Z}" r; echo "$r"; }
 getkey(){ oc_get_env_key "${ENV_FILE:-$REPO/.env}" "$1"; }
 
-printf "\n${B}${BD}┌─ OpenConfig deep diagnostics ───────────────────────┐${Z}\n"
-printf "${B}${BD}│${Z} %-51s ${B}${BD}│${Z}\n" "$REPO"
-printf "${B}${BD}└─────────────────────────────────────────────────────┘${Z}\n"
+c_b="$B"; c_bold="$BD"; c_0="$Z"
+oc_section "oc diagnose"
+printf "  ${D}%s${Z}\n" "$REPO"
 
 ORKEY="$(getkey OPENROUTER_API_KEY)"; [[ -z "$ORKEY" ]] && ORKEY="${OPENROUTER_API_KEY:-}"
 OAIKEY="$(getkey OPENAI_API_KEY)"; [[ -z "$OAIKEY" ]] && OAIKEY="${OPENAI_API_KEY:-}"
@@ -277,7 +277,7 @@ if ai_on and key:
     rq=urllib.request.Request("https://openrouter.ai/api/v1/chat/completions",data=json.dumps(payload).encode(),
         headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"})
     try:
-        d=json.load(urllib.request.urlopen(rq,timeout=90)); txt=d["choices"][0]["message"]["content"].strip()
+        d=json.load(urllib.request.urlopen(rq,timeout=90)); txt=(d["choices"][0]["message"].get("content") or "").strip()
         print("  "+D(f"model: {model}"))
         for ln in txt.splitlines(): print("  "+ln)
         cmds=re.findall(r"\./fix\.sh --set [^\n`\"']+", txt)

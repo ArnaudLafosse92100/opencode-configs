@@ -46,7 +46,7 @@ class GradeTests(unittest.TestCase):
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "content-aware-fast", "load_skills": ["content-aware-recon"], "status": "completed"}],
             "children": [{
-                "terminal_provider": "openrouter",
+                "terminal_provider": case["expected_routes"][0]["provider"],
                 "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
@@ -67,7 +67,7 @@ class GradeTests(unittest.TestCase):
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
             "children": [{
-                "terminal_provider": "openrouter",
+                "terminal_provider": case["expected_routes"][0]["provider"],
                 "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
@@ -84,7 +84,7 @@ class GradeTests(unittest.TestCase):
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "content-aware-fast", "load_skills": [], "status": "completed"}],
             "children": [{
-                "terminal_provider": "openrouter",
+                "terminal_provider": case["expected_routes"][0]["provider"],
                 "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,
@@ -102,7 +102,7 @@ class GradeTests(unittest.TestCase):
         fallback = case["expected_routes"][1]
         self.assertEqual(
             fallback,
-            {"provider": "openrouter", "model": "deepseek/deepseek-v4-pro-0813"},
+            {"provider": "venice", "model": "deepseek-v4-pro-0813"},
         )
         evidence = {
             "root": {"agent": "codex-router"},
@@ -135,7 +135,7 @@ class GradeTests(unittest.TestCase):
             "root": {"agent": "codex-router"},
             "tasks": [{"category": "content-aware-deep", "load_skills": ["content-aware-audit"], "status": "completed"}],
             "children": [{
-                "terminal_provider": "openrouter",
+                "terminal_provider": case["expected_routes"][0]["provider"],
                 "terminal_model": case["expected_routes"][0]["model"],
                 "terminal_finish": "stop",
                 "terminal_error": None,

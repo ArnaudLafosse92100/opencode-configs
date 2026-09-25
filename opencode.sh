@@ -5,7 +5,7 @@
 # Loads allowlisted keys from ~/.config/opencode/.env (never `source`s the file —
 # values with & in DB URLs break shell source). Does NOT wrap Infisical/Doppler
 # (that injects vault-wide secrets into the agent). Sync keys with:
-#   oc setup --sync-env
+#   oc secrets sync   or   oc setup --sync-env
 
 set -euo pipefail
 
