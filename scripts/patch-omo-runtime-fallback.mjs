@@ -1714,7 +1714,7 @@ function configuredPrimaryRetryLimit(config3, state3) {
   // profile-wide environment default; Pro/Hermes/Kimi/Gemini Pro are zero.
   if (openConfigProfileName() === "pentest") return /deepseek-v4-flash-0731-zdr-throughput/.test(model) ? 3 : 0;
   if (/deepseek-v4-flash-0731(?:$|:|\\b)/.test(model)) return 2;
-  if (/(?:z-ai\\/glm-5\\.3|gemini-3\\.7-flash|minimax\\/minimax-m3|subscription-gateway\\/)/.test(model)) return 1;
+  if (/(?:z-ai\\/glm-5\\.3|gemini-3\\.7-flash|minimax\\/minimax-m3|codex-subscription\\/)/.test(model)) return 1;
   return 0;
 }
 function openConfigMaxRecoveryDispatches() {

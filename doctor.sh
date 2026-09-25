@@ -385,18 +385,10 @@ if [[ -f "$ENV_FILE" ]]; then
       tip "https://openrouter.ai/keys  ·  then: oc secrets sync"
     fi
   done
-  for k in LLM_GATEWAY_OPENAI_BASE_URL LLM_GATEWAY_API_KEY CONTEXT7_API_KEY EXA_API_KEY; do
+  for k in CONTEXT7_API_KEY EXA_API_KEY; do
     if [[ -n "$(getkey $k)" ]]; then ok "$k set"
     else
       case "$k" in
-        LLM_GATEWAY_OPENAI_BASE_URL)
-          bad "$k MISSING — subscription GPT lane unavailable"
-          tip "add the gateway OpenAI-compatible base URL (for example https://proxy.unbeatn.ai/v1) to $ENV_FILE"
-          ;;
-        LLM_GATEWAY_API_KEY)
-          bad "$k MISSING — subscription GPT lane unavailable"
-          tip "add the shared gateway bearer key to $ENV_FILE"
-          ;;
         CONTEXT7_API_KEY)
           opt "$k unset (Context7 docs MCP unauthenticated)"
           tip "https://context7.com/dashboard  ·  oc secrets sync"
@@ -504,29 +496,20 @@ if [[ -f "$REPO/vault.json" ]]; then
       info "Infisical CLI present (set INFISICAL_DIR to use as fallback)"
     fi
   fi
-  # Shared subscription gateway probe: /models is non-billable and validates
-  # the same OpenAI-compatible endpoint used by the GPT agent lane.
-  gateway_url="$(getkey LLM_GATEWAY_OPENAI_BASE_URL)"
-  gateway_key="$(getkey LLM_GATEWAY_API_KEY)"
-  if [[ -n "$gateway_url" && -n "$gateway_key" ]] && command -v curl >/dev/null; then
-    _gw_out="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' \
-      --connect-timeout 5 --max-time 15 \
-      -H "Authorization: Bearer $gateway_key" "${gateway_url%/}/models" 2>/dev/null || echo "000 0")"
-    gwcode="${_gw_out%% *}"
-    gwsecs="${_gw_out##* }"
-    gwms="$(python3 -c "print(int(round(float('$gwsecs')*1000)))" 2>/dev/null || echo "?")"
-    if [[ "$gwcode" == "200" ]]; then
-      ok "Subscription gateway live (HTTP 200, ${gwms}ms)"
-      if [[ "$gwms" != "?" && "$gwms" -gt 1500 ]]; then
-        soft "Subscription gateway latency ${gwms}ms — GPT lane still usable"
-      fi
-    elif [[ "$gwcode" == "401" || "$gwcode" == "403" ]]; then
-      bad "Subscription gateway key rejected (HTTP $gwcode) — GPT lane will fail"
-      tip "update LLM_GATEWAY_API_KEY in $ENV_FILE"
-    else
-      soft "Subscription gateway probe returned HTTP $gwcode (${gwms}ms)"
-      tip "verify LLM_GATEWAY_OPENAI_BASE_URL and gateway availability"
-    fi
+  # Local OpenCodex is the subscription transport for Astra, Sol, and Terra.
+  # Its model catalog is non-billable and requires no external gateway secret.
+  _codex_models="$(curl -fsS --connect-timeout 2 --max-time 5 \
+    http://127.0.0.1:10100/v1/models 2>/dev/null || true)"
+  if printf '%s' "$_codex_models" | python3 -c '
+import json, sys
+available = {str(m.get("id")) for m in json.load(sys.stdin).get("data", []) if isinstance(m, dict)}
+required = {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra"}
+raise SystemExit(0 if required <= available else 1)
+' >/dev/null 2>&1; then
+    ok "Local OpenCodex subscription models available (Astra, Sol, Terra)"
+  else
+    bad "Local OpenCodex model catalog unavailable or incomplete at 127.0.0.1:10100"
+    tip "start or reconnect the Codex OpenCodex service, then rerun oc doctor"
   fi
 else
   bad "vault.json missing"
@@ -1131,7 +1114,7 @@ elif dc != 6:
 else:
     ok("defaultConcurrency=%s" % dc)
 
-for prov, cap in (("openrouter", 8), ("subscription-gateway", 4), ("anthropic", 2)):
+for prov, cap in (("openrouter", 8), ("codex-subscription", 4), ("anthropic", 2)):
     v = pc.get(prov)
     if not isinstance(v, int):
         bad("providerConcurrency.%s missing" % prov)
@@ -1229,12 +1212,12 @@ else:
 
 # MCP env allowlist (Exa / Context7 / provider keys into OmO MCP)
 allow = set(omo.get("mcp_env_allowlist") or [])
-need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL", "OPENROUTER_API_KEY"}
+need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "OPENROUTER_API_KEY"}
 miss_env = sorted(need_env - allow)
 if miss_env:
     opt("mcp_env_allowlist missing: %s — run: oc fix" % ", ".join(miss_env))
 else:
-    ok("mcp_env_allowlist covers Context7/Exa/subscription gateway/OpenRouter")
+    ok("mcp_env_allowlist covers Context7/Exa/OpenRouter")
 
 sw = omo.get("start_work") if isinstance(omo.get("start_work"), dict) else {}
 if "start_work" not in omo:

@@ -1,6 +1,6 @@
-# Category: unspecified-high (GLM 5.3 / subscription-gateway escalation)
+# Category: unspecified-high (GLM 5.3 / codex-subscription escalation)
 
-High-effort general work and hyperplan expensive critic. Use GLM 5.3 plus the normal-profile subscription gateway deep lanes when stronger reasoning is genuinely required.
+High-effort general work and hyperplan expensive critic. Use GLM 5.3 plus the normal-profile local Codex subscription deep lanes when stronger reasoning is genuinely required.
 
 ## Do
 

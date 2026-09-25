@@ -1142,7 +1142,7 @@ test("per-model rung retries and recovery dispatches stay isolated per root or d
     ["normal-private", "openrouter/z-ai/glm-5.3", 1],
     ["normal", "openrouter/google/gemini-3.7-flash", 1],
     ["normal", "openrouter/minimax/minimax-m3", 1],
-    ["normal", "subscription-gateway/gpt-5.6-sol", 1],
+    ["normal", "codex-subscription/gpt-5.6-sol", 1],
     ["normal", "openrouter/moonshotai/kimi-k2.7-code", 0],
     ["normal", "openrouter/google/gemini-3.1-pro-preview", 0],
     ["normal", "openrouter/nousresearch/hermes-4-405b", 0],

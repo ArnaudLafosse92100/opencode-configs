@@ -217,8 +217,6 @@ fi
 # Never dump the whole .env (DB URLs, company secrets, etc.) into the process environment.
 OC_ENV_ALLOWLIST=(
   OPENROUTER_API_KEY
-  LLM_GATEWAY_API_KEY
-  LLM_GATEWAY_OPENAI_BASE_URL
   EXA_API_KEY
   CONTEXT7_API_KEY
   VENICE_API_KEY
@@ -1801,6 +1799,16 @@ oc_strip_ansi() {
   printf '%s' "$*" | sed $'s/\x1b\\[[0-9;]*[A-Za-z]//g'
 }
 
+# Redact credentials before provider diagnostics or maintenance output can be
+# logged. Keep this centralized so every shell caller applies the same rules.
+oc_redact_secrets() {
+  sed -E \
+    -e 's/(Authorization:[[:space:]]*Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1<redacted>/Ig' \
+    -e 's/((API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Za-z0-9_-]*[[:space:]]*[:=][[:space:]]*)[^[:space:]"]+/\1<redacted>/Ig' \
+    -e 's/(sk-(or-v1-|proj-)?)[A-Za-z0-9_-]{16,}/\1<redacted>/g' \
+    -e 's/(gh[pousr]_)[A-Za-z0-9]{16,}/\1<redacted>/g'
+}
+
 # Open OC_LOG_FILE (create dir, chmod 600, write header). Sets OC_LOG_FILE + OC_LOG_DIR.
 # Usage: oc_log_open [kind] [optional explicit path]
 oc_log_open() {
@@ -1833,7 +1841,7 @@ oc_log() {
   local level="${1:-INFO}"
   shift || true
   [[ -n "${OC_LOG_FILE:-}" ]] || return 0
-  printf '%s [%s] %s\n' "$(oc_log_ts)" "$level" "$(oc_strip_ansi "$*")" >>"$OC_LOG_FILE" 2>/dev/null || true
+  printf '%s [%s] %s\n' "$(oc_log_ts)" "$level" "$(oc_strip_ansi "$*" | oc_redact_secrets)" >>"$OC_LOG_FILE" 2>/dev/null || true
 }
 
 oc_log_section() {
@@ -1846,7 +1854,7 @@ oc_log_blob() {
   [[ -n "${OC_LOG_FILE:-}" ]] || return 0
   {
     echo "$(oc_log_ts) [BLOB:${label}] begin"
-    oc_strip_ansi "$(cat)"
+    oc_strip_ansi "$(cat)" | oc_redact_secrets
     echo ""
     echo "$(oc_log_ts) [BLOB:${label}] end"
   } >>"$OC_LOG_FILE" 2>/dev/null || true

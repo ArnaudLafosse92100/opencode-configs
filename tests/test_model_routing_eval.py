@@ -179,6 +179,23 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 self.assertIn(model, models)
         self.assertNotIn("qwen/qwen3.8-max", models)
 
+    def test_codex_subscription_is_local_and_has_no_retired_gateway_dependency(self) -> None:
+        opencode = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))
+        self.assertNotIn("subscription-gateway", opencode["enabled_providers"])
+        self.assertNotIn("subscription-gateway", opencode["provider"])
+        codex = opencode["provider"]["codex-subscription"]
+        self.assertEqual(codex["options"]["baseURL"], "http://127.0.0.1:10100/v1")
+        self.assertEqual(
+            set(codex["models"]),
+            {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
+        )
+        self.assertEqual(codex["models"]["gpt-5.6-sol-review"]["id"], "openai/gpt-5.6-sol")
+        active_sources = "\n".join(
+            (REPO / name).read_text(encoding="utf-8")
+            for name in (".env.example", "lib/common.sh", "oh-my-openagent.json")
+        )
+        self.assertNotIn("LLM_GATEWAY_", active_sources)
+
     def test_normal_quick_and_unspecified_low_use_flash_then_minimax(self) -> None:
         expected = {
             "model": "openrouter/deepseek/deepseek-v4-flash-0731",
@@ -222,7 +239,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         for name in ("ultrabrain", "deep", "arch-review"):
             self.assertEqual(normal["categories"][name]["fallback_models"], pro_glm, name)
         self.assertEqual(normal["agents"]["hephaestus"]["fallback_models"], pro_glm)
-        self.assertEqual(normal["agents"]["metis"]["fallback_models"], ["subscription-gateway/gpt-5.6-sol", "openrouter/moonshotai/kimi-k2.7-code"])
+        self.assertEqual(normal["agents"]["metis"]["fallback_models"], ["codex-subscription/gpt-5.6-sol", "openrouter/moonshotai/kimi-k2.7-code"])
         for section, names in (("agents", ("librarian", "sisyphus-junior")), ("categories", ("quick", "unspecified-low"))):
             for name in names:
                 self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/minimax/minimax-m3"], name)
@@ -319,7 +336,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         selected = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["default_profile"]
         self.assertIn(f"Runtime profile `{selected}`", prompt)
         if selected == "pentest":
-            self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, subscription-gateway", prompt)
+            self.assertIn("Gemini, Claude/Opus, Kimi, Minimax, codex-subscription", prompt)
         else:
             self.assertNotIn("Runtime profile `pentest`", prompt)
 
@@ -333,7 +350,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
             self.assertIn("retries Flash exactly three times", prompt)
             self.assertIn("exactly one DeepSeek V4 Pro 0813 ZDR Throughput attempt", prompt)
             self.assertIn("that failure is terminal", prompt)
-            self.assertIn("Do not dispatch GLM, GPT/subscription-gateway, Kimi", prompt)
+            self.assertIn("Do not dispatch GLM, GPT/codex-subscription, Kimi", prompt)
             self.assertNotIn("pentest-safe routes use only GLM 5.3", prompt)
 
     def test_profile_activation_renders_external_state_without_mutating_sources(self) -> None:
@@ -506,7 +523,7 @@ class PentestPromptOverlayTests(unittest.TestCase):
                 self.assertIn("DeepSeek V4 Pro 0813 ZDR Throughput", prompt)
                 self.assertIn("exactly once", prompt)
                 self.assertIn("terminal failure", prompt)
-                self.assertIn("Do not dispatch GLM, GPT/subscription-gateway, Kimi", prompt)
+                self.assertIn("Do not dispatch GLM, GPT/codex-subscription, Kimi", prompt)
                 self.assertNotIn("at most one", prompt)
                 self.assertNotIn("may be resumed once", prompt)
         self.assertEqual((REPO / "runtime-profile.json").read_bytes(), routes_before)

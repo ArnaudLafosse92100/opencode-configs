@@ -249,7 +249,7 @@ else
   bad "DeepSeek version, OmO reasoning schema, or OpenConfig runtime fallback retry policy drift"
 fi
 
-# Fast OpenRouter lanes, bounded subscription gateway, expensive models capped.
+# Fast OpenRouter lanes, bounded local Codex subscription, expensive models capped.
 if python3 -c '
 import json, sys
 omo=json.load(open(sys.argv[1]))
@@ -258,7 +258,7 @@ pc=bt.get("providerConcurrency") or {}
 mc=bt.get("modelConcurrency") or {}
 ok=(bt.get("defaultConcurrency")==6
     and pc.get("openrouter")==8
-    and pc.get("subscription-gateway")==4
+    and pc.get("codex-subscription")==4
     and pc.get("anthropic")==2
     and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==8
     and mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput")==5
@@ -274,7 +274,7 @@ else
   bad "concurrency drift — run: oc fix"
 fi
 
-# OpenRouter lanes usually fail over to the independent subscription gateway
+# OpenRouter lanes may fail over to the independent local Codex subscription
 # first in normal mode. Runtime-profile-listed routes are authoritative. In
 # In pentest mode, every listed agent/category must take the fixed price-capped
 # Flash 0731 ZDR Throughput then Pro 0813 ZDR Throughput path, with no other provider/model.
@@ -312,7 +312,7 @@ for section in ("agents", "categories"):
             if prof == "pentest" and (primary != flash or fbs != [pro]):
                 raise SystemExit(4)
             continue
-        if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("subscription-gateway/")):
+        if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("codex-subscription/")):
             raise SystemExit(2)
 ' "$REPO/oh-my-openagent.json" "$REPO/runtime-profile.json"; then
   ok "fallback isolation, runtime-profile routing, and no paid OpenRouter GPT fallback"
@@ -364,13 +364,22 @@ else
 fi
 
 # Helpers exist
-for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature oc_secrets_sync oc_export_vault_allowlist oc_vault_merged_json oc_vault_op_refs oc_live_config_root oc_is_live_config oc_omo_teams_canonical oc_omo_teams_ok oc_runtime_conf_ok oc_banner oc_section oc_infisical_dir oc_openrouter_key_configured oc_telemetry_off; do
+for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature oc_secrets_sync oc_export_vault_allowlist oc_vault_merged_json oc_vault_op_refs oc_live_config_root oc_is_live_config oc_omo_teams_canonical oc_omo_teams_ok oc_runtime_conf_ok oc_banner oc_section oc_infisical_dir oc_openrouter_key_configured oc_telemetry_off oc_redact_secrets; do
   if grep -q "${fn}()" "$REPO/lib/common.sh"; then
     ok "helper $fn"
   else
     bad "helper $fn missing"
   fi
 done
+
+redaction_fixture='Authorization: Bearer secret-token API_KEY=api-secret sk-or-v1-1234567890abcdef ghp_1234567890abcdef'
+redacted_fixture="$(printf '%s\n' "$redaction_fixture" | oc_redact_secrets)"
+if [[ "$redacted_fixture" == *secret-token* || "$redacted_fixture" == *api-secret* \
+   || "$redacted_fixture" == *1234567890abcdef* || "$redacted_fixture" != *'<redacted>'* ]]; then
+  bad "secret redaction helper"
+else
+  ok "secret redaction helper"
+fi
 
 # /goal disabled + no ralph_loop + footgun doc (OmO 4.19.x breaks /start-work when goal is on)
 if [[ -f "$REPO/prompts/goal.md" ]] \

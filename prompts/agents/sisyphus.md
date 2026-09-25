@@ -43,7 +43,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Cursor-pace: s
 
 ## Keywords
 
-- `ultrawork` / `ulw` — GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` when normal-mode subscription-gateway reasoning is required.
+- `ultrawork` / `ulw` — GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` when normal-mode codex-subscription reasoning is required.
 - `hyperplan` / `hpp` / `/hyperplan` — only from you (not prometheus).
 - `/goal` — disabled for pinned OmO 4.19.4. Use `/start-work` → Atlas. See `prompts/goal.md`.
 - Filters biting → skills `content-aware-recon` / `content-aware-audit`, or categories `content-aware-fast` / `content-aware-deep` / agent `content-aware-research`. Pasted-context / uncensored consult → `context-aware-hermes` (Hermes 4 405B, no tools).

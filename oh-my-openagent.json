@@ -47,7 +47,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/hephaestus.md",
       "color": "#FF5C00",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-terra",
+      "model": "codex-subscription/gpt-5.6-terra",
       "reasoning": "high",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -92,7 +92,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/oracle.md",
       "color": "#6C63FF",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -161,7 +161,7 @@
       "model": "openrouter/google/gemini-3.1-pro-preview",
       "reasoning": "medium",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
+        "codex-subscription/gpt-5.6-sol",
         "openrouter/moonshotai/kimi-k2.7-code"
       ]
     },
@@ -171,7 +171,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/momus.md",
       "color": "#FF8A3D",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-sol-review",
+      "model": "codex-subscription/gpt-5.6-sol-review",
       "reasoning": "xhigh",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -249,7 +249,7 @@
       "model": "openrouter/nousresearch/hermes-4-405b",
       "reasoning": "high",
       "fallback_models": [
-        "subscription-gateway/gpt-5.6-sol",
+        "codex-subscription/gpt-5.6-sol",
         "openrouter/deepseek/deepseek-v4-pro-0813"
       ]
     },
@@ -357,7 +357,7 @@
     "ultrabrain": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "xhigh",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -367,7 +367,7 @@
     "deep": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/deep.md",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-sol",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -448,7 +448,7 @@
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/arch-review.md",
       "maxTokens": 32768,
-      "model": "subscription-gateway/gpt-5.6-sol-review",
+      "model": "codex-subscription/gpt-5.6-sol-review",
       "reasoning": "high",
       "fallback_models": [
         "openrouter/deepseek/deepseek-v4-pro-0813",
@@ -527,11 +527,10 @@
     "defaultConcurrency": 6,
     "providerConcurrency": {
       "openrouter": 8,
-      "subscription-gateway": 4,
       "anthropic": 2,
       "venice": 6,
       "deepseek": 6,
-      "codex-subscription": 2
+      "codex-subscription": 4
     },
     "modelConcurrency": {
       "openrouter/z-ai/glm-5.3": 8,
@@ -542,9 +541,9 @@
       "openrouter/deepseek/deepseek-v4-flash-0731": 10,
       "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput": 6,
       "openrouter/nousresearch/hermes-4-405b": 2,
-      "subscription-gateway/gpt-5.6-sol": 3,
-      "subscription-gateway/gpt-5.6-terra": 3,
-      "subscription-gateway/gpt-5.6-sol-review": 3,
+      "codex-subscription/gpt-5.6-sol": 3,
+      "codex-subscription/gpt-5.6-terra": 3,
+      "codex-subscription/gpt-5.6-sol-review": 3,
       "openrouter/deepseek/deepseek-v4-pro-0813": 8,
       "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput": 5,
       "openrouter/z-ai/glm-5.3-flash": 10,
@@ -748,8 +747,6 @@
   "mcp_env_allowlist": [
     "CONTEXT7_API_KEY",
     "EXA_API_KEY",
-    "LLM_GATEWAY_API_KEY",
-    "LLM_GATEWAY_OPENAI_BASE_URL",
     "OPENROUTER_API_KEY"
   ],
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/v4.19.4/assets/oh-my-opencode.schema.json"
