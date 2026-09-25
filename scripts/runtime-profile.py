@@ -453,6 +453,22 @@ class RuntimeProfiles:
             selected = self.data.get(profile)
             if not isinstance(selected, dict):
                 raise SystemExit(f"missing runtime profile {profile!r} in {self.profile_path}")
+            excluded_routes = selected.get("excluded_routes", {})
+            if not isinstance(excluded_routes, dict) or any(
+                section not in VALID_SECTIONS
+                or not isinstance(names, list)
+                or any(not isinstance(name, str) or not name for name in names)
+                or len(names) != len(set(names))
+                for section, names in excluded_routes.items()
+            ):
+                raise SystemExit(f"invalid {profile}.excluded_routes in {self.profile_path}")
+            normal = self.data.get("normal") or {}
+            if any(
+                name not in (normal.get(section) or {})
+                for section, names in excluded_routes.items()
+                for name in names
+            ):
+                raise SystemExit(f"unknown {profile}.excluded_routes entry in {self.profile_path}")
             if selected.get("compose") == "normal":
                 if profile != "normal-private" or not isinstance(selected.get("privacy"), dict):
                     raise SystemExit(f"invalid composed runtime profile {profile!r} in {self.profile_path}")
@@ -731,6 +747,9 @@ class RuntimeProfiles:
         # provider. Routes with no OpenRouter rung use the single explicit
         # private replacement rather than duplicating the normal matrix.
         private = copy.deepcopy(self.data["normal"])
+        for section, names in (selected.get("excluded_routes") or {}).items():
+            for name in names:
+                private[section].pop(name, None)
         replacement = selected["non_openrouter_route"]
         for section in VALID_SECTIONS:
             for name, route in private[section].items():
@@ -1010,6 +1029,9 @@ class RuntimeProfiles:
 
         for section in VALID_SECTIONS:
             target = omo.setdefault(section, {})
+            managed = set((self.data["normal"].get(section) or {}))
+            for name in managed - set(selected[section]):
+                target.pop(name, None)
             for name, patch in selected[section].items():
                 if name not in target:
                     raise SystemExit(f"missing source route: {section}.{name}")

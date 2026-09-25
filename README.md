@@ -186,6 +186,7 @@ OpenCode TUI sessions continue to use `sisyphus`.
 | `arch-review` | Runtime-profile routed | Coupling / blast radius |
 | `content-aware-fast` | `runtime-profile.json` | Attack-surface recon |
 | `content-aware-deep` | `runtime-profile.json` | Deep vuln research |
+| `security-strix-scan` | `runtime-profile.json` | Export-only route for the Bridge Strix synthetic canary |
 | `agentic-deep-kimi` | Runtime-profile routed | Explicit long-horizon escalation after evaluation |
 | `writing` | Runtime-profile routed | Docs / prose |
 | `visual-engineering` | Runtime-profile routed | Ship UI |
@@ -283,6 +284,7 @@ Hephaestus uses local Codex Terra; Prometheus, Atlas, and the OpenRouter consult
 | `categories.deep` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.quick` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.refactor-safe` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.security-strix-scan` | `openrouter/deepseek/deepseek-v4-flash-0731` | — |
 | `categories.ultrabrain` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.unspecified-high` | `openrouter/z-ai/glm-5.3` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.unspecified-low` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
@@ -291,6 +293,15 @@ Hephaestus uses local Codex Terra; Prometheus, Atlas, and the OpenRouter consult
 
 Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with codex-subscription removed and OpenRouter ZDR constraints.
 <!-- END GENERATED: runtime-routing -->
+
+`security-strix-scan` is deliberately available only in `normal`. Its primary
+`openrouter/deepseek/deepseek-v4-flash-0731` is a direct LiteLLM/OpenRouter
+slug for the synthetic Strix canary. The listed Pro fallback is OpenConfig
+outer-policy metadata; the Bridge admits only the primary rung inside one
+Strix attempt. `normal-private` and `pentest` omit this route because the
+OpenConfig-only `-zdr-throughput` aliases encode provider controls that cannot
+be transferred to Strix by model name alone. Private source scans remain
+blocked until equivalent provider controls or a qualified preset exist.
 
 OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol/Terra roles use the local OpenCodex service through the Codex subscription; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 
