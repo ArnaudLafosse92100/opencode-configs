@@ -116,13 +116,10 @@ class ContentAwareFallbackTests(unittest.TestCase):
         pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
         selected = self.profile_data["pentest"]
         for section in ("agents", "categories"):
-            expected_names = set(self.config.get(section, {}))
-            if section == "categories":
-                expected_names.remove("security-strix-scan")
             self.assertEqual(
                 set(selected.get(section, {})),
-                expected_names,
-                f"pentest profile must explicitly pin every eligible {section[:-1]} route",
+                set(self.config.get(section, {})),
+                f"pentest profile must explicitly pin every {section[:-1]} route",
             )
             for name, expected in selected.get(section, {}).items():
                 self.assertEqual(expected, {"model": flash, "fallback_models": [pro]}, f"{section}.{name}")
@@ -133,7 +130,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         ).encode("utf-8")
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
-            "efa349e16f7d6a9482940d0415682fc601ab9902ae38c415240ccafcde653dd8",
+            "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
@@ -143,90 +140,6 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 with self.subTest(section=section, name=name):
                     chain = [route["model"], *route["fallback_models"]]
                     self.assertTrue(all(model.startswith("openrouter/") for model in chain))
-
-    def test_security_strix_scan_is_a_direct_normal_only_export(self) -> None:
-        expected = {
-            "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-            "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813"],
-        }
-        self.assertEqual(self.profile_data["normal"]["categories"]["security-strix-scan"], expected)
-        self.assertNotIn("-zdr-throughput", expected["model"])
-        self.assertEqual(
-            self.config["categories"]["security-strix-scan"]["model"],
-            expected["model"],
-        )
-        self.assertNotIn(
-            "security-strix-scan",
-            runtime_profile.RuntimeProfiles(REPO).selected("normal-private")["categories"],
-        )
-        self.assertNotIn("security-strix-scan", self.profile_data["pentest"]["categories"])
-        for profile in ("normal-private", "pentest"):
-            with self.subTest(profile=profile), self.assertRaisesRegex(
-                SystemExit, f"route not found: {profile}\\.categories\\.security-strix-scan"
-            ):
-                runtime_profile.RuntimeProfiles(REPO).resolve(
-                    profile, "categories", "security-strix-scan"
-                )
-        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
-            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
-        ):
-            profiles = runtime_profile.RuntimeProfiles(REPO)
-            for profile in ("normal-private", "pentest"):
-                with self.subTest(rendered_profile=profile):
-                    rendered = json.loads(
-                        (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
-                            encoding="utf-8"
-                        )
-                    )
-                    self.assertNotIn("security-strix-scan", rendered["categories"])
-
-    def test_security_strix_scan_resolve_and_snapshot_export_the_direct_slug(self) -> None:
-        profiles = runtime_profile.RuntimeProfiles(REPO)
-        resolved = profiles.resolve("normal", "categories", "security-strix-scan")
-        self.assertEqual(resolved["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
-        self.assertEqual(resolved["reasoning"], "low")
-        with tempfile.TemporaryDirectory() as state, tempfile.TemporaryDirectory() as native:
-            environment = {
-                **os.environ,
-                "OC_RUNTIME_STATE_DIR": state,
-                "OC_NATIVE_OMO_PATH": str(pathlib.Path(native) / "omo.jsonc"),
-            }
-            subprocess.run(
-                [
-                    "python3",
-                    str(REPO / "scripts/runtime-profile.py"),
-                    "--repo",
-                    str(REPO),
-                    "activate",
-                    "normal",
-                ],
-                check=True,
-                env=environment,
-                capture_output=True,
-                text=True,
-            )
-            snapshot = json.loads(
-                subprocess.run(
-                    [
-                        "python3",
-                        str(REPO / "scripts/runtime-profile.py"),
-                        "--repo",
-                        str(REPO),
-                        "snapshot",
-                    ],
-                    check=True,
-                    env=environment,
-                    capture_output=True,
-                    text=True,
-                ).stdout
-            )
-            rendered = json.loads(
-                (pathlib.Path(snapshot["runtimePath"]) / "oh-my-openagent.json").read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                rendered["categories"]["security-strix-scan"]["model"],
-                resolved["model"],
-            )
 
     def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
         replacement = self.profile_data["normal-private"]["non_openrouter_route"]
@@ -532,6 +445,140 @@ class ContentAwareFallbackTests(unittest.TestCase):
             self.assertEqual((xdg / "gh").resolve(), (pathlib.Path(source_xdg) / "gh").resolve())
         after = {name: (REPO / name).read_bytes() for name in tracked}
         self.assertEqual(after, before)
+
+
+class ExportRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
+
+    def test_strix_policy_is_exported_only_from_normal(self) -> None:
+        expected = {
+            "primary": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "source_fallbacks": ["openrouter/deepseek/deepseek-v4-pro-0813"],
+            "reasoning": "low",
+            "variant": "low",
+            "data_classification": "synthetic",
+            "admission": "primary-only",
+        }
+        self.assertEqual(
+            self.profile_data["export_routes"]["normal"]["security-strix-scan"],
+            expected,
+        )
+        self.assertEqual(self.profile_data["export_routes"]["normal-private"], {})
+        self.assertEqual(self.profile_data["export_routes"]["pentest"], {})
+        config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
+        self.assertNotIn("security-strix-scan", config["categories"])
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        with self.assertRaisesRegex(
+            SystemExit, "route not found: normal\\.categories\\.security-strix-scan"
+        ):
+            profiles.resolve("normal", "categories", "security-strix-scan")
+        for profile in ("normal-private", "pentest"):
+            with self.subTest(profile=profile), self.assertRaisesRegex(
+                SystemExit, f"exported route not found: {profile}\\.security-strix-scan"
+            ):
+                profiles.export_route(profile, "security-strix-scan")
+
+    def test_export_api_is_canonical_and_revision_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "state"
+            result = subprocess.run(
+                [str(REPO / "oc"), "profile", "export-route", "normal", "security-strix-scan"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "OC_RUNTIME_STATE_DIR": str(state)},
+            )
+            self.assertFalse(state.exists(), "export-route must not create runtime state")
+        payload = json.loads(result.stdout)
+        revision = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=normal"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+        self.assertEqual(payload["repository_revision"], revision)
+        self.assertEqual(payload["repository_dirty"], dirty)
+        self.assertEqual(payload["primary"], "openrouter/deepseek/deepseek-v4-flash-0731")
+        self.assertNotIn("-zdr-throughput", payload["primary"])
+        self.assertEqual(payload["admission"], "primary-only")
+        self.assertEqual(payload["data_classification"], "synthetic")
+        self.assertEqual(
+            result.stdout.strip(),
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        )
+
+    def test_export_policy_never_renders_into_omo(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            for profile in ("normal", "normal-private", "pentest"):
+                with self.subTest(profile=profile):
+                    rendered = json.loads(
+                        (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    self.assertNotIn("security-strix-scan", rendered["categories"])
+
+    def test_export_validation_rejects_collisions_duplicates_and_invalid_chains(self) -> None:
+        mutations = []
+        collision = json.loads(json.dumps(self.profile_data))
+        collision["normal"]["categories"]["security-strix-scan"] = {
+            "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "fallback_models": [],
+        }
+        mutations.append((collision, "collides with runtime route"))
+        duplicate = json.loads(json.dumps(self.profile_data))
+        duplicate["export_routes"]["pentest"]["security-strix-scan"] = json.loads(
+            json.dumps(duplicate["export_routes"]["normal"]["security-strix-scan"])
+        )
+        mutations.append((duplicate, "duplicate exported route name"))
+        invalid_chain = json.loads(json.dumps(self.profile_data))
+        invalid_chain["export_routes"]["normal"]["security-strix-scan"]["source_fallbacks"] *= 2
+        mutations.append((invalid_chain, "invalid exported model chain"))
+        for data, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                repo = pathlib.Path(directory)
+                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaisesRegex(SystemExit, message):
+                    runtime_profile.RuntimeProfiles(repo)
+
+    def test_repository_identity_reports_clean_and_dirty_states(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "OpenConfig Test"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@example.invalid"], check=True)
+            tracked = repo / "tracked.txt"
+            tracked.write_text("clean\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-qm", "fixture"], check=True)
+            revision, dirty = runtime_profile.repository_identity(repo)
+            self.assertFalse(dirty)
+            self.assertEqual(
+                revision,
+                subprocess.run(
+                    ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip(),
+            )
+            tracked.write_text("dirty\n", encoding="utf-8")
+            dirty_revision, dirty = runtime_profile.repository_identity(repo)
+            self.assertEqual(dirty_revision, revision)
+            self.assertTrue(dirty)
 
 
 class NativeOmoMigrationTests(unittest.TestCase):

@@ -866,14 +866,8 @@ if omo:
         for name, cfg in ((pentest_profile or {}).get(section) or {}).items()
         if isinstance(cfg, dict)
     }
-    pentest_excluded = {
-        (section, name)
-        for section, names in ((pentest_profile or {}).get("excluded_routes") or {}).items()
-        for name in names
-    }
     missing_from_profile = sorted(
-        f"{section}.{name}"
-        for section, name in (actual_routes - pentest_routes - pentest_excluded)
+        f"{section}.{name}" for section, name in (actual_routes - pentest_routes)
     )
     extra_in_profile = sorted(
         f"{section}.{name}" for section, name in (pentest_routes - actual_routes)
@@ -887,17 +881,6 @@ if omo:
         err(
             "runtime-profile.json[pentest]: profile contains routes absent from oh-my-openagent.json: "
             f"{extra_in_profile}"
-        )
-    invalid_exclusions = sorted(
-        f"{section}.{name}"
-        for section, name in (
-            (pentest_excluded - actual_routes) | (pentest_excluded & pentest_routes)
-        )
-    )
-    if invalid_exclusions:
-        err(
-            "runtime-profile.json[pentest]: excluded routes must exist in the source and be absent "
-            f"from pentest routes: {invalid_exclusions}"
         )
     for section in ("agents", "categories"):
         for name, cfg in (omo.get(section) or {}).items():
