@@ -116,10 +116,13 @@ class ContentAwareFallbackTests(unittest.TestCase):
         pro = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
         selected = self.profile_data["pentest"]
         for section in ("agents", "categories"):
+            expected_names = set(self.config.get(section, {}))
+            if section == "categories":
+                expected_names.remove("security-strix-scan")
             self.assertEqual(
                 set(selected.get(section, {})),
-                set(self.config.get(section, {})),
-                f"pentest profile must explicitly pin every {section[:-1]} route",
+                expected_names,
+                f"pentest profile must explicitly pin every eligible {section[:-1]} route",
             )
             for name, expected in selected.get(section, {}).items():
                 self.assertEqual(expected, {"model": flash, "fallback_models": [pro]}, f"{section}.{name}")
@@ -130,7 +133,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         ).encode("utf-8")
         self.assertEqual(
             hashlib.sha256(canonical).hexdigest(),
-            "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
+            "efa349e16f7d6a9482940d0415682fc601ab9902ae38c415240ccafcde653dd8",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
@@ -140,6 +143,90 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 with self.subTest(section=section, name=name):
                     chain = [route["model"], *route["fallback_models"]]
                     self.assertTrue(all(model.startswith("openrouter/") for model in chain))
+
+    def test_security_strix_scan_is_a_direct_normal_only_export(self) -> None:
+        expected = {
+            "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "fallback_models": ["openrouter/deepseek/deepseek-v4-pro-0813"],
+        }
+        self.assertEqual(self.profile_data["normal"]["categories"]["security-strix-scan"], expected)
+        self.assertNotIn("-zdr-throughput", expected["model"])
+        self.assertEqual(
+            self.config["categories"]["security-strix-scan"]["model"],
+            expected["model"],
+        )
+        self.assertNotIn(
+            "security-strix-scan",
+            runtime_profile.RuntimeProfiles(REPO).selected("normal-private")["categories"],
+        )
+        self.assertNotIn("security-strix-scan", self.profile_data["pentest"]["categories"])
+        for profile in ("normal-private", "pentest"):
+            with self.subTest(profile=profile), self.assertRaisesRegex(
+                SystemExit, f"route not found: {profile}\\.categories\\.security-strix-scan"
+            ):
+                runtime_profile.RuntimeProfiles(REPO).resolve(
+                    profile, "categories", "security-strix-scan"
+                )
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            for profile in ("normal-private", "pentest"):
+                with self.subTest(rendered_profile=profile):
+                    rendered = json.loads(
+                        (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    self.assertNotIn("security-strix-scan", rendered["categories"])
+
+    def test_security_strix_scan_resolve_and_snapshot_export_the_direct_slug(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        resolved = profiles.resolve("normal", "categories", "security-strix-scan")
+        self.assertEqual(resolved["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
+        self.assertEqual(resolved["reasoning"], "low")
+        with tempfile.TemporaryDirectory() as state, tempfile.TemporaryDirectory() as native:
+            environment = {
+                **os.environ,
+                "OC_RUNTIME_STATE_DIR": state,
+                "OC_NATIVE_OMO_PATH": str(pathlib.Path(native) / "omo.jsonc"),
+            }
+            subprocess.run(
+                [
+                    "python3",
+                    str(REPO / "scripts/runtime-profile.py"),
+                    "--repo",
+                    str(REPO),
+                    "activate",
+                    "normal",
+                ],
+                check=True,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+            snapshot = json.loads(
+                subprocess.run(
+                    [
+                        "python3",
+                        str(REPO / "scripts/runtime-profile.py"),
+                        "--repo",
+                        str(REPO),
+                        "snapshot",
+                    ],
+                    check=True,
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+            )
+            rendered = json.loads(
+                (pathlib.Path(snapshot["runtimePath"]) / "oh-my-openagent.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                rendered["categories"]["security-strix-scan"]["model"],
+                resolved["model"],
+            )
 
     def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
         replacement = self.profile_data["normal-private"]["non_openrouter_route"]
