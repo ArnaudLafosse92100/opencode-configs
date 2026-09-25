@@ -20,6 +20,7 @@ Usage:
   oc profile xdg-path [normal|normal-private|pentest]
   oc profile env [normal|normal-private|pentest] [--shell]
   oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>
+  oc profile export-route <normal|normal-private|pentest> <name>
   oc profile ensure [--quiet]
   oc profile prepare-native-alias
 EOF
@@ -55,6 +56,11 @@ case "$MODE" in
     shift
     [[ $# -eq 3 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" resolve "$@"
+    ;;
+  export-route)
+    shift
+    [[ $# -eq 2 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" export-route "$@"
     ;;
   ensure)
     shift

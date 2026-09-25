@@ -11,8 +11,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 import uuid
@@ -20,6 +22,14 @@ import uuid
 
 VALID_PROFILES = ("normal", "normal-private", "pentest")
 VALID_SECTIONS = ("agents", "categories")
+EXPORT_ROUTE_FIELDS = {
+    "primary",
+    "source_fallbacks",
+    "reasoning",
+    "variant",
+    "data_classification",
+    "admission",
+}
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
     "2026-08-reasoning-unification",
@@ -81,6 +91,28 @@ def load_json(path: Path) -> dict:
     if not isinstance(data, dict):
         raise SystemExit(f"invalid JSON object: {path}")
     return data
+
+
+def repository_identity(repo: Path) -> tuple[str, bool]:
+    """Return the exact Git revision and whether any tracked/untracked input is dirty."""
+    try:
+        revision = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=normal"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"cannot identify OpenConfig Git revision: {repo}") from error
+    if not re.fullmatch(r"[0-9a-f]{40,64}", revision):
+        raise SystemExit(f"invalid OpenConfig Git revision: {revision!r}")
+    return revision, bool(status.strip())
 
 
 def write_if_changed(path: Path, content: str, mode: int = 0o600) -> None:
@@ -449,26 +481,59 @@ class RuntimeProfiles:
         self.default = str(self.data.get("default_profile") or "normal")
         if self.default not in VALID_PROFILES:
             raise SystemExit(f"invalid default_profile in {self.profile_path}: {self.default!r}")
+        exports = self.data.get("export_routes")
+        if not isinstance(exports, dict) or set(exports) != set(VALID_PROFILES):
+            raise SystemExit(f"export_routes must declare exactly {', '.join(VALID_PROFILES)}")
+        exported_names: set[str] = set()
+        runtime_names = {
+            name
+            for profile in VALID_PROFILES
+            for section in VALID_SECTIONS
+            for name in ((self.data.get(profile) or {}).get(section) or {})
+        }
+        for profile in VALID_PROFILES:
+            profile_exports = exports[profile]
+            if not isinstance(profile_exports, dict):
+                raise SystemExit(f"invalid export_routes.{profile} in {self.profile_path}")
+            for name, route in profile_exports.items():
+                if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name):
+                    raise SystemExit(f"invalid exported route name: {profile}.{name}")
+                if name in exported_names:
+                    raise SystemExit(f"duplicate exported route name: {name}")
+                if name in runtime_names:
+                    raise SystemExit(f"exported route collides with runtime route: {name}")
+                exported_names.add(name)
+                if not isinstance(route, dict) or set(route) != EXPORT_ROUTE_FIELDS:
+                    raise SystemExit(f"invalid exported route fields: {profile}.{name}")
+                primary = route.get("primary")
+                fallbacks = route.get("source_fallbacks")
+                if (
+                    not isinstance(primary, str)
+                    or not primary.startswith("openrouter/")
+                    or primary.endswith("-zdr-throughput")
+                    or not isinstance(fallbacks, list)
+                    or any(
+                        not isinstance(model, str)
+                        or not model.startswith("openrouter/")
+                        or model.endswith("-zdr-throughput")
+                        for model in fallbacks
+                    )
+                    or len(fallbacks) != len(set(fallbacks))
+                    or primary in fallbacks
+                ):
+                    raise SystemExit(f"invalid exported model chain: {profile}.{name}")
+                if route.get("reasoning") not in {"low", "medium", "high", "max", "xhigh"}:
+                    raise SystemExit(f"invalid exported reasoning: {profile}.{name}")
+                if route.get("variant") not in {"low", "medium", "high", "max"}:
+                    raise SystemExit(f"invalid exported variant: {profile}.{name}")
+                if route.get("data_classification") != "synthetic":
+                    raise SystemExit(f"invalid exported data classification: {profile}.{name}")
+                if route.get("admission") != "primary-only":
+                    raise SystemExit(f"invalid exported admission: {profile}.{name}")
         for profile in VALID_PROFILES:
             selected = self.data.get(profile)
             if not isinstance(selected, dict):
                 raise SystemExit(f"missing runtime profile {profile!r} in {self.profile_path}")
-            excluded_routes = selected.get("excluded_routes", {})
-            if not isinstance(excluded_routes, dict) or any(
-                section not in VALID_SECTIONS
-                or not isinstance(names, list)
-                or any(not isinstance(name, str) or not name for name in names)
-                or len(names) != len(set(names))
-                for section, names in excluded_routes.items()
-            ):
-                raise SystemExit(f"invalid {profile}.excluded_routes in {self.profile_path}")
-            normal = self.data.get("normal") or {}
-            if any(
-                name not in (normal.get(section) or {})
-                for section, names in excluded_routes.items()
-                for name in names
-            ):
-                raise SystemExit(f"unknown {profile}.excluded_routes entry in {self.profile_path}")
             if selected.get("compose") == "normal":
                 if profile != "normal-private" or not isinstance(selected.get("privacy"), dict):
                     raise SystemExit(f"invalid composed runtime profile {profile!r} in {self.profile_path}")
@@ -747,9 +812,6 @@ class RuntimeProfiles:
         # provider. Routes with no OpenRouter rung use the single explicit
         # private replacement rather than duplicating the normal matrix.
         private = copy.deepcopy(self.data["normal"])
-        for section, names in (selected.get("excluded_routes") or {}).items():
-            for name in names:
-                private[section].pop(name, None)
         replacement = selected["non_openrouter_route"]
         for section in VALID_SECTIONS:
             for name, route in private[section].items():
@@ -785,6 +847,20 @@ class RuntimeProfiles:
             "variant": variant,
             "reasoning": reasoning,
             "source": str(self.profile_path),
+        }
+
+    def export_route(self, profile: str, name: str) -> dict:
+        route = ((self.data.get("export_routes") or {}).get(profile) or {}).get(name)
+        if not isinstance(route, dict):
+            raise SystemExit(f"exported route not found: {profile}.{name}")
+        revision, dirty = repository_identity(self.repo)
+        return {
+            "schema_version": 1,
+            "repository_revision": revision,
+            "repository_dirty": dirty,
+            "profile": profile,
+            "name": name,
+            **copy.deepcopy(route),
         }
 
     def source_fingerprint(self) -> str:
@@ -1029,9 +1105,6 @@ class RuntimeProfiles:
 
         for section in VALID_SECTIONS:
             target = omo.setdefault(section, {})
-            managed = set((self.data["normal"].get(section) or {}))
-            for name in managed - set(selected[section]):
-                target.pop(name, None)
             for name, patch in selected[section].items():
                 if name not in target:
                     raise SystemExit(f"missing source route: {section}.{name}")
@@ -1352,12 +1425,18 @@ def parser() -> argparse.ArgumentParser:
     resolve.add_argument("profile", choices=VALID_PROFILES)
     resolve.add_argument("section", choices=VALID_SECTIONS)
     resolve.add_argument("name")
+    export_route = sub.add_parser("export-route")
+    export_route.add_argument("profile", choices=VALID_PROFILES)
+    export_route.add_argument("name")
     return result
 
 
 def main() -> int:
     args = parser().parse_args()
     profiles = RuntimeProfiles(Path(args.repo))
+    if args.command == "export-route":
+        print(json.dumps(profiles.export_route(args.profile, args.name), ensure_ascii=False, sort_keys=True))
+        return 0
     with profiles.locked():
         profiles.assert_native_migration_safe()
         # Snapshot is intentionally observational. In particular, it must not
