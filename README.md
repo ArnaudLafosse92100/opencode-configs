@@ -317,8 +317,11 @@ routes have subscription billing and an empty fallback list, so an integration
 must fail closed instead of silently spending through OpenRouter or another API
 provider. `normal-private` and `pentest` intentionally export no workflow
 subscription route and the command fails closed for those profiles. The
-validator accepts only native `codex` and `claude` providers, allowing a future
-qualified subscription switch without guessing a Claude model identifier.
+validator cross-checks each exported primary against the existing qualified
+normal-profile roles (`oracle`/`deep`/`ultrabrain` for standard and
+`codex-plan`/`codex-review` for frontier). It accepts only native `codex` and
+`claude` providers, but a future Claude switch remains invalid until the export
+and every canonical role move together to the same subscription mapping.
 
 OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol/Terra roles use the local OpenCodex service through the Codex subscription; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 

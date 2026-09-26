@@ -704,11 +704,59 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, message):
                     runtime_profile.RuntimeProfiles(repo)
 
-    def test_validator_accepts_native_claude_after_qualification(self) -> None:
+    def test_workflow_routes_reject_sol_and_astra_canonical_drift(self) -> None:
+        mutations = []
+
+        standard_contract = json.loads(json.dumps(self.profile_data))
+        standard_contract["workflow_subscription_routes"]["profiles"]["normal"]["standard"][
+            "model"
+        ] = "gpt-5.6-terra"
+        mutations.append(
+            (standard_contract, "normal.standard must match normal.agents.oracle")
+        )
+
+        frontier_contract = json.loads(json.dumps(self.profile_data))
+        frontier_contract["workflow_subscription_routes"]["profiles"]["normal"]["frontier"][
+            "model"
+        ] = "gpt-5.6-sol"
+        mutations.append(
+            (frontier_contract, "normal.frontier must match normal.categories.codex-plan")
+        )
+
+        standard = json.loads(json.dumps(self.profile_data))
+        standard["normal"]["categories"]["deep"]["model"] = "codex-subscription/gpt-5.6-terra"
+        mutations.append((standard, "normal.standard must match normal.categories.deep"))
+
+        frontier = json.loads(json.dumps(self.profile_data))
+        frontier["normal"]["categories"]["codex-review"]["model"] = (
+            "codex-subscription/gpt-5.6-sol-review"
+        )
+        mutations.append((frontier, "normal.frontier must match normal.categories.codex-review"))
+
+        for data, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                repo = pathlib.Path(directory)
+                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaisesRegex(SystemExit, message):
+                    runtime_profile.RuntimeProfiles(repo)
+
+    def test_future_claude_switch_requires_all_canonical_routes_to_move_together(self) -> None:
         data = json.loads(json.dumps(self.profile_data))
         frontier = data["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]
         frontier["provider"] = "claude"
         frontier["model"] = "qualified-model-id"
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(
+                SystemExit, "normal.frontier must match normal.categories.codex-plan"
+            ):
+                runtime_profile.RuntimeProfiles(repo)
+
+        for category in ("codex-plan", "codex-review"):
+            data["normal"]["categories"][category]["model"] = (
+                "claude-subscription/qualified-model-id"
+            )
         with tempfile.TemporaryDirectory() as directory:
             repo = pathlib.Path(directory)
             (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")

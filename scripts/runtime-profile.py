@@ -40,6 +40,17 @@ WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS = {
 }
 WORKFLOW_SUBSCRIPTION_ROUTE_NAMES = {"standard", "frontier"}
 WORKFLOW_SUBSCRIPTION_PROVIDERS = {"codex", "claude"}
+WORKFLOW_SUBSCRIPTION_CANONICAL_ROUTES = {
+    "standard": (
+        ("agents", "oracle"),
+        ("categories", "deep"),
+        ("categories", "ultrabrain"),
+    ),
+    "frontier": (
+        ("categories", "codex-plan"),
+        ("categories", "codex-review"),
+    ),
+}
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
     "2026-08-reasoning-unification",
@@ -526,6 +537,21 @@ class RuntimeProfiles:
                     raise SystemExit(f"inactive or unqualified workflow subscription route: {profile}.{name}")
                 if route.get("fallbacks") != []:
                     raise SystemExit(f"workflow subscription route cannot declare fallbacks: {profile}.{name}")
+        normal_routes = workflow_profiles["normal"]
+        normal_profile = self.data.get("normal")
+        if not isinstance(normal_profile, dict):
+            raise SystemExit("normal profile is required for workflow subscription route binding")
+        for name, references in WORKFLOW_SUBSCRIPTION_CANONICAL_ROUTES.items():
+            route = normal_routes[name]
+            expected_model = f"{route['provider']}-subscription/{route['model']}"
+            for section, reference in references:
+                section_routes = normal_profile.get(section)
+                canonical = section_routes.get(reference) if isinstance(section_routes, dict) else None
+                if not isinstance(canonical, dict) or canonical.get("model") != expected_model:
+                    raise SystemExit(
+                        "workflow subscription route canonical drift: "
+                        f"normal.{name} must match normal.{section}.{reference} ({expected_model})"
+                    )
         exports = self.data.get("export_routes")
         if not isinstance(exports, dict) or set(exports) != set(VALID_PROFILES):
             raise SystemExit(f"export_routes must declare exactly {', '.join(VALID_PROFILES)}")
