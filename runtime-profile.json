@@ -1,6 +1,31 @@
 {
   "schema_version": 3,
   "default_profile": "normal",
+  "workflow_subscription_routes": {
+    "schema_version": 1,
+    "profiles": {
+      "normal": {
+        "standard": {
+          "provider": "codex",
+          "model": "gpt-5.6-sol",
+          "billing": "subscription",
+          "active": true,
+          "qualified": true,
+          "fallbacks": []
+        },
+        "frontier": {
+          "provider": "codex",
+          "model": "gpt-6-astra",
+          "billing": "subscription",
+          "active": true,
+          "qualified": true,
+          "fallbacks": []
+        }
+      },
+      "normal-private": {},
+      "pentest": {}
+    }
+  },
   "export_routes": {
     "normal": {
       "security-strix-scan": {

@@ -581,6 +581,188 @@ class ExportRouteTests(unittest.TestCase):
             self.assertTrue(dirty)
 
 
+class WorkflowSubscriptionRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
+
+    def test_normal_contract_has_exact_qualified_subscription_routes(self) -> None:
+        contract = self.profile_data["workflow_subscription_routes"]
+        self.assertEqual(contract["schema_version"], 1)
+        self.assertEqual(set(contract["profiles"]), {"normal", "normal-private", "pentest"})
+        self.assertEqual(contract["profiles"]["normal-private"], {})
+        self.assertEqual(contract["profiles"]["pentest"], {})
+        self.assertEqual(
+            contract["profiles"]["normal"],
+            {
+                "standard": {
+                    "provider": "codex",
+                    "model": "gpt-5.6-sol",
+                    "billing": "subscription",
+                    "active": True,
+                    "qualified": True,
+                    "fallbacks": [],
+                },
+                "frontier": {
+                    "provider": "codex",
+                    "model": "gpt-6-astra",
+                    "billing": "subscription",
+                    "active": True,
+                    "qualified": True,
+                    "fallbacks": [],
+                },
+            },
+        )
+
+    def test_workflow_export_is_revision_bound_and_observational(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "state"
+            result = subprocess.run(
+                [str(REPO / "oc"), "profile", "export-workflow-routes", "normal"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "OC_RUNTIME_STATE_DIR": str(state)},
+            )
+            self.assertFalse(state.exists(), "workflow export must not create runtime state")
+        payload = json.loads(result.stdout)
+        revision = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=normal"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["repository_revision"], revision)
+        self.assertEqual(payload["repository_dirty"], dirty)
+        self.assertEqual(payload["profile"], "normal")
+        self.assertEqual(set(payload["routes"]), {"standard", "frontier"})
+        self.assertEqual(
+            result.stdout.strip(),
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        )
+
+    def test_private_and_pentest_workflow_exports_fail_closed(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        for profile in ("normal-private", "pentest"):
+            with self.subTest(profile=profile), self.assertRaisesRegex(
+                SystemExit, f"workflow subscription routes unavailable for profile: {profile}"
+            ):
+                profiles.export_workflow_routes(profile)
+
+    def test_workflow_contract_never_renders_into_omo(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            for profile in ("normal", "normal-private", "pentest"):
+                with self.subTest(profile=profile):
+                    rendered = json.loads(
+                        (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    self.assertNotIn("workflow_subscription_routes", rendered)
+
+    def test_workflow_route_validation_is_native_subscription_only(self) -> None:
+        mutations = []
+
+        missing_route = json.loads(json.dumps(self.profile_data))
+        del missing_route["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]
+        mutations.append((missing_route, "must declare exactly frontier, standard"))
+
+        api_provider = json.loads(json.dumps(self.profile_data))
+        api_provider["workflow_subscription_routes"]["profiles"]["normal"]["standard"]["provider"] = "openrouter"
+        mutations.append((api_provider, "invalid workflow subscription provider"))
+
+        pi_provider = json.loads(json.dumps(self.profile_data))
+        pi_provider["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]["provider"] = "pi"
+        mutations.append((pi_provider, "invalid workflow subscription provider"))
+
+        api_fallback = json.loads(json.dumps(self.profile_data))
+        api_fallback["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]["fallbacks"] = [
+            "openrouter/z-ai/glm-5.3"
+        ]
+        mutations.append((api_fallback, "cannot declare fallbacks"))
+
+        unqualified = json.loads(json.dumps(self.profile_data))
+        unqualified["workflow_subscription_routes"]["profiles"]["normal"]["standard"]["qualified"] = False
+        mutations.append((unqualified, "inactive or unqualified"))
+
+        for data, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                repo = pathlib.Path(directory)
+                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaisesRegex(SystemExit, message):
+                    runtime_profile.RuntimeProfiles(repo)
+
+    def test_workflow_routes_reject_sol_and_astra_canonical_drift(self) -> None:
+        mutations = []
+
+        standard_contract = json.loads(json.dumps(self.profile_data))
+        standard_contract["workflow_subscription_routes"]["profiles"]["normal"]["standard"][
+            "model"
+        ] = "gpt-5.6-terra"
+        mutations.append(
+            (standard_contract, "normal.standard must match normal.agents.oracle")
+        )
+
+        frontier_contract = json.loads(json.dumps(self.profile_data))
+        frontier_contract["workflow_subscription_routes"]["profiles"]["normal"]["frontier"][
+            "model"
+        ] = "gpt-5.6-sol"
+        mutations.append(
+            (frontier_contract, "normal.frontier must match normal.categories.codex-plan")
+        )
+
+        standard = json.loads(json.dumps(self.profile_data))
+        standard["normal"]["categories"]["deep"]["model"] = "codex-subscription/gpt-5.6-terra"
+        mutations.append((standard, "normal.standard must match normal.categories.deep"))
+
+        frontier = json.loads(json.dumps(self.profile_data))
+        frontier["normal"]["categories"]["codex-review"]["model"] = (
+            "codex-subscription/gpt-5.6-sol-review"
+        )
+        mutations.append((frontier, "normal.frontier must match normal.categories.codex-review"))
+
+        for data, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                repo = pathlib.Path(directory)
+                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaisesRegex(SystemExit, message):
+                    runtime_profile.RuntimeProfiles(repo)
+
+    def test_future_claude_switch_requires_all_canonical_routes_to_move_together(self) -> None:
+        data = json.loads(json.dumps(self.profile_data))
+        frontier = data["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]
+        frontier["provider"] = "claude"
+        frontier["model"] = "qualified-model-id"
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(
+                SystemExit, "normal.frontier must match normal.categories.codex-plan"
+            ):
+                runtime_profile.RuntimeProfiles(repo)
+
+        for category in ("codex-plan", "codex-review"):
+            data["normal"]["categories"][category]["model"] = (
+                "claude-subscription/qualified-model-id"
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+            runtime_profile.RuntimeProfiles(repo)
+
+
 class NativeOmoMigrationTests(unittest.TestCase):
     def test_native_models_preserve_route_settings_and_normalize_matching_aliases(self) -> None:
         route = {

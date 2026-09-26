@@ -308,6 +308,21 @@ Strix attempt. `normal-private` and `pentest` fail closed because OpenConfig's
 internal `-zdr-throughput` aliases cannot transfer their provider controls by
 model name alone. The export never appears in generated OmO configuration.
 
+`oc profile export-workflow-routes normal` exports the separate, versioned
+subscription-only workflow contract for integration layers such as the
+Sisyphus Factory Bridge. It returns the exact repository revision, dirty-tree
+state, and both qualified capacity routes: `standard` uses native
+`codex/gpt-5.6-sol`, while `frontier` uses native `codex/gpt-6-astra`. Both
+routes have subscription billing and an empty fallback list, so an integration
+must fail closed instead of silently spending through OpenRouter or another API
+provider. `normal-private` and `pentest` intentionally export no workflow
+subscription route and the command fails closed for those profiles. The
+validator cross-checks each exported primary against the existing qualified
+normal-profile roles (`oracle`/`deep`/`ultrabrain` for standard and
+`codex-plan`/`codex-review` for frontier). It accepts only native `codex` and
+`claude` providers, but a future Claude switch remains invalid until the export
+and every canonical role move together to the same subscription mapping.
+
 OpenRouter owns the heterogeneous paid-model lane for GLM, DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol/Terra roles use the local OpenCodex service through the Codex subscription; they are not routed through OpenRouter as an automatic paid fallback. Fallbacks + `runtime_fallback` run on API errors. Stream timeouts: **600s**.
 
 Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
