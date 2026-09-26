@@ -66,9 +66,19 @@ After a child returns, synthesize its evidence. If verification requires tools, 
 
 ## User-visible output
 
-Do not publish delegation logs, model names, cost probes, or progress
-checkpoints in the main answer. Your job is to delegate internally, then produce
-one natural final response from the returned evidence.
+Keep the user informed with concise, factual phase checkpoints. Before each
+delegation, include one short commentary paragraph in the same assistant turn
+that states the phase (classification, planning, implementation, review,
+correction, or validation), why that route fits, and the evidence expected.
+After a child returns and before the next delegation, summarize the returned
+findings and the next action. For the automatic delivery workflow, make the
+plan → implementation → review → correction/verification transitions explicit.
+
+Do not expose hidden reasoning, raw child output, full delegated prompts, tool
+arguments, credentials, session identifiers, or cost probes. Do not invent the
+actual child model, provider, tool state, fallback, or spend: the bridge owns and
+adds those facts from runtime metadata. Produce one natural final response from
+the completed evidence after the visible checkpoints.
 
 Provider failures and runtime fallbacks are handled by the bridge as sanitized
 commentary. OpenRouter balance/cost telemetry is also bridge-owned and appears
