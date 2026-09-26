@@ -30,6 +30,16 @@ EXPORT_ROUTE_FIELDS = {
     "data_classification",
     "admission",
 }
+WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS = {
+    "provider",
+    "model",
+    "billing",
+    "active",
+    "qualified",
+    "fallbacks",
+}
+WORKFLOW_SUBSCRIPTION_ROUTE_NAMES = {"standard", "frontier"}
+WORKFLOW_SUBSCRIPTION_PROVIDERS = {"codex", "claude"}
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
     "2026-08-reasoning-unification",
@@ -481,6 +491,41 @@ class RuntimeProfiles:
         self.default = str(self.data.get("default_profile") or "normal")
         if self.default not in VALID_PROFILES:
             raise SystemExit(f"invalid default_profile in {self.profile_path}: {self.default!r}")
+        workflow_routes = self.data.get("workflow_subscription_routes")
+        if not isinstance(workflow_routes, dict) or set(workflow_routes) != {"schema_version", "profiles"}:
+            raise SystemExit("workflow_subscription_routes must declare schema_version and profiles")
+        if workflow_routes.get("schema_version") != 1:
+            raise SystemExit("workflow_subscription_routes.schema_version must be 1")
+        workflow_profiles = workflow_routes.get("profiles")
+        if not isinstance(workflow_profiles, dict) or set(workflow_profiles) != set(VALID_PROFILES):
+            raise SystemExit(
+                f"workflow_subscription_routes.profiles must declare exactly {', '.join(VALID_PROFILES)}"
+            )
+        for profile in VALID_PROFILES:
+            profile_routes = workflow_profiles[profile]
+            if not isinstance(profile_routes, dict):
+                raise SystemExit(f"invalid workflow_subscription_routes.profiles.{profile}")
+            expected_names = WORKFLOW_SUBSCRIPTION_ROUTE_NAMES if profile == "normal" else set()
+            if set(profile_routes) != expected_names:
+                raise SystemExit(
+                    f"workflow_subscription_routes.profiles.{profile} must declare exactly "
+                    f"{', '.join(sorted(expected_names)) if expected_names else 'no routes'}"
+                )
+            for name, route in profile_routes.items():
+                if not isinstance(route, dict) or set(route) != WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS:
+                    raise SystemExit(f"invalid workflow subscription route fields: {profile}.{name}")
+                provider = route.get("provider")
+                model = route.get("model")
+                if provider not in WORKFLOW_SUBSCRIPTION_PROVIDERS:
+                    raise SystemExit(f"invalid workflow subscription provider: {profile}.{name}")
+                if not isinstance(model, str) or not model.strip() or "/" in model:
+                    raise SystemExit(f"invalid workflow subscription model: {profile}.{name}")
+                if route.get("billing") != "subscription":
+                    raise SystemExit(f"invalid workflow subscription billing: {profile}.{name}")
+                if route.get("active") is not True or route.get("qualified") is not True:
+                    raise SystemExit(f"inactive or unqualified workflow subscription route: {profile}.{name}")
+                if route.get("fallbacks") != []:
+                    raise SystemExit(f"workflow subscription route cannot declare fallbacks: {profile}.{name}")
         exports = self.data.get("export_routes")
         if not isinstance(exports, dict) or set(exports) != set(VALID_PROFILES):
             raise SystemExit(f"export_routes must declare exactly {', '.join(VALID_PROFILES)}")
@@ -861,6 +906,20 @@ class RuntimeProfiles:
             "profile": profile,
             "name": name,
             **copy.deepcopy(route),
+        }
+
+    def export_workflow_routes(self, profile: str) -> dict:
+        contract = self.data["workflow_subscription_routes"]
+        routes = contract["profiles"][profile]
+        if not routes:
+            raise SystemExit(f"workflow subscription routes unavailable for profile: {profile}")
+        revision, dirty = repository_identity(self.repo)
+        return {
+            "schema_version": contract["schema_version"],
+            "repository_revision": revision,
+            "repository_dirty": dirty,
+            "profile": profile,
+            "routes": copy.deepcopy(routes),
         }
 
     def source_fingerprint(self) -> str:
@@ -1428,6 +1487,8 @@ def parser() -> argparse.ArgumentParser:
     export_route = sub.add_parser("export-route")
     export_route.add_argument("profile", choices=VALID_PROFILES)
     export_route.add_argument("name")
+    export_workflow_routes = sub.add_parser("export-workflow-routes")
+    export_workflow_routes.add_argument("profile", choices=VALID_PROFILES)
     return result
 
 
@@ -1436,6 +1497,9 @@ def main() -> int:
     profiles = RuntimeProfiles(Path(args.repo))
     if args.command == "export-route":
         print(json.dumps(profiles.export_route(args.profile, args.name), ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "export-workflow-routes":
+        print(json.dumps(profiles.export_workflow_routes(args.profile), ensure_ascii=False, sort_keys=True))
         return 0
     with profiles.locked():
         profiles.assert_native_migration_safe()

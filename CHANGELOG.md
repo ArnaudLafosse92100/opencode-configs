@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a revision-bound `oc profile export-workflow-routes` contract for the qualified normal-profile standard and frontier subscription lanes, with native-provider validation and no API fallbacks.
 - Retire the removed `proxy.unbeatn.ai` subscription gateway and route Astra, Sol, and Terra through the healthy local OpenCodex subscription endpoint; remove obsolete gateway secrets and add local catalog health checks.
 - Restore centralized secret redaction for provider diagnostics and maintenance logs, with a smoke regression test.
 - Keep normal DeepSeek routes price-first on `:floor`; replace the pentest aliases with **DeepSeek V4 Flash 0731 ZDR Throughput** and **DeepSeek V4 Pro 0813 ZDR Throughput**, using base API IDs, `provider.zdr=true`, `data_collection=deny`, `require_parameters=true`, no provider allowlist, provider fallbacks, throughput ordering, and ceilings of `$0.50/$1.50` and `$1.50/$4.50` per-million prompt/completion respectively.
