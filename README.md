@@ -242,7 +242,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `content-aware-research` / `-fast` / `-deep` | Edit-denied research | Venice DeepSeek only | `VENICE_API_KEY` |
 | `context-aware-hermes` | Edit-denied context analysis | OpenRouter Hermes 4 405B | `OPENROUTER_API_KEY` |
 
-Hephaestus and Atlas use local Codex Sol for implementation. Sisyphus, Prometheus, Oracle, Metis, Momus, and architecture/review categories use local Codex Astra. Explore/Librarian/quick work uses DeepSeek Flash. For material interactive implementation, `codex-router` runs the named Sisyphus chain Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle; Factory/Archon remains an explicit optional lifecycle. Specialized visual, writing, content-aware, Kimi, and Hermes routes remain explicit capability exceptions. Interactive Sol and Astra routes may recover only through the other qualified Codex subscription route; they never cross silently into a metered API.
+Hephaestus and Atlas use local Codex Sol for implementation. Sisyphus, Prometheus, Oracle, Metis, Momus, and architecture/review categories use local Codex Astra. Explore/Librarian/quick work uses DeepSeek Flash. For material interactive implementation, `codex-router` runs the named Sisyphus chain Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle. The logical Prometheus stage uses OmO's callable demoted `plan` adapter; directly targeting the built-in `prometheus` coordinator is rejected by pinned OmO. Factory/Archon remains an explicit optional lifecycle. Specialized visual, writing, content-aware, Kimi, and Hermes routes remain explicit capability exceptions. Interactive Sol and Astra routes may recover only through the other qualified Codex subscription route; they never cross silently into a metered API.
 
 ## Model routing
 
@@ -266,6 +266,7 @@ export-policy matrix. The table below is generated from its runtime routes and
 | `agents.momus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.multimodal-looker` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.oracle` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.plan` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.prometheus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `agents.sisyphus-deepseek` | `deepseek/deepseek-v4-pro` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |

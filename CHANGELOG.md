@@ -1,5 +1,7 @@
 # Changelog
 
+- Route the logical Prometheus planning stage through OmO's demoted `plan` subagent adapter, preserving the Astra/Sol policy while avoiding pinned OmO's hard rejection of `prometheus` as a `task()` coordinator target
+
 ## Unreleased
 
 - Replace the bridge-facing `codex-plan`/`codex-implement`/`codex-review` loop with the named interactive Sisyphus chain (Explore + Librarian, Metis, Prometheus, Momus, Hephaestus, Oracle), while keeping Factory/Archon explicit and Opus limited to its qualified Archon surface.

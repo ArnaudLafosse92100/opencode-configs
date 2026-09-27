@@ -33,7 +33,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 
 ### Routing logic (short)
 
-- **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`. Material interactive implementation follows the named Sisyphus sequence Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle; small and specialized work keeps the smallest fitting category. Factory/Archon is never entered automatically.
+- **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`. Material interactive implementation follows the named Sisyphus sequence Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle; the Prometheus role is dispatched through OmO's callable demoted `plan` adapter because pinned OmO hard-rejects its coordinator name as a `task` target. Small and specialized work keeps the smallest fitting category. Factory/Archon is never entered automatically.
 - **Orchestration / architecture / review** → normal uses local Codex subscription Astra for Sisyphus, codex-router, Prometheus, Oracle, Metis, Momus and the architecture/review categories.
 - **Economy / recon routes** → `runtime-profile.json` sends Explore, Librarian, Sisyphus Junior, `quick`, and `unspecified-low` to DeepSeek V4 Flash 0731 through OpenRouter/Pi, with an OpenCode-only GLM → MiniMax metered recovery pool.
 - **Implementation** → normal uses local Codex subscription Sol for Hephaestus, Atlas, `deep`, `bug-hunt`, and `refactor-safe`.

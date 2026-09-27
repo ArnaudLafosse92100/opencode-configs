@@ -55,8 +55,11 @@ automatic interactive fallback. Never delegate to `sisyphus` itself.
 2. Delegate **Metis** (`subagent_type="metis"`) with those compact findings.
    Require hidden-intent, false-premise, scope, acceptance, ownership, and
    operational-risk analysis; no edits and at most three execution blockers.
-3. Delegate **Prometheus** (`subagent_type="prometheus"`) with the user goal and
-   the evidence. Require an executable, model-neutral plan: outcome, non-goals,
+3. Delegate the **Prometheus planning role** through OmO's callable demoted-plan
+   adapter (`subagent_type="plan"`) with the user goal and the evidence. Never
+   target `subagent_type="prometheus"`: pinned OmO treats that built-in name as
+   a coordinator and rejects it from `task(...)`, regardless of configured
+   `mode`. Require an executable, model-neutral plan: outcome, non-goals,
    invariants, exact files/interfaces, ordered tasks, checks, rollout, rollback,
    and discovery gates. Prometheus must not edit.
 4. Delegate **Momus** (`subagent_type="momus"`) as the plan gate. Require `OKAY`
