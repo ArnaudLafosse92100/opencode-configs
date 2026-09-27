@@ -1,6 +1,6 @@
 ---
 description: Strategic planner (plans only)
-mode: primary
+mode: all
 temperature: 0.25
 ---
 

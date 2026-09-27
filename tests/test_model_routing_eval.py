@@ -135,7 +135,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         profiles = runtime_profile.RuntimeProfiles(REPO)
         self.assertEqual(
             profiles.policy_snapshot_id("pentest"),
-            "0656794a94eda0f4b77f9218ea6e50160bc1af9b75718bda0dc10b6135ef187c",
+            "69fcff53a27f810abcec7e5b550761d7e245fb19631a7292e94086fd1a1170f9",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
@@ -208,10 +208,13 @@ class ContentAwareFallbackTests(unittest.TestCase):
         )
         self.assertNotIn("LLM_GATEWAY_", active_sources)
 
-    def test_normal_quick_and_unspecified_low_use_flash_without_fallback(self) -> None:
+    def test_normal_quick_and_unspecified_low_use_metered_runtime_pool(self) -> None:
         expected = {
             "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-            "fallback_models": [],
+            "fallback_models": [
+                "openrouter/z-ai/glm-5.3",
+                "openrouter/minimax/minimax-m3",
+            ],
         }
         normal = self.profile_data["normal"]["categories"]
         for name in ("quick", "unspecified-low"):
@@ -236,7 +239,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
             )
         self.assertEqual(rendered, current_opencode)
 
-    def test_normal_machine_routes_use_flash_sol_and_astra_without_api_fallbacks(self) -> None:
+    def test_normal_machine_routes_use_surface_specific_runtime_fallbacks(self) -> None:
         normal = self.profile_data["normal"]
         flash = "openrouter/deepseek/deepseek-v4-flash-0731"
         sol = "codex-subscription/gpt-5.6-sol"
@@ -246,19 +249,25 @@ class ContentAwareFallbackTests(unittest.TestCase):
             ("categories", ("quick", "unspecified-low")),
         ):
             for name in names:
-                self.assertEqual(normal[section][name], {"model": flash, "fallback_models": []}, name)
+                self.assertEqual(normal[section][name], {
+                    "model": flash,
+                    "fallback_models": ["openrouter/z-ai/glm-5.3", "openrouter/minimax/minimax-m3"],
+                }, name)
         for section, names in (
             ("agents", ("hephaestus", "atlas")),
-            ("categories", ("deep", "bug-hunt", "refactor-safe", "codex-implement")),
+            ("categories", ("deep", "bug-hunt", "refactor-safe")),
         ):
             for name in names:
-                self.assertEqual(normal[section][name], {"model": sol, "fallback_models": []}, name)
+                self.assertEqual(normal[section][name], {"model": sol, "fallback_models": [astra]}, name)
         for section, names in (
             ("agents", ("codex-router", "sisyphus", "prometheus", "oracle", "metis", "momus")),
-            ("categories", ("ultrabrain", "unspecified-high", "arch-review", "codex-plan", "codex-review")),
+            ("categories", ("ultrabrain", "unspecified-high", "arch-review")),
         ):
             for name in names:
-                self.assertEqual(normal[section][name], {"model": astra, "fallback_models": []}, name)
+                self.assertEqual(normal[section][name], {"model": astra, "fallback_models": [sol]}, name)
+        for removed in ("codex-plan", "codex-implement", "codex-review"):
+            self.assertNotIn(removed, normal["categories"])
+            self.assertNotIn(removed, self.config["categories"])
 
     def test_specialized_normal_routes_remain_explicit_exceptions(self) -> None:
         normal = self.profile_data["normal"]
@@ -275,7 +284,10 @@ class ContentAwareFallbackTests(unittest.TestCase):
             for name, route in normal[section].items():
                 with self.subTest(section=section, name=name):
                     if route["model"].startswith("codex-subscription/"):
-                        self.assertEqual(route["fallback_models"], [])
+                        self.assertTrue(all(
+                            fallback.startswith("codex-subscription/")
+                            for fallback in route["fallback_models"]
+                        ))
                     self.assertFalse(route["model"].startswith("claude-subscription/"))
 
     def test_project_scaffolds_do_not_restore_the_old_glm_default(self) -> None:

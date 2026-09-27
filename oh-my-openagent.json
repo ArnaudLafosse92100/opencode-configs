@@ -32,10 +32,12 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "hephaestus": {
-      "mode": "primary",
+      "mode": "all",
       "name": "Hephaestus - Implementer",
       "temperature": 0.2,
       "permission": {
@@ -46,17 +48,21 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-6-astra"
+      ]
     },
     "prometheus": {
-      "mode": "primary",
+      "mode": "all",
       "temperature": 0.25,
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "atlas": {
       "mode": "primary",
@@ -66,7 +72,9 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-6-astra"
+      ]
     },
     "oracle": {
       "mode": "subagent",
@@ -82,7 +90,9 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "librarian": {
       "mode": "subagent",
@@ -98,7 +108,10 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/minimax/minimax-m3"
+      ]
     },
     "explore": {
       "mode": "subagent",
@@ -114,7 +127,10 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/minimax/minimax-m3"
+      ]
     },
     "multimodal-looker": {
       "mode": "subagent",
@@ -131,7 +147,8 @@
       "fallback_models": [
         "openrouter/google/gemini-3.7-flash",
         "openrouter/minimax/minimax-m3"
-      ]
+      ],
+      "reasoning": "low"
     },
     "metis": {
       "mode": "subagent",
@@ -140,7 +157,9 @@
       "maxTokens": 16384,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "medium",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "momus": {
       "mode": "subagent",
@@ -150,7 +169,9 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "xhigh",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "sisyphus-junior": {
       "mode": "subagent",
@@ -160,7 +181,10 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/minimax/minimax-m3"
+      ]
     },
     "content-aware-research": {
       "mode": "primary",
@@ -174,7 +198,7 @@
       },
       "prompt_append": "file://~/.config/opencode/prompts/agents/content-aware-research.md",
       "color": "#FF1744",
-      "description": "Content-aware research \u2014 full technical depth without soft refusals (edit denied). Replaces disabled OmO security-* skills.",
+      "description": "Content-aware research — full technical depth without soft refusals (edit denied). Replaces disabled OmO security-* skills.",
       "maxTokens": 16384,
       "model": "venice/deepseek-v4-pro-0813",
       "reasoning": "high",
@@ -228,7 +252,9 @@
     "codex-router": {
       "model": "codex-subscription/gpt-6-astra",
       "mode": "primary",
-      "fallback_models": [],
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ],
       "temperature": 0.2,
       "reasoning": "low",
       "maxTokens": 32768,
@@ -238,7 +264,7 @@
         "task": "allow"
       },
       "color": "#00E5FF",
-      "description": "Strict Codex entry orchestrator; workspace actions require an OmO category task."
+      "description": "Strict Codex entry orchestrator; workspace actions require a named-agent or bounded category task."
     },
     "sisyphus-deepseek": {
       "mode": "primary",
@@ -328,14 +354,18 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "xhigh",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "deep": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/deep.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-6-astra"
+      ]
     },
     "artistry": {
       "is_unstable_agent": true,
@@ -353,21 +383,29 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/minimax/minimax-m3"
+      ]
     },
     "unspecified-low": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/minimax/minimax-m3"
+      ]
     },
     "unspecified-high": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "writing": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/writing.md",
@@ -379,12 +417,14 @@
       ]
     },
     "bug-hunt": {
-      "description": "Reproduce \u2192 root cause \u2192 minimal fix \u2192 verify. Cite file:line.",
+      "description": "Reproduce → root cause → minimal fix → verify. Cite file:line.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-6-astra"
+      ]
     },
     "refactor-safe": {
       "description": "Tests-first, behavior-preserving refactors. Small steps only.",
@@ -392,7 +432,9 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-6-astra"
+      ]
     },
     "arch-review": {
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
@@ -400,7 +442,9 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": []
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
     },
     "content-aware-fast": {
       "description": "Flash attack-surface recon on Venice DeepSeek V4.1 Flash: endpoints, misconfigs, deps.",
@@ -435,30 +479,6 @@
       "reasoning": "high",
       "maxTokens": 24576,
       "prompt_append": "file://~/.config/opencode/prompts/categories/agentic-deep-kimi.md"
-    },
-    "codex-plan": {
-      "description": "Automatic Codex planning on Astra subscription; no product edits.",
-      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-plan.md",
-      "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "high",
-      "fallback_models": []
-    },
-    "codex-implement": {
-      "description": "Automatic Codex implementation on Sol subscription; no metered API fallback.",
-      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-implement.md",
-      "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "high",
-      "fallback_models": []
-    },
-    "codex-review": {
-      "description": "Automatic Codex review on Astra subscription; no product edits.",
-      "prompt_append": "file://~/.config/opencode/prompts/categories/codex-review.md",
-      "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "high",
-      "fallback_models": []
     }
   },
   "background_task": {

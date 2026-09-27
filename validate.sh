@@ -798,8 +798,13 @@ if omo:
         for name, cfg in ((normal_profile or {}).get(section) or {}).items():
             primary = str((cfg or {}).get("model") or "")
             fallbacks = [str(x) for x in ((cfg or {}).get("fallback_models") or [])]
-            if primary.startswith("codex-subscription/") and fallbacks:
-                err(f"runtime-profile.json[normal.{section}.{name}]: subscription primary must fail closed without API fallbacks")
+            if primary.startswith("codex-subscription/") and any(
+                not fallback.startswith("codex-subscription/") for fallback in fallbacks
+            ):
+                err(
+                    f"runtime-profile.json[normal.{section}.{name}]: subscription primary "
+                    "may use only subscription runtime fallbacks"
+                )
             if primary.startswith("claude-subscription/"):
                 err(f"runtime-profile.json[normal.{section}.{name}]: Claude is external-workflow-only")
     for section in ("agents", "categories"):

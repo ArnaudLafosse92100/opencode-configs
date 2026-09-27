@@ -670,6 +670,41 @@ class RuntimeProfiles:
                 if profile != "normal-private" or selected.get("replacement_capability") not in self.capabilities:
                     raise SystemExit(f"invalid composed profile: {profile}")
                 continue
+            runtime_fallbacks = selected.get("runtime_fallbacks", {})
+            if not isinstance(runtime_fallbacks, dict):
+                raise SystemExit(f"invalid runtime fallbacks: {profile}")
+            if runtime_fallbacks and set(runtime_fallbacks) != {"capabilities", "by_billing"}:
+                raise SystemExit(f"invalid runtime fallback fields: {profile}")
+            fallback_capabilities = runtime_fallbacks.get("capabilities", [])
+            fallback_pools = runtime_fallbacks.get("by_billing", {})
+            if (
+                not isinstance(fallback_capabilities, list)
+                or len(fallback_capabilities) != len(set(fallback_capabilities))
+                or any(name not in self.capabilities for name in fallback_capabilities)
+                or not isinstance(fallback_pools, dict)
+                or (runtime_fallbacks and set(fallback_pools) != {"subscription", "metered"})
+            ):
+                raise SystemExit(f"invalid runtime fallback policy: {profile}")
+            for billing, pool in fallback_pools.items():
+                if not isinstance(pool, list) or not pool or len(pool) != len(set(pool)):
+                    raise SystemExit(f"invalid runtime fallback pool: {profile}.{billing}")
+                if any(reference not in self.models or self.models[reference]["billing"] != billing for reference in pool):
+                    raise SystemExit(f"runtime fallback pool billing mismatch: {profile}.{billing}")
+            for capability_name in fallback_capabilities:
+                capability = self.capabilities[capability_name]
+                references = self._profile_runtime_fallbacks(selected, capability_name)
+                if references is None or not references:
+                    raise SystemExit(f"empty runtime fallback chain: {profile}.{capability_name}")
+                for reference in references:
+                    model = self.models[reference]
+                    if capability["required_privacy"] not in model["privacy_classes"]:
+                        raise SystemExit(f"runtime fallback privacy incompatibility: {profile}.{capability_name} -> {reference}")
+                    if not set(capability["required_modalities"]) <= set(model["modalities"]):
+                        raise SystemExit(f"runtime fallback modality incompatibility: {profile}.{capability_name} -> {reference}")
+                    if model["billing"] not in capability["allowed_billing"]:
+                        raise SystemExit(f"runtime fallback billing incompatibility: {profile}.{capability_name} -> {reference}")
+                    if capability["requires_tools"] and model["tool_use"] is not True:
+                        raise SystemExit(f"runtime fallback tool incompatibility: {profile}.{capability_name} -> {reference}")
             bindings = selected.get("bindings")
             if not isinstance(bindings, dict) or set(bindings) != set(VALID_SECTIONS):
                 raise SystemExit(f"invalid bindings: {profile}")
@@ -681,7 +716,12 @@ class RuntimeProfiles:
                     effort = binding.get("effort")
                     if capability not in self.capabilities or effort not in EFFORTS:
                         raise SystemExit(f"invalid binding value: {profile}.{section}.{name}")
-                    for reference in (self.capabilities[capability]["primary"], *self.capabilities[capability]["fallbacks"]):
+                    selected_runtime_fallbacks = self._profile_runtime_fallbacks(selected, capability)
+                    references = (
+                        self.capabilities[capability]["primary"],
+                        *(self.capabilities[capability]["fallbacks"] if selected_runtime_fallbacks is None else selected_runtime_fallbacks),
+                    )
+                    for reference in references:
                         model = self.models[reference]
                         if model["active"] is not True or model["qualified"] is not True:
                             raise SystemExit(f"inactive or unqualified model bound to runtime: {profile}.{section}.{name} -> {reference}")
@@ -1001,6 +1041,10 @@ class RuntimeProfiles:
                     base[key] = replacement
             base["privacy"] = copy.deepcopy(profile_policy["privacy"])
             base["admission"] = copy.deepcopy(profile_policy["admission"])
+            # Interactive fallbacks are a normal-surface policy. Private
+            # composition fails closed instead of inheriting subscription or
+            # non-ZDR candidates from that surface.
+            base["runtime_fallbacks"] = {}
             profile_policy = base
 
         resolved = {
@@ -1016,13 +1060,31 @@ class RuntimeProfiles:
                 resolved[key] = self._resolve_capability(capability)["model"]
         for section in VALID_SECTIONS:
             for name, binding in profile_policy["bindings"][section].items():
-                resolved[section][name] = self._resolve_capability(binding["capability"], binding["effort"])
+                resolved[section][name] = self._resolve_capability(
+                    binding["capability"], binding["effort"],
+                    self._profile_runtime_fallbacks(profile_policy, binding["capability"]),
+                )
         return resolved
 
-    def _resolve_capability(self, name: str, effort: str | None = None) -> dict:
+    def _profile_runtime_fallbacks(self, profile_policy: dict, capability_name: str) -> list[str] | None:
+        policy = profile_policy.get("runtime_fallbacks") or {}
+        if capability_name not in policy.get("capabilities", []):
+            return None
+        capability = self.capabilities[capability_name]
+        primary_reference = capability["primary"]
+        billing = self.models[primary_reference]["billing"]
+        return [
+            reference for reference in (policy.get("by_billing", {}).get(billing) or [])
+            if reference != primary_reference
+        ]
+
+    def _resolve_capability(
+        self, name: str, effort: str | None = None, runtime_fallbacks: list[str] | None = None,
+    ) -> dict:
         capability = self.capabilities[name]
         primary = self.models[capability["primary"]]
-        fallbacks = [self.models[reference] for reference in capability["fallbacks"]]
+        fallback_references = capability["fallbacks"] if runtime_fallbacks is None else runtime_fallbacks
+        fallbacks = [self.models[reference] for reference in fallback_references]
         if primary["runtime_model"] is None or any(model["runtime_model"] is None for model in fallbacks):
             raise SystemExit(f"capability is not executable by OpenConfig: {name}")
         resolved = {

@@ -1,6 +1,6 @@
 ---
 description: Deep implementation on the configured implementation capability
-mode: primary
+mode: all
 temperature: 0.2
 ---
 
