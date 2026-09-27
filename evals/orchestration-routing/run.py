@@ -111,6 +111,9 @@ def load_cases() -> dict:
             raise ValueError(f"active profile {active} has an invalid compose source")
         selected = json.loads(json.dumps(base))
         excluded = set((overlay.get("privacy") or {}).get("exclude_providers") or [])
+        replacement = overlay.get("non_openrouter_route")
+        if not isinstance(replacement, dict):
+            raise ValueError(f"active profile {active} has no private replacement route")
         for section in ("agents", "categories"):
             for route in (selected.get(section) or {}).values():
                 if isinstance(route, dict):
@@ -120,7 +123,9 @@ def load_cases() -> dict:
                         if isinstance(ref, str) and ref.split("/", 1)[0] not in excluded
                     ]
                     if not allowed:
-                        raise ValueError(f"normal-private route has no privacy-compatible model: {section}")
+                        route.clear()
+                        route.update(json.loads(json.dumps(replacement)))
+                        continue
                     route["model"], route["fallback_models"] = allowed[0], allowed[1:]
     categories = selected.get("categories") or {}
     for case in suite["cases"]:

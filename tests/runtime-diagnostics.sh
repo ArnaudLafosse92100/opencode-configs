@@ -521,10 +521,9 @@ elif kind=='forged-generation':
 elif kind=='other-diff':
     value['[opencode]']['categories']['quick']['model']='unexpected/model'
 elif kind=='fallback-order':
-    # `quick` currently has one fallback, so reversing it was a no-op and made
-    # this negative fixture fail for the wrong reason. codex-router has at
-    # least two ordered fallbacks in the normal profile.
-    value['[opencode]']['agents']['codex-router']['fallback_models'].reverse()
+    # Direct subscription routes deliberately have no model fallback. Use the
+    # vision lane, which still has two capability-compatible ordered fallbacks.
+    value['[opencode]']['agents']['multimodal-looker']['fallback_models'].reverse()
 elif kind=='reasoning-drift':
     value['[opencode]']['agents']['sisyphus']['reasoning']='high'
 elif kind=='temperature-drift':
@@ -623,7 +622,7 @@ SH
 cat >"$BRIDGE_FAKE/curl" <<'SH'
 #!/bin/sh
 case "$*" in
-  *"/agent"*) printf '[{"name":"codex-router","modelID":"z-ai/glm-5.3"}]\n';;
+  *"/agent"*) printf '[{"name":"codex-router","modelID":"gpt-6-astra"}]\n';;
   *"/healthz"*)
     [ "${FAKE_HEALTH_FAIL:-0}" = 1 ] && exit 1
     state="${FAKE_BRIDGE_STATE:?}"; count=0

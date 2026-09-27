@@ -1,5 +1,5 @@
 ---
-description: Team-eligible fast child on OpenRouter GLM 5.3 Flash
+description: Team-eligible fast child on OpenRouter DeepSeek V4 Flash 0731
 mode: subagent
 model: openrouter/z-ai/glm-5.3-flash
 temperature: 0.2

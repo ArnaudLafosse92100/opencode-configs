@@ -1,6 +1,6 @@
-# Profile: low (GLM 5.3 orchestrator / cheap subagents)
+# Profile: low (DeepSeek Flash orchestrator / cheap subagents)
 
-Cost-first scaffold. Normal mode keeps Sisyphus on GLM 5.3 for tool quality; pentest mode overrides Sisyphus to DeepSeek Flash 0731 primary. Prefer Flash for parallel work.
+Cost-first scaffold. The project entry stays on DeepSeek Flash 0731; explicit architecture and implementation delegates still follow the normal Astra/Sol routes. Pentest mode overrides every route to the stricter ZDR chain.
 
 ## Prefer
 

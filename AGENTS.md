@@ -34,11 +34,12 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 ### Routing logic (short)
 
 - **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
-- **Orchestration / tool loops** → normal uses GLM 5.3 (Sisyphus, Atlas, Prometheus, bug-hunt, refactor) for tool-call quality.
-- **Economy / recon routes** → `runtime-profile.json` decides each agent/category primary. In normal mode this deliberately distinguishes GLM exploration and Flash delegation/quick work.
-- **Deep implement / critique** → normal uses local Codex subscription aliases: Terra for implementation (Hephaestus), Sol for planning/review (Oracle, Momus, deep, ultrabrain, arch-review), with DeepSeek Pro 0813 as the first OpenRouter depth fallback.
+- **Orchestration / architecture / review** → normal uses local Codex subscription Astra for Sisyphus, codex-router, Prometheus, Oracle, Metis, Momus and the architecture/review categories.
+- **Economy / recon routes** → `runtime-profile.json` sends Explore, Librarian, Sisyphus Junior, `quick`, and `unspecified-low` to DeepSeek V4 Flash 0731 through OpenRouter/Pi without automatic escalation.
+- **Implementation** → normal uses local Codex subscription Sol for Hephaestus, Atlas, `deep`, `bug-hunt`, `refactor-safe`, and `codex-implement`.
+- **Subscription fail-closed rule** → direct Sol/Astra routes have no API fallback. Claude Opus is exported only for Factory/Archon adjudication because OmO has no native Claude Max subscription transport.
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash).
-- **Hard ceiling** → codex-subscription Sol for `deep` / `ultrabrain`; GLM 5.3 remains the `ultrawork` max route inside Sisyphus.
+- **Hard ceiling** → codex-subscription Astra for `ultrabrain` and architecture/review; Sol for `deep` implementation.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.
 - **Content-aware research** → normal uses Venice DeepSeek V4 Pro 0813 with Venice Pro/Flash fallbacks. `content-aware-deep` follows the same tool-capable Venice family; Hermes 4 405B remains an explicit pasted-context consult with tools and edits denied.
 - **Runtime profile override** → `runtime-profile.json` is the routing SSoT; do not duplicate an exact route table in this file. Use `oc profile resolve <normal|pentest> <agents|categories> <name>` or the generated README matrix. In `pentest`, every agent and category starts on **DeepSeek V4 Flash 0731 ZDR Throughput**, makes exactly three Flash retries, then makes exactly one **DeepSeek V4 Pro 0813 ZDR Throughput** attempt; that failure is terminal. Pentest never dispatches GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or another model. Profile state and generated configs live under `~/.local/state/openconfig`; switching must never rewrite tracked source files.
@@ -122,7 +123,7 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Lead: **sisyphus**. Eligible: sisyphus, atlas, sisyphus-junior, hephaestus (`teammate: allow`), or `kind: category`.
 - Teams: explorers, ship-feature, debug-team, review-panel, refactor-team, docs-team, content-aware-audit → `~/.omo/teams/` (symlinks to the live `~/.config/opencode` tree).
 - Hyperplan (`hyperplan` / `hpp` / `/hyperplan`): **sisyphus only**, not prometheus. Needs team mode + demoted `plan` agent for Phase 6. Do not put `plan` in `disabled_agents`.
-- Ultrawork (`ulw`): GLM 5.3 max inside Sisyphus; use `deep` / `ultrabrain` for codex-subscription Sol reasoning in normal mode.
+- Ultrawork (`ulw`): Astra-led orchestration inside Sisyphus; use `deep` for Sol implementation and `ultrabrain` for Astra reasoning in normal mode.
 
 ## What not to do
 

@@ -738,6 +738,35 @@ if omo:
             runtime_profile_data = json.load(open(runtime_profile_path))
         except Exception:
             runtime_profile_data = {}
+    workflow_contract = runtime_profile_data.get("workflow_routes") if isinstance(runtime_profile_data, dict) else None
+    expected_workflow_routes = {
+        "exploration": {
+            "provider": "pi", "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "billing": "metered", "active": True, "qualified": True, "fallbacks": [],
+        },
+        "implementation": {
+            "provider": "codex", "model": "gpt-5.6-sol",
+            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
+        },
+        "architecture": {
+            "provider": "codex", "model": "gpt-6-astra",
+            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
+        },
+        "adjudication": {
+            "provider": "claude", "model": "claude-opus-5-5",
+            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
+        },
+    }
+    if not isinstance(workflow_contract, dict) or workflow_contract.get("schema_version") != 3:
+        err("runtime-profile.json: workflow_routes must use schema_version 3")
+    else:
+        workflow_profiles = workflow_contract.get("profiles")
+        if not isinstance(workflow_profiles, dict) or set(workflow_profiles) != {"normal", "normal-private", "pentest"}:
+            err("runtime-profile.json: workflow_routes profiles must be normal, normal-private, and pentest")
+        elif workflow_profiles.get("normal") != expected_workflow_routes or workflow_profiles.get("normal-private") != {} or workflow_profiles.get("pentest") != {}:
+            err("runtime-profile.json: workflow_routes v3 capability contract drifted")
+        else:
+            ok("workflow_routes v3 exports Flash exploration, Sol implementation, Astra architecture, and Claude adjudication")
     selected_profile = runtime_profile_data.get(default_profile) if isinstance(runtime_profile_data, dict) else {}
     if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
         # Backward-compatible schema v1: category map at profile root.
@@ -771,6 +800,14 @@ if omo:
     pentest_pro = "openrouter/deepseek/deepseek-v4-pro-0813"
     pentest_pro_throughput = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
     pentest_flash = "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
+    for section in ("agents", "categories"):
+        for name, cfg in ((normal_profile or {}).get(section) or {}).items():
+            primary = str((cfg or {}).get("model") or "")
+            fallbacks = [str(x) for x in ((cfg or {}).get("fallback_models") or [])]
+            if primary.startswith("codex-subscription/") and fallbacks:
+                err(f"runtime-profile.json[normal.{section}.{name}]: subscription primary must fail closed without API fallbacks")
+            if primary.startswith("claude-subscription/"):
+                err(f"runtime-profile.json[normal.{section}.{name}]: Claude is external-workflow-only")
     for section in ("agents", "categories"):
         for name, cfg in ((pentest_profile or {}).get(section) or {}).items():
             primary = str((cfg or {}).get("model") or "")

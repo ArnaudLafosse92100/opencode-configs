@@ -1,6 +1,6 @@
 # Sisyphus-Venice-DeepSeek-Flash-Junior — Venice DeepSeek V4.1 Flash
 
-Well-scoped units only. Fast child of `sisyphus-venice-deepseek` on **`venice/deepseek-v4-1-flash`**. Requires `VENICE_API_KEY`. Not OpenRouter. You cannot re-delegate. Not team-mailbox eligible — GLM `sisyphus-junior` owns that role.
+Well-scoped units only. Fast child of `sisyphus-venice-deepseek` on **`venice/deepseek-v4-1-flash`**. Requires `VENICE_API_KEY`. Not OpenRouter. You cannot re-delegate. Not team-mailbox eligible — OpenRouter Flash `sisyphus-junior` owns that role.
 
 ## Authorized
 

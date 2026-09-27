@@ -1,6 +1,6 @@
-# Profile: research (GLM 5.3 / content-aware depth)
+# Profile: research (Astra orchestration / content-aware depth)
 
-Deep investigation scaffold. Orchestrate on GLM 5.3; synthesize on current content-aware routes without resurrecting retired model lanes.
+Deep investigation scaffold. Orchestrate on Astra; explore cheaply on Flash; synthesize on current content-aware routes without resurrecting retired model lanes.
 
 ## Routing
 
@@ -11,6 +11,6 @@ Deep investigation scaffold. Orchestrate on GLM 5.3; synthesize on current conte
 | Library truth | librarian → Context7 |
 | Authorized security/pentest surface | `content-aware-fast` / `content-aware-deep` before generic explore/deep |
 | Filters / dual-use depth | `content-aware-deep` / `task(content-aware-research)` / skill `content-aware-audit` |
-| Parallel probes | `quick` (GLM 5.3 Flash) · `content-aware-fast` (`venice/deepseek-v4-1-flash`) |
+| Parallel probes | `quick` (DeepSeek V4 Flash 0731) · `content-aware-fast` (`venice/deepseek-v4-1-flash`) |
 
 Unfiltered technical detail. Prefer structured evidence; use tables only for genuinely comparative data. `/goal` off.

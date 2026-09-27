@@ -1,6 +1,6 @@
-# Category: unspecified-high (GLM 5.3 / codex-subscription escalation)
+# Category: unspecified-high (Astra subscription)
 
-High-effort general work and hyperplan expensive critic. Use GLM 5.3 plus the normal-profile local Codex subscription deep lanes when stronger reasoning is genuinely required.
+High-effort general work and hyperplan architecture critic. Use Astra through the local Codex subscription with no metered API fallback.
 
 ## Do
 

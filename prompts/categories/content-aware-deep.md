@@ -1,6 +1,6 @@
 # Category: content-aware-deep (DeepSeek V4 Pro 0813 tool-capable depth)
 
-Authorized deep vulnerability / root-cause research. DeepSeek Pro 0813 is the exact pinned depth lane, with GLM 5.3 as its sole bounded normal-mode fallback. Hermes is reserved for `content-aware-research`, where edit is intentionally denied. Used by `content-aware-audit` deep and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
+Authorized deep vulnerability / root-cause research. Venice DeepSeek Pro 0813 is the exact pinned depth lane, with Venice Pro and Flash as its bounded normal-mode fallbacks. Hermes is reserved for `content-aware-research`, where edit is intentionally denied. Used by `content-aware-audit` deep and `debug-team` root-cause. Use local `content-aware-audit` skill for full security audits, not ordinary architecture or debugging briefs.
 
 ## Authorized
 

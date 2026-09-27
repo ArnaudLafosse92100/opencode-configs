@@ -30,7 +30,7 @@ EXPORT_ROUTE_FIELDS = {
     "data_classification",
     "admission",
 }
-WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS = {
+WORKFLOW_ROUTE_FIELDS = {
     "provider",
     "model",
     "billing",
@@ -38,18 +38,47 @@ WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS = {
     "qualified",
     "fallbacks",
 }
-WORKFLOW_SUBSCRIPTION_ROUTE_NAMES = {"standard", "frontier"}
-WORKFLOW_SUBSCRIPTION_PROVIDERS = {"codex", "claude"}
-WORKFLOW_SUBSCRIPTION_CANONICAL_ROUTES = {
-    "standard": (
-        ("agents", "oracle"),
-        ("categories", "deep"),
-        ("categories", "ultrabrain"),
+WORKFLOW_ROUTE_NAMES = {"exploration", "implementation", "architecture", "adjudication"}
+WORKFLOW_ROUTE_PROVIDERS = {"pi", "codex", "claude"}
+WORKFLOW_ROUTE_BILLING = {
+    "exploration": "metered",
+    "implementation": "subscription",
+    "architecture": "subscription",
+    "adjudication": "subscription",
+}
+WORKFLOW_ROUTE_CANONICAL_ROUTES = {
+    "exploration": (
+        ("agents", "librarian"),
+        ("agents", "explore"),
+        ("agents", "sisyphus-junior"),
+        ("categories", "quick"),
+        ("categories", "unspecified-low"),
     ),
-    "frontier": (
+    "implementation": (
+        ("agents", "hephaestus"),
+        ("agents", "atlas"),
+        ("categories", "deep"),
+        ("categories", "bug-hunt"),
+        ("categories", "refactor-safe"),
+        ("categories", "codex-implement"),
+    ),
+    "architecture": (
+        ("agents", "codex-router"),
+        ("agents", "sisyphus"),
+        ("agents", "prometheus"),
+        ("agents", "oracle"),
+        ("agents", "metis"),
+        ("agents", "momus"),
+        ("categories", "ultrabrain"),
+        ("categories", "unspecified-high"),
+        ("categories", "arch-review"),
         ("categories", "codex-plan"),
         ("categories", "codex-review"),
     ),
+    # Claude is intentionally external-workflow-only. OmO has no native
+    # Claude Max subscription transport, so direct OpenConfig must not pretend
+    # that this route is locally executable.
+    "adjudication": (),
 }
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
@@ -502,54 +531,71 @@ class RuntimeProfiles:
         self.default = str(self.data.get("default_profile") or "normal")
         if self.default not in VALID_PROFILES:
             raise SystemExit(f"invalid default_profile in {self.profile_path}: {self.default!r}")
-        workflow_routes = self.data.get("workflow_subscription_routes")
+        workflow_routes = self.data.get("workflow_routes")
         if not isinstance(workflow_routes, dict) or set(workflow_routes) != {"schema_version", "profiles"}:
-            raise SystemExit("workflow_subscription_routes must declare schema_version and profiles")
-        if workflow_routes.get("schema_version") != 1:
-            raise SystemExit("workflow_subscription_routes.schema_version must be 1")
+            raise SystemExit("workflow_routes must declare schema_version and profiles")
+        if workflow_routes.get("schema_version") != 3:
+            raise SystemExit("workflow_routes.schema_version must be 3")
         workflow_profiles = workflow_routes.get("profiles")
         if not isinstance(workflow_profiles, dict) or set(workflow_profiles) != set(VALID_PROFILES):
             raise SystemExit(
-                f"workflow_subscription_routes.profiles must declare exactly {', '.join(VALID_PROFILES)}"
+                f"workflow_routes.profiles must declare exactly {', '.join(VALID_PROFILES)}"
             )
         for profile in VALID_PROFILES:
             profile_routes = workflow_profiles[profile]
             if not isinstance(profile_routes, dict):
-                raise SystemExit(f"invalid workflow_subscription_routes.profiles.{profile}")
-            expected_names = WORKFLOW_SUBSCRIPTION_ROUTE_NAMES if profile == "normal" else set()
+                raise SystemExit(f"invalid workflow_routes.profiles.{profile}")
+            expected_names = WORKFLOW_ROUTE_NAMES if profile == "normal" else set()
             if set(profile_routes) != expected_names:
                 raise SystemExit(
-                    f"workflow_subscription_routes.profiles.{profile} must declare exactly "
+                    f"workflow_routes.profiles.{profile} must declare exactly "
                     f"{', '.join(sorted(expected_names)) if expected_names else 'no routes'}"
                 )
             for name, route in profile_routes.items():
-                if not isinstance(route, dict) or set(route) != WORKFLOW_SUBSCRIPTION_ROUTE_FIELDS:
-                    raise SystemExit(f"invalid workflow subscription route fields: {profile}.{name}")
+                if not isinstance(route, dict) or set(route) != WORKFLOW_ROUTE_FIELDS:
+                    raise SystemExit(f"invalid workflow route fields: {profile}.{name}")
                 provider = route.get("provider")
                 model = route.get("model")
-                if provider not in WORKFLOW_SUBSCRIPTION_PROVIDERS:
-                    raise SystemExit(f"invalid workflow subscription provider: {profile}.{name}")
-                if not isinstance(model, str) or not model.strip() or "/" in model:
-                    raise SystemExit(f"invalid workflow subscription model: {profile}.{name}")
-                if route.get("billing") != "subscription":
-                    raise SystemExit(f"invalid workflow subscription billing: {profile}.{name}")
+                if provider not in WORKFLOW_ROUTE_PROVIDERS:
+                    raise SystemExit(f"invalid workflow route provider: {profile}.{name}")
+                if not isinstance(model, str) or not model.strip():
+                    raise SystemExit(f"invalid workflow route model: {profile}.{name}")
+                if provider == "pi":
+                    if not model.startswith("openrouter/"):
+                        raise SystemExit(f"invalid Pi workflow route model: {profile}.{name}")
+                elif "/" in model:
+                    raise SystemExit(f"invalid subscription workflow route model: {profile}.{name}")
+                if route.get("billing") != WORKFLOW_ROUTE_BILLING[name]:
+                    raise SystemExit(f"invalid workflow route billing: {profile}.{name}")
                 if route.get("active") is not True or route.get("qualified") is not True:
-                    raise SystemExit(f"inactive or unqualified workflow subscription route: {profile}.{name}")
+                    raise SystemExit(f"inactive or unqualified workflow route: {profile}.{name}")
                 if route.get("fallbacks") != []:
-                    raise SystemExit(f"workflow subscription route cannot declare fallbacks: {profile}.{name}")
+                    raise SystemExit(f"workflow route cannot declare fallbacks: {profile}.{name}")
         normal_routes = workflow_profiles["normal"]
         normal_profile = self.data.get("normal")
         if not isinstance(normal_profile, dict):
-            raise SystemExit("normal profile is required for workflow subscription route binding")
-        for name, references in WORKFLOW_SUBSCRIPTION_CANONICAL_ROUTES.items():
+            raise SystemExit("normal profile is required for workflow route binding")
+        for section in VALID_SECTIONS:
+            for reference, route in (normal_profile.get(section) or {}).items():
+                model = route.get("model") if isinstance(route, dict) else None
+                if isinstance(model, str) and model.startswith("claude-subscription/"):
+                    raise SystemExit(
+                        "Claude adjudication is external-workflow-only: "
+                        f"normal.{section}.{reference} cannot use {model}"
+                    )
+        for name, references in WORKFLOW_ROUTE_CANONICAL_ROUTES.items():
             route = normal_routes[name]
-            expected_model = f"{route['provider']}-subscription/{route['model']}"
+            expected_model = (
+                route["model"]
+                if route["provider"] == "pi"
+                else f"{route['provider']}-subscription/{route['model']}"
+            )
             for section, reference in references:
                 section_routes = normal_profile.get(section)
                 canonical = section_routes.get(reference) if isinstance(section_routes, dict) else None
                 if not isinstance(canonical, dict) or canonical.get("model") != expected_model:
                     raise SystemExit(
-                        "workflow subscription route canonical drift: "
+                        "workflow route canonical drift: "
                         f"normal.{name} must match normal.{section}.{reference} ({expected_model})"
                     )
         exports = self.data.get("export_routes")
@@ -934,14 +980,21 @@ class RuntimeProfiles:
             **copy.deepcopy(route),
         }
 
-    def export_workflow_routes(self, profile: str) -> dict:
-        contract = self.data["workflow_subscription_routes"]
+    def export_workflow_routes(self, profile: str, schema_version: int = 3) -> dict:
+        contract = self.data["workflow_routes"]
         routes = contract["profiles"][profile]
         if not routes:
-            raise SystemExit(f"workflow subscription routes unavailable for profile: {profile}")
+            raise SystemExit(f"workflow routes unavailable for profile: {profile}")
+        if schema_version == 1:
+            routes = {
+                "standard": routes["implementation"],
+                "frontier": routes["architecture"],
+            }
+        elif schema_version != 3:
+            raise SystemExit(f"unsupported workflow route export schema: {schema_version}")
         revision, dirty = repository_identity(self.repo)
         return {
-            "schema_version": contract["schema_version"],
+            "schema_version": schema_version,
             "repository_revision": revision,
             "repository_dirty": dirty,
             "profile": profile,
@@ -1515,6 +1568,7 @@ def parser() -> argparse.ArgumentParser:
     export_route.add_argument("name")
     export_workflow_routes = sub.add_parser("export-workflow-routes")
     export_workflow_routes.add_argument("profile", choices=VALID_PROFILES)
+    export_workflow_routes.add_argument("--schema-version", type=int, choices=(1, 3), default=3)
     return result
 
 
@@ -1525,7 +1579,7 @@ def main() -> int:
         print(json.dumps(profiles.export_route(args.profile, args.name), ensure_ascii=False, sort_keys=True))
         return 0
     if args.command == "export-workflow-routes":
-        print(json.dumps(profiles.export_workflow_routes(args.profile), ensure_ascii=False, sort_keys=True))
+        print(json.dumps(profiles.export_workflow_routes(args.profile, args.schema_version), ensure_ascii=False, sort_keys=True))
         return 0
     with profiles.locked():
         profiles.assert_native_migration_safe()

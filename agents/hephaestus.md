@@ -1,5 +1,5 @@
 ---
-description: Deep implement / critique on GLM 5.3
+description: Deep implementation on Sol subscription
 mode: primary
 model: openrouter/z-ai/glm-5.3
 temperature: 0.2

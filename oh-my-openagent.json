@@ -30,12 +30,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/sisyphus.md",
       "color": "#00F0FF",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "hephaestus": {
       "mode": "primary",
@@ -47,12 +44,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/hephaestus.md",
       "color": "#FF5C00",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-terra",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "prometheus": {
       "mode": "primary",
@@ -60,12 +54,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "atlas": {
       "mode": "primary",
@@ -73,12 +64,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/atlas.md",
       "color": "#39FF14",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "oracle": {
       "mode": "subagent",
@@ -92,12 +80,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/oracle.md",
       "color": "#6C63FF",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-sol",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "librarian": {
       "mode": "subagent",
@@ -113,9 +98,7 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/minimax/minimax-m3"
-      ]
+      "fallback_models": []
     },
     "explore": {
       "mode": "subagent",
@@ -131,9 +114,7 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/minimax/minimax-m3"
-      ]
+      "fallback_models": []
     },
     "multimodal-looker": {
       "mode": "subagent",
@@ -157,12 +138,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/metis.md",
       "color": "#9DFFFF",
       "maxTokens": 16384,
-      "model": "openrouter/google/gemini-3.1-pro-preview",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "medium",
-      "fallback_models": [
-        "codex-subscription/gpt-5.6-sol",
-        "openrouter/moonshotai/kimi-k2.7-code"
-      ]
+      "fallback_models": []
     },
     "momus": {
       "mode": "subagent",
@@ -170,12 +148,9 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/momus.md",
       "color": "#FF8A3D",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-sol-review",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "xhigh",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "sisyphus-junior": {
       "mode": "subagent",
@@ -185,9 +160,7 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/minimax/minimax-m3"
-      ]
+      "fallback_models": []
     },
     "content-aware-research": {
       "mode": "primary",
@@ -253,12 +226,9 @@
       ]
     },
     "codex-router": {
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-6-astra",
       "mode": "primary",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ],
+      "fallback_models": [],
       "temperature": 0.2,
       "reasoning": "low",
       "maxTokens": 32768,
@@ -356,22 +326,16 @@
     "ultrabrain": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-sol",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "xhigh",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "deep": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/deep.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "artistry": {
       "is_unstable_agent": true,
@@ -389,28 +353,21 @@
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/minimax/minimax-m3"
-      ]
+      "fallback_models": []
     },
     "unspecified-low": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/minimax/minimax-m3"
-      ]
+      "fallback_models": []
     },
     "unspecified-high": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "writing": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/writing.md",
@@ -425,34 +382,25 @@
       "description": "Reproduce \u2192 root cause \u2192 minimal fix \u2192 verify. Cite file:line.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "refactor-safe": {
       "description": "Tests-first, behavior-preserving refactors. Small steps only.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/refactor-safe.md",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "low",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "arch-review": {
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/arch-review.md",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-5.6-sol-review",
+      "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "content-aware-fast": {
       "description": "Flash attack-surface recon on Venice DeepSeek V4.1 Flash: endpoints, misconfigs, deps.",
@@ -494,21 +442,15 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     },
     "codex-implement": {
-      "description": "Automatic Codex implementation on GLM 5.3 Flash through OpenRouter.",
+      "description": "Automatic Codex implementation on Sol subscription; no metered API fallback.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/codex-implement.md",
       "maxTokens": 32768,
-      "model": "openrouter/z-ai/glm-5.3-flash",
+      "model": "codex-subscription/gpt-5.6-sol",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/moonshotai/kimi-k2.7-code",
-        "openrouter/deepseek/deepseek-v4-pro-0813"
-      ]
+      "fallback_models": []
     },
     "codex-review": {
       "description": "Automatic Codex review on Astra subscription; no product edits.",
@@ -516,10 +458,7 @@
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
       "reasoning": "high",
-      "fallback_models": [
-        "openrouter/deepseek/deepseek-v4-pro-0813",
-        "openrouter/z-ai/glm-5.3"
-      ]
+      "fallback_models": []
     }
   },
   "background_task": {

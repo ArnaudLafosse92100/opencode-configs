@@ -21,7 +21,7 @@ Usage:
   oc profile env [normal|normal-private|pentest] [--shell]
   oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>
   oc profile export-route <normal|normal-private|pentest> <name>
-  oc profile export-workflow-routes <normal|normal-private|pentest>
+  oc profile export-workflow-routes <normal|normal-private|pentest> [--schema-version 1|3]
   oc profile ensure [--quiet]
   oc profile prepare-native-alias
 EOF
@@ -65,7 +65,7 @@ case "$MODE" in
     ;;
   export-workflow-routes)
     shift
-    [[ $# -eq 1 ]] || usage
+    [[ $# -eq 1 || $# -eq 3 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" export-workflow-routes "$@"
     ;;
   ensure)

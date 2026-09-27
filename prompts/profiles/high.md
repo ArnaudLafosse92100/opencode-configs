@@ -1,6 +1,6 @@
-# Profile: high (GLM 5.3 / sisyphus)
+# Profile: high (Astra / sisyphus)
 
-Default OpenConfig path for app work (`oc new --profile high`). Parallel delegation. GLM 5.3 for tool-call quality.
+Default OpenConfig path for app work (`oc new --profile high`). Astra leads planning and orchestration through the local Codex subscription; delegate implementation to Sol and exploration to Flash.
 
 ## Routing
 

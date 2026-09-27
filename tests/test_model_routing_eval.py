@@ -196,12 +196,10 @@ class ContentAwareFallbackTests(unittest.TestCase):
         )
         self.assertNotIn("LLM_GATEWAY_", active_sources)
 
-    def test_normal_quick_and_unspecified_low_use_flash_then_minimax(self) -> None:
+    def test_normal_quick_and_unspecified_low_use_flash_without_fallback(self) -> None:
         expected = {
             "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-            "fallback_models": [
-                "openrouter/minimax/minimax-m3",
-            ],
+            "fallback_models": [],
         }
         normal = self.profile_data["normal"]["categories"]
         for name in ("quick", "unspecified-low"):
@@ -226,33 +224,62 @@ class ContentAwareFallbackTests(unittest.TestCase):
             )
         self.assertEqual(rendered, current_opencode)
 
-    def test_normal_routes_are_bounded_by_role_and_capability(self) -> None:
+    def test_normal_machine_routes_use_flash_sol_and_astra_without_api_fallbacks(self) -> None:
         normal = self.profile_data["normal"]
-        glm_chain = ["openrouter/moonshotai/kimi-k2.7-code", "openrouter/deepseek/deepseek-v4-pro-0813"]
-        pro_glm = ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"]
-        self.assertEqual(normal["agents"]["explore"]["model"], "openrouter/deepseek/deepseek-v4-flash-0731")
-        self.assertEqual(normal["categories"]["codex-implement"]["model"], "openrouter/z-ai/glm-5.3-flash")
-        for name in ("codex-router", "sisyphus", "prometheus", "atlas"):
-            self.assertEqual(normal["agents"][name]["fallback_models"], glm_chain, name)
-        for name in ("bug-hunt", "refactor-safe", "unspecified-high"):
-            self.assertEqual(normal["categories"][name]["fallback_models"], glm_chain, name)
-        for name in ("oracle", "momus"):
-            self.assertEqual(normal["agents"][name]["fallback_models"], pro_glm, name)
-        for name in ("ultrabrain", "deep", "arch-review"):
-            self.assertEqual(normal["categories"][name]["fallback_models"], pro_glm, name)
-        self.assertEqual(normal["agents"]["hephaestus"]["fallback_models"], pro_glm)
-        self.assertEqual(normal["agents"]["metis"]["fallback_models"], ["codex-subscription/gpt-5.6-sol", "openrouter/moonshotai/kimi-k2.7-code"])
-        for section, names in (("agents", ("librarian", "sisyphus-junior", "explore")), ("categories", ("quick", "unspecified-low"))):
+        flash = "openrouter/deepseek/deepseek-v4-flash-0731"
+        sol = "codex-subscription/gpt-5.6-sol"
+        astra = "codex-subscription/gpt-6-astra"
+        for section, names in (
+            ("agents", ("librarian", "sisyphus-junior", "explore")),
+            ("categories", ("quick", "unspecified-low")),
+        ):
             for name in names:
-                self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/minimax/minimax-m3"], name)
-        for section, names in (("agents", ("multimodal-looker",)), ("categories", ("visual-engineering", "artistry"))):
+                self.assertEqual(normal[section][name], {"model": flash, "fallback_models": []}, name)
+        for section, names in (
+            ("agents", ("hephaestus", "atlas")),
+            ("categories", ("deep", "bug-hunt", "refactor-safe", "codex-implement")),
+        ):
             for name in names:
-                self.assertEqual(normal[section][name]["fallback_models"], ["openrouter/google/gemini-3.7-flash", "openrouter/minimax/minimax-m3"], name)
-        self.assertEqual(normal["categories"]["writing"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-flash-0731"])
-        self.assertEqual(normal["categories"]["agentic-deep-kimi"]["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813", "openrouter/z-ai/glm-5.3"])
-        self.assertEqual(normal["agents"]["content-aware-research"]["fallback_models"], ["venice/deepseek-v4-pro", "venice/deepseek-v4-1-flash"])
-        self.assertEqual(normal["categories"]["content-aware-fast"]["fallback_models"], ["venice/deepseek-v4-pro-0813", "venice/deepseek-v4-pro"])
-        self.assertEqual(normal["categories"]["content-aware-deep"]["fallback_models"], ["venice/deepseek-v4-pro", "venice/deepseek-v4-1-flash"])
+                self.assertEqual(normal[section][name], {"model": sol, "fallback_models": []}, name)
+        for section, names in (
+            ("agents", ("codex-router", "sisyphus", "prometheus", "oracle", "metis", "momus")),
+            ("categories", ("ultrabrain", "unspecified-high", "arch-review", "codex-plan", "codex-review")),
+        ):
+            for name in names:
+                self.assertEqual(normal[section][name], {"model": astra, "fallback_models": []}, name)
+
+    def test_specialized_normal_routes_remain_explicit_exceptions(self) -> None:
+        normal = self.profile_data["normal"]
+        self.assertEqual(normal["agents"]["multimodal-looker"]["model"], "openrouter/google/gemini-3.1-pro-preview")
+        self.assertEqual(normal["categories"]["writing"]["model"], "openrouter/google/gemini-3.8-flash")
+        self.assertEqual(normal["categories"]["agentic-deep-kimi"]["model"], "openrouter/moonshotai/kimi-k2.7-code")
+        self.assertEqual(normal["agents"]["content-aware-research"]["model"], "venice/deepseek-v4-pro-0813")
+        self.assertEqual(normal["categories"]["content-aware-fast"]["model"], "venice/deepseek-v4-1-flash")
+        self.assertEqual(normal["categories"]["content-aware-deep"]["model"], "venice/deepseek-v4-pro-0813")
+
+    def test_direct_normal_subscription_routes_never_fall_back_to_metered_api(self) -> None:
+        normal = self.profile_data["normal"]
+        for section in ("agents", "categories"):
+            for name, route in normal[section].items():
+                with self.subTest(section=section, name=name):
+                    if route["model"].startswith("codex-subscription/"):
+                        self.assertEqual(route["fallback_models"], [])
+                    self.assertFalse(route["model"].startswith("claude-subscription/"))
+
+    def test_project_scaffolds_do_not_restore_the_old_glm_default(self) -> None:
+        expected = {
+            "high": "codex-subscription/gpt-6-astra",
+            "low": "openrouter/deepseek/deepseek-v4-flash-0731",
+            "fast": "codex-subscription/gpt-5.6-sol",
+            "research": "codex-subscription/gpt-6-astra",
+            "debug": "codex-subscription/gpt-5.6-sol",
+            "writing": "openrouter/google/gemini-3.8-flash",
+        }
+        for name, model in expected.items():
+            with self.subTest(profile=name):
+                profile = json.loads((REPO / "profiles" / f"{name}.json").read_text(encoding="utf-8"))
+                self.assertEqual(profile["model"], model)
+                self.assertNotIn("glm-5.3", profile["model"])
 
     def test_every_normal_openrouter_family_is_price_first_capped_without_allowlists(self) -> None:
         models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
@@ -581,21 +608,29 @@ class ExportRouteTests(unittest.TestCase):
             self.assertTrue(dirty)
 
 
-class WorkflowSubscriptionRouteTests(unittest.TestCase):
+class WorkflowRouteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
 
-    def test_normal_contract_has_exact_qualified_subscription_routes(self) -> None:
-        contract = self.profile_data["workflow_subscription_routes"]
-        self.assertEqual(contract["schema_version"], 1)
+    def test_normal_contract_has_exact_qualified_capability_routes(self) -> None:
+        contract = self.profile_data["workflow_routes"]
+        self.assertEqual(contract["schema_version"], 3)
         self.assertEqual(set(contract["profiles"]), {"normal", "normal-private", "pentest"})
         self.assertEqual(contract["profiles"]["normal-private"], {})
         self.assertEqual(contract["profiles"]["pentest"], {})
         self.assertEqual(
             contract["profiles"]["normal"],
             {
-                "standard": {
+                "exploration": {
+                    "provider": "pi",
+                    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+                    "billing": "metered",
+                    "active": True,
+                    "qualified": True,
+                    "fallbacks": [],
+                },
+                "implementation": {
                     "provider": "codex",
                     "model": "gpt-5.6-sol",
                     "billing": "subscription",
@@ -603,9 +638,17 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
                     "qualified": True,
                     "fallbacks": [],
                 },
-                "frontier": {
+                "architecture": {
                     "provider": "codex",
                     "model": "gpt-6-astra",
+                    "billing": "subscription",
+                    "active": True,
+                    "qualified": True,
+                    "fallbacks": [],
+                },
+                "adjudication": {
+                    "provider": "claude",
+                    "model": "claude-opus-5-5",
                     "billing": "subscription",
                     "active": True,
                     "qualified": True,
@@ -640,11 +683,14 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
                 text=True,
             ).stdout.strip()
         )
-        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["schema_version"], 3)
         self.assertEqual(payload["repository_revision"], revision)
         self.assertEqual(payload["repository_dirty"], dirty)
         self.assertEqual(payload["profile"], "normal")
-        self.assertEqual(set(payload["routes"]), {"standard", "frontier"})
+        self.assertEqual(
+            set(payload["routes"]),
+            {"exploration", "implementation", "architecture", "adjudication"},
+        )
         self.assertEqual(
             result.stdout.strip(),
             json.dumps(payload, ensure_ascii=False, sort_keys=True),
@@ -654,7 +700,7 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
         profiles = runtime_profile.RuntimeProfiles(REPO)
         for profile in ("normal-private", "pentest"):
             with self.subTest(profile=profile), self.assertRaisesRegex(
-                SystemExit, f"workflow subscription routes unavailable for profile: {profile}"
+                SystemExit, f"workflow routes unavailable for profile: {profile}"
             ):
                 profiles.export_workflow_routes(profile)
 
@@ -670,31 +716,35 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
                             encoding="utf-8"
                         )
                     )
-                    self.assertNotIn("workflow_subscription_routes", rendered)
+                    self.assertNotIn("workflow_routes", rendered)
 
-    def test_workflow_route_validation_is_native_subscription_only(self) -> None:
+    def test_workflow_route_validation_is_billing_and_provider_strict(self) -> None:
         mutations = []
 
         missing_route = json.loads(json.dumps(self.profile_data))
-        del missing_route["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]
-        mutations.append((missing_route, "must declare exactly frontier, standard"))
+        del missing_route["workflow_routes"]["profiles"]["normal"]["architecture"]
+        mutations.append((missing_route, "must declare exactly adjudication, architecture, exploration, implementation"))
 
         api_provider = json.loads(json.dumps(self.profile_data))
-        api_provider["workflow_subscription_routes"]["profiles"]["normal"]["standard"]["provider"] = "openrouter"
-        mutations.append((api_provider, "invalid workflow subscription provider"))
+        api_provider["workflow_routes"]["profiles"]["normal"]["implementation"]["provider"] = "openrouter"
+        mutations.append((api_provider, "invalid workflow route provider"))
 
-        pi_provider = json.loads(json.dumps(self.profile_data))
-        pi_provider["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]["provider"] = "pi"
-        mutations.append((pi_provider, "invalid workflow subscription provider"))
+        pi_model = json.loads(json.dumps(self.profile_data))
+        pi_model["workflow_routes"]["profiles"]["normal"]["exploration"]["model"] = "deepseek-v4-flash-0731"
+        mutations.append((pi_model, "invalid Pi workflow route model"))
+
+        wrong_billing = json.loads(json.dumps(self.profile_data))
+        wrong_billing["workflow_routes"]["profiles"]["normal"]["exploration"]["billing"] = "subscription"
+        mutations.append((wrong_billing, "invalid workflow route billing"))
 
         api_fallback = json.loads(json.dumps(self.profile_data))
-        api_fallback["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]["fallbacks"] = [
+        api_fallback["workflow_routes"]["profiles"]["normal"]["architecture"]["fallbacks"] = [
             "openrouter/z-ai/glm-5.3"
         ]
         mutations.append((api_fallback, "cannot declare fallbacks"))
 
         unqualified = json.loads(json.dumps(self.profile_data))
-        unqualified["workflow_subscription_routes"]["profiles"]["normal"]["standard"]["qualified"] = False
+        unqualified["workflow_routes"]["profiles"]["normal"]["implementation"]["qualified"] = False
         mutations.append((unqualified, "inactive or unqualified"))
 
         for data, message in mutations:
@@ -707,31 +757,31 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
     def test_workflow_routes_reject_sol_and_astra_canonical_drift(self) -> None:
         mutations = []
 
-        standard_contract = json.loads(json.dumps(self.profile_data))
-        standard_contract["workflow_subscription_routes"]["profiles"]["normal"]["standard"][
+        implementation_contract = json.loads(json.dumps(self.profile_data))
+        implementation_contract["workflow_routes"]["profiles"]["normal"]["implementation"][
             "model"
         ] = "gpt-5.6-terra"
         mutations.append(
-            (standard_contract, "normal.standard must match normal.agents.oracle")
+            (implementation_contract, "normal.implementation must match normal.agents.hephaestus")
         )
 
-        frontier_contract = json.loads(json.dumps(self.profile_data))
-        frontier_contract["workflow_subscription_routes"]["profiles"]["normal"]["frontier"][
+        architecture_contract = json.loads(json.dumps(self.profile_data))
+        architecture_contract["workflow_routes"]["profiles"]["normal"]["architecture"][
             "model"
         ] = "gpt-5.6-sol"
         mutations.append(
-            (frontier_contract, "normal.frontier must match normal.categories.codex-plan")
+            (architecture_contract, "normal.architecture must match normal.agents.codex-router")
         )
 
-        standard = json.loads(json.dumps(self.profile_data))
-        standard["normal"]["categories"]["deep"]["model"] = "codex-subscription/gpt-5.6-terra"
-        mutations.append((standard, "normal.standard must match normal.categories.deep"))
+        implementation = json.loads(json.dumps(self.profile_data))
+        implementation["normal"]["categories"]["deep"]["model"] = "codex-subscription/gpt-5.6-terra"
+        mutations.append((implementation, "normal.implementation must match normal.categories.deep"))
 
-        frontier = json.loads(json.dumps(self.profile_data))
-        frontier["normal"]["categories"]["codex-review"]["model"] = (
+        architecture = json.loads(json.dumps(self.profile_data))
+        architecture["normal"]["categories"]["codex-review"]["model"] = (
             "codex-subscription/gpt-5.6-sol-review"
         )
-        mutations.append((frontier, "normal.frontier must match normal.categories.codex-review"))
+        mutations.append((architecture, "normal.architecture must match normal.categories.codex-review"))
 
         for data, message in mutations:
             with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
@@ -740,27 +790,29 @@ class WorkflowSubscriptionRouteTests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, message):
                     runtime_profile.RuntimeProfiles(repo)
 
-    def test_future_claude_switch_requires_all_canonical_routes_to_move_together(self) -> None:
+    def test_claude_adjudication_stays_external_workflow_only(self) -> None:
         data = json.loads(json.dumps(self.profile_data))
-        frontier = data["workflow_subscription_routes"]["profiles"]["normal"]["frontier"]
-        frontier["provider"] = "claude"
-        frontier["model"] = "qualified-model-id"
+        data["normal"]["agents"]["momus"]["model"] = "claude-subscription/claude-opus-5-5"
         with tempfile.TemporaryDirectory() as directory:
             repo = pathlib.Path(directory)
             (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(
-                SystemExit, "normal.frontier must match normal.categories.codex-plan"
+                SystemExit, "Claude adjudication is external-workflow-only"
             ):
                 runtime_profile.RuntimeProfiles(repo)
 
-        for category in ("codex-plan", "codex-review"):
-            data["normal"]["categories"][category]["model"] = (
-                "claude-subscription/qualified-model-id"
-            )
-        with tempfile.TemporaryDirectory() as directory:
-            repo = pathlib.Path(directory)
-            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
-            runtime_profile.RuntimeProfiles(repo)
+    def test_legacy_v1_export_is_an_explicit_rollback_view(self) -> None:
+        result = subprocess.run(
+            [str(REPO / "oc"), "profile", "export-workflow-routes", "normal", "--schema-version", "1"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(set(payload["routes"]), {"standard", "frontier"})
+        self.assertEqual(payload["routes"]["standard"]["model"], "gpt-5.6-sol")
+        self.assertEqual(payload["routes"]["frontier"]["model"], "gpt-6-astra")
 
 
 class NativeOmoMigrationTests(unittest.TestCase):

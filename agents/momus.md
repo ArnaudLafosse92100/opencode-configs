@@ -1,5 +1,5 @@
 ---
-description: Plan / review gate on GLM 5.3 max
+description: Plan / review gate on Astra subscription
 mode: subagent
 model: openrouter/z-ai/glm-5.3
 temperature: 0.2

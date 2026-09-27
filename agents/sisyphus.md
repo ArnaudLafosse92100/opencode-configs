@@ -1,5 +1,5 @@
 ---
-description: Default orchestrator / lead on OpenRouter GLM 5.3
+description: Default orchestrator / lead on Astra subscription
 mode: primary
 model: openrouter/z-ai/glm-5.3
 temperature: 0.25
