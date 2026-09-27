@@ -650,16 +650,16 @@ class RuntimeProfiles:
             raise SystemExit("factory-archon aliases must declare the canonical workflow aliases")
         alias_capabilities = set()
         for alias, binding in aliases.items():
-            if not isinstance(binding, dict) or set(binding) != {"capability", "effort"}:
+            if not isinstance(binding, dict) or set(binding) != {"capability", "default_effort"}:
                 raise SystemExit(f"invalid factory-archon alias binding: {alias}")
             capability_name = binding.get("capability")
             if capability_name not in WORKFLOW_ROUTE_NAMES or capability_name in alias_capabilities:
                 raise SystemExit(f"invalid factory-archon alias capability: {alias}")
             alias_capabilities.add(capability_name)
-            if binding["effort"] not in EFFORTS:
-                raise SystemExit(f"invalid factory-archon alias effort: {alias}")
-            if [binding["effort"]] != WORKFLOW_ROUTE_EFFORTS[capability_name]:
-                raise SystemExit(f"factory-archon alias effort mismatch: {alias}")
+            if binding["default_effort"] not in EFFORTS:
+                raise SystemExit(f"invalid factory-archon alias default effort: {alias}")
+            if [binding["default_effort"]] != WORKFLOW_ROUTE_EFFORTS[capability_name]:
+                raise SystemExit(f"factory-archon alias default effort mismatch: {alias}")
         if alias_capabilities != WORKFLOW_ROUTE_NAMES:
             raise SystemExit("factory-archon aliases must cover every workflow capability")
         for profile in VALID_PROFILES:

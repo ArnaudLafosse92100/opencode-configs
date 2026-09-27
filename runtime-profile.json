@@ -802,23 +802,23 @@
       "aliases": {
         "@explorer": {
           "capability": "exploration",
-          "effort": "low"
+          "default_effort": "low"
         },
         "@implementer": {
           "capability": "implementation",
-          "effort": "medium"
+          "default_effort": "medium"
         },
         "@architect": {
           "capability": "architecture",
-          "effort": "high"
+          "default_effort": "high"
         },
         "@reviewer": {
           "capability": "review",
-          "effort": "high"
+          "default_effort": "high"
         },
         "@adjudicator": {
           "capability": "adjudication",
-          "effort": "high"
+          "default_effort": "high"
         }
       }
     }

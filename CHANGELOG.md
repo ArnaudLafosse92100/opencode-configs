@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `oc profile export-policy-manifest normal` as the canonical cross-surface policy contract, sealing OpenCode agent/category capability bindings and Factory/Archon aliases under a separate manifest snapshot while preserving the workflow-routes v4 contract unchanged.
+- Add `oc profile export-policy-manifest normal` as the canonical cross-surface policy contract, sealing OpenCode agent/category capability bindings and Factory/Archon aliases with explicit default efforts under a separate manifest snapshot while preserving the workflow-routes v4 contract unchanged.
 - Add a revision-bound `oc profile export-workflow-routes` contract for the qualified normal-profile standard and frontier subscription lanes, with native-provider validation and no API fallbacks.
 - Retire the removed `proxy.unbeatn.ai` subscription gateway and route Astra, Sol, and Terra through the healthy local OpenCodex subscription endpoint; remove obsolete gateway secrets and add local catalog health checks.
 - Restore centralized secret redaction for provider diagnostics and maintenance logs, with a smoke regression test.

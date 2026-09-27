@@ -137,10 +137,10 @@ def workflow_routing(repo: Path) -> str:
         "the declarative OpenCode agent/category bindings and these Factory/Archon",
         "aliases under a separate `manifest_snapshot_id`:",
         "",
-        "| Factory/Archon alias | Capability | Effort |",
+        "| Factory/Archon alias | Capability | Default effort |",
         "| --- | --- | --- |",
         *(
-            f"| `{alias}` | `{binding['capability']}` | `{binding['effort']}` |"
+            f"| `{alias}` | `{binding['capability']}` | `{binding['default_effort']}` |"
             for alias, binding in aliases.items()
         ),
         "",

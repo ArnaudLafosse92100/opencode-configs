@@ -338,7 +338,7 @@ cross-surface contract without changing the schema-v4 route export. It seals
 the declarative OpenCode agent/category bindings and these Factory/Archon
 aliases under a separate `manifest_snapshot_id`:
 
-| Factory/Archon alias | Capability | Effort |
+| Factory/Archon alias | Capability | Default effort |
 | --- | --- | --- |
 | `@explorer` | `exploration` | `low` |
 | `@implementer` | `implementation` | `medium` |

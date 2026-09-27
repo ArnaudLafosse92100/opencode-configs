@@ -685,6 +685,8 @@ class WorkflowRouteTests(unittest.TestCase):
             {"capability": "architecture", "effort": "xhigh"},
         )
         aliases = payload["surfaces"]["factory-archon"]["aliases"]
+        for binding in aliases.values():
+            self.assertEqual(set(binding), {"capability", "default_effort"})
         self.assertEqual(
             {alias: binding["capability"] for alias, binding in aliases.items()},
             {
@@ -725,8 +727,8 @@ class WorkflowRouteTests(unittest.TestCase):
         before_v4 = baseline.export_workflow_routes("normal")
         with tempfile.TemporaryDirectory() as directory:
             data = json.loads(json.dumps(self.profile_data))
-            data["surface_bindings"]["factory-archon"]["aliases"]["@reviewer"]["effort"] = "xhigh"
-            with self.assertRaisesRegex(SystemExit, "alias effort mismatch"):
+            data["surface_bindings"]["factory-archon"]["aliases"]["@reviewer"]["default_effort"] = "xhigh"
+            with self.assertRaisesRegex(SystemExit, "alias default effort mismatch"):
                 runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
         with tempfile.TemporaryDirectory() as directory:
             data = json.loads(json.dumps(self.profile_data))
@@ -755,7 +757,7 @@ class WorkflowRouteTests(unittest.TestCase):
         mutations.append((missing, "canonical workflow aliases"))
         extra = json.loads(json.dumps(self.profile_data))
         extra["surface_bindings"]["factory-archon"]["aliases"]["@planner"] = {
-            "capability": "architecture", "effort": "high",
+            "capability": "architecture", "default_effort": "high",
         }
         mutations.append((extra, "canonical workflow aliases"))
         mismatch = json.loads(json.dumps(self.profile_data))
