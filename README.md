@@ -6,66 +6,44 @@
     ╰───╯     Pinned stack for OpenCode · OpenRouter · OmO
 ```
 
-> **Pinned, hardened config-as-code stack for [OpenCode](https://opencode.ai) + [OpenRouter](https://openrouter.ai) + [oh-my-openagent (OmO)](https://omo.vibetip.help/docs).** OpenRouter general gateway, Venice content-aware lane, 12 curated OpenRouter models + 3 Venice DeepSeek slugs, deployment guards, cost-aware fallbacks — one install, zero drift.
+Pinned global config for [OpenCode](https://opencode.ai) + [OpenRouter](https://openrouter.ai) + [oh-my-openagent (OmO)](https://omo.vibetip.help/docs).
 
-**v1.5.80** · CLI **`oc`** · identity `jesseoue/opencode-configs`
-
-**Keywords:** OpenCode config · OpenRouter gateway · Venice · oh-my-openagent · AI agent config · LLM model routing · multi-agent coding · DeepSeek · Gemini · GLM · Qwen · Kimi · circuit breaker · cost-aware fallback · deployment protection · content-aware research
+**v1.5.80** · CLI **`oc`** · identity `openconfig/opencode-configs`
 
 ```bash
-# Clone
-git clone https://github.com/jesseoue/opencode-configs
+git clone --branch main https://github.com/ArnaudLafosse92100/opencode-configs.git
 cd opencode-configs
-./install.sh --yes          # or: oc install --quick
+oc install --quick          # or: ./install.sh --yes
 
 # Fresh machine
-curl -fsSL https://github.com/jesseoue/opencode-configs/raw/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ArnaudLafosse92100/opencode-configs/main/install.sh | bash
 source ~/.zshrc && oc doctor && oc launch
 ```
 
 | | |
 | --- | --- |
 | **Pins** | OpenConfig `1.5.80` · OpenCode `1.18.30+` · OmO `oh-my-openagent@4.19.4` · `@opencode-ai/plugin` `1.18.30` |
-| **Default lead** | `sisyphus` (GLM 5.3) |
-| **Config path** | `/Users/Shared/opencode-configs` (git, config-only) · `~/.config/opencode` → this repo · `~/.omo` → `/Users/Shared/opencode-runtime` |
+| **Default lead** | `sisyphus` (runtime-profile routed; normal Astra subscription, pentest DeepSeek) |
+| **Codex model-picker entry** | `codex-router` (runtime-profile routed, task-only workspace access) |
+| **Public config path** | `~/.config/opencode` → `~/.local/state/openconfig/compat/current` (generated compatibility view) |
 | **Projects home** | `oc new` → `~/Projects/<name>` |
-| **Health** | `oc doctor` · `oc versions` · `oc test` · `oc models --probe` |
+| **Health** | `oc doctor` · `oc versions` · `oc test` |
+
+Canonical distribution: `ArnaudLafosse92100/opencode-configs@main`.
+
+Upstream comparison reference: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, codex-subscription and retry-policy extensions.
 
 > Plugin name must stay **`oh-my-openagent@…`** (not legacy `oh-my-opencode`).  
 > Schema URL basename stays `omo.schema.json` (legacy `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` 404 — `oc validate` rejects both).
 
 Decision log: [`AGENTS.md`](./AGENTS.md) · Stance: [`prompts/core.md`](./prompts/core.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
-**Forking:** update `signature.json` → `github_b64` to your repo URL, then `oc fix && oc signature --refresh`.
-
----
-
-## Features
-
-| Capability | What you get |
-| --- | --- |
-| **OpenRouter general gateway** | GLM, DeepSeek, Gemini, MiniMax, Qwen, Kimi via one `OPENROUTER_API_KEY` — no direct OpenAI/Anthropic/Google keys |
-| **12 curated OpenRouter models** | DeepSeek V4 Pro 0813 / V4.1 Flash · GLM 5.3 / GLM 5.3 Flash · Gemini 3.1 Pro / 3.8 Flash · Qwen 3.8 Max-0902 · Kimi K2.7 Code · MiniMax M3 · Hermes 4 405B (`context-aware-hermes`) · Laguna S 2.1 · LongCat 2.0 |
-| **Venice content-aware lane** | `content-aware-research` / `-deep` on `venice/deepseek-v4-pro-0813`; flash agent `content-aware-fast` on `venice/deepseek-v4-1-flash`; fallbacks `-pro` / `-pro-0813`. Edit denied on research. Never `openrouter/…` here |
-| **Context-aware Hermes** | `context-aware-hermes` on `openrouter/nousresearch/hermes-4-405b` (tool-less, edit denied). Fallbacks GLM 5.3 · Laguna · Qwen. Consult only — not a team member |
-| **Optional Sisyphus leads** | Native DeepSeek (`sisyphus-deepseek` / `-junior`) via `DEEPSEEK_API_KEY`; Venice DeepSeek (`sisyphus-venice-deepseek` / `-flash-junior`) via `VENICE_API_KEY`. Default lead stays GLM `sisyphus` |
-| **Per-agent fallbacks** | `fallback_models` on every OmO agent/category. OmO `runtime_fallback` retry block is present (`max_fallback_attempts` 3) but **`enabled: false`** — 4.19.4 has no `cost_aware_routing` |
-| **Circuit breaker** | Consecutive-failure trip, half-open retries, cooldown, notify-on-trip — protects against provider outages |
-| **Deployment guards** | `oc deploy check` gates on credits, model health, rate limits, git cleanliness, and signature before you ship |
-| **Quarantine mode** | `oc deploy quarantine` auto-swaps to cheaper models when credits run low; one command to restore |
-| **Multi-agent teams** | Sisyphus / Hephaestus / Prometheus / Atlas / content-aware-research + 7 team specs (tmux panes) |
-| **T3 Code pin** | [`t3-opencode.json`](./t3-opencode.json) — OpenCode serve `127.0.0.1:4097`, same curated slugs, no keys |
-| **Config-as-code hygiene** | Deny-all `.gitignore`, signature fingerprinting, `oc validate`, `oc fix` self-repair, smoke via `oc test`, hermetic GitHub Actions (`.github/workflows/check.yml`) |
-| **Privacy by default** | Telemetry off everywhere, `.env` never committed, allowlist-only env sync, no host paths in source |
-
 ---
 
 ## Install
 
 ```bash
-export OPENROUTER_API_KEY=…     # required — GLM / OpenRouter DeepSeek / Gemini / Qwen / Kimi
-export VENICE_API_KEY=…         # content-aware + optional Venice Sisyphus (venice/deepseek-v4-*)
-export DEEPSEEK_API_KEY=…       # optional — native sisyphus-deepseek / junior (not OpenRouter)
+export OPENROUTER_API_KEY=…     # required
 export EXA_API_KEY=…            # OmO websearch
 export CONTEXT7_API_KEY=…       # library docs
 
@@ -93,21 +71,16 @@ oc heal                # probe-first self-repair
 oc launch [dir]        # TUI (never starts in the config repo)
 oc new myapp           # scaffold under ~/Projects
 oc run "…"             # headless to completion
-oc admin health        # live OpenRouter model probes + rate limits
-oc models --probe       # fast parallel live test (latency + moderation flags)
-oc models --moderation  # provider moderation/data-policy catalog (no chat calls)
-oc models --providers   # OpenRouter endpoint health for routed models
+oc admin health        # live OpenRouter + codex-subscription probes
+oc models --providers  # OpenRouter provider health for routed models
 oc versions            # pins vs npm + GitHub (+ other opencode.json)
 oc versions --fix       # align ~/.opencode @opencode-ai/plugin to CLI
 oc plugin doctor       # OmO pin-cache doctor (also: oc plugin --fix)
 oc locate              # repo / CLI / keys
 oc signature           # identity fingerprint
-oc test                # smoke + idempotency + runtime diagnostics
+oc test                # smoke + idempotency
 oc doctor              # full readiness
 oc doctor --quick --json   # machine summary (heal/check tooling)
-oc deploy check        # pre-deployment gate (credits, models, rate limits, git, signature)
-oc deploy quarantine   # cost-saving mode (swap to cheaper models)
-oc deploy status       # lock state + credit balance + alert log
 ```
 
 Prefer `oc <cmd>` over raw `./foo.sh`. Full help: `oc help`.
@@ -130,11 +103,11 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 | Package | Source of truth | Current |
 | --- | --- | --- |
 | OpenConfig | `versions.json` → `opencode_configs` | `1.5.80` |
-| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.30+` |
+| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.17+` |
 | OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.4` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
 
-`oc versions` also lists other `opencode.json` files under your projects home (`projects.json` → `projects_dir`, override with `OC_PROJECTS_DIR`). Those are project overlays — OmO stays pinned globally here.
+`oc versions` also lists other `opencode.json` files under `~/Projects` and `/Users/Shared`. Those are project overlays — OmO stays pinned globally here.
 
 ---
 
@@ -155,12 +128,12 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 | --- | --- |
 | Context7 MCP | Enabled (`CONTEXT7_API_KEY`) |
 | Exa websearch | Enabled (`EXA_API_KEY`) |
-| codegraph | OmO-managed 1.4.1 daemon · auto-index off · telemetry off · `~/.omo/codegraph` |
+| codegraph | Enabled · telemetry off · `~/.omo/codegraph` |
 | LSP | TypeScript · Python · Go only |
 | Formatters | Prettier + Ruff |
 | Skills | `content-aware-recon` · `content-aware-audit` under `skills/` (fenced) |
 | OmO `security-*` skills | Disabled (hang headless `oc run`) — use local content-aware skills |
-| Extra MCPs | Disabled (PostHog, Sentry, Playwright, Slack, Stripe, Supabase, Clerk, Vercel, Axiom, AgentMemory) |
+| Extra MCPs | Disabled (PostHog, Sentry, Playwright MCP, …) |
 | Telemetry | Off (OpenCode share/OTel · OmO PostHog · codegraph · `DO_NOT_TRACK`) |
 
 Disabled on purpose (noisy / footguns): `interactive_bash`, monitor tools, `session_list` / `session_search`.
@@ -173,52 +146,53 @@ Encoded in `prompts/core.md`, `sisyphus`, and `librarian`.
 
 ### Primary
 
-| Agent | Model | Role |
+| Agent | Routing authority | Role |
 | --- | --- | --- |
-| **sisyphus** | GLM 5.3 | Default orchestrator / lead |
-| **sisyphus-deepseek** | Native DeepSeek V4 Pro | Optional lead (`DEEPSEEK_API_KEY`) |
-| **sisyphus-venice-deepseek** | Venice DeepSeek V4 Pro 0813 | Optional lead (`VENICE_API_KEY`) |
-| **hephaestus** | GLM 5.3 | Implementation |
-| **prometheus** | GLM 5.3 | Planner |
-| **atlas** | GLM 5.3 | Plan executor after `/start-work` |
-| **content-aware-research** | Venice DeepSeek V4 Pro 0813 | Full-depth research (edit denied) |
-| **content-aware-fast** | Venice DeepSeek V4.1 Flash | Flash recon (edit denied); same-name category for teams |
-| **context-aware-hermes** | Hermes 4 405B | Uncensored context analysis (edit denied, no tools) |
+| **codex-router** | Runtime-profile routed | Strict Codex bridge entry; delegates workspace actions to OmO categories |
+| **sisyphus** | Runtime-profile routed | Default orchestrator / lead |
+| **hephaestus** | Runtime-profile routed | Implementation |
+| **prometheus** | Runtime-profile routed | Planner |
+| **atlas** | Runtime-profile routed | Plan executor after `/start-work` |
+| **content-aware-research** | Runtime-profile routed (normal Hermes, pentest Flash 0731) | Full-depth research (edit denied) |
 
 ### Subagents (`task` / `call_omo_agent` — not team members)
 
 | Agent | Model | Role |
 | --- | --- | --- |
-| oracle | GLM 5.3 | Critique / adjudication |
-| librarian | DeepSeek V4 Pro 0813 | Docs / OSS (Context7-first, unmoderated) |
-| explore | DeepSeek V4 Pro 0813 | Codebase + web recon (edit denied, unmoderated) |
-| multimodal-looker | Gemini 3.1 Pro | Vision (`look_at`, unmoderated) |
-| metis | GLM 5.3 | Pre-planning critic (unmoderated) |
-| momus | GLM 5.3 max | Plan / review gate |
-| sisyphus-junior | GLM 5.3 Flash | Cheap delegated work (team-eligible) |
-| sisyphus-deepseek-junior | Native DeepSeek Flash | Lane-only child of `sisyphus-deepseek` |
-| sisyphus-venice-deepseek-flash-junior | Venice DeepSeek V4.1 Flash | Lane-only child of `sisyphus-venice-deepseek` |
+| oracle | `runtime-profile.json` | Critique / adjudication |
+| librarian | `runtime-profile.json` | Docs (Context7-first) |
+| explore | `runtime-profile.json` | Codebase map |
+| multimodal-looker | `runtime-profile.json` | Vision (`look_at`) in normal mode |
+| metis | `runtime-profile.json` | Pre-planning critic |
+| momus | `runtime-profile.json` | Plan / review gate |
+| sisyphus-junior | `runtime-profile.json` | Cheap delegated work |
 
 Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff — do **not** put it in `disabled_agents`.
+
+`codex-router` is selected only by `/Volumes/PERSO/OpenCode-Codex-Bridge`.
+Its final permission rules are `* = deny`, then `task = allow`, so it cannot
+silently inspect or modify a workspace on the Astra parent. The OmO category
+still owns the child model, skills/category prompt, and fallbacks. Normal
+OpenCode TUI sessions continue to use `sisyphus`.
 
 ---
 
 ## Categories
 
-| Category | Model | Use |
+| Category | Routing authority | Use |
 | --- | --- | --- |
-| `bug-hunt` | GLM 5.3 | Reproduce → root cause → fix |
-| `refactor-safe` | GLM 5.3 | Behavior-preserving refactors |
-| `arch-review` | GLM 5.3 | Coupling / blast radius (unmoderated) |
-| `content-aware-fast` | Venice DeepSeek V4.1 Flash | Flash attack-surface recon |
-| `content-aware-deep` | Venice DeepSeek V4 Pro 0813 | Deep vuln research |
-| `writing` | Gemini 3.8 Flash | Docs / prose |
-| `visual-engineering` | Gemini 3.1 Pro | Ship UI |
-| `artistry` | Gemini 3.1 Pro | Design direction |
-| `quick` | GLM 5.3 Flash | Cheap fast tasks |
-| `deep` | DeepSeek V4 Pro 0813 | Autonomous problem-solving (unmoderated) |
-| `ultrabrain` | GLM 5.3 | Heavy / max reasoning |
-| `unspecified-low` / `unspecified-high` | GLM 5.3 Flash / GLM 5.3 | Hyperplan critics |
+| `bug-hunt` | Runtime-profile routed | Reproduce → root cause → fix |
+| `refactor-safe` | Runtime-profile routed | Behavior-preserving refactors |
+| `arch-review` | Runtime-profile routed | Coupling / blast radius |
+| `content-aware-fast` | `runtime-profile.json` | Attack-surface recon |
+| `content-aware-deep` | `runtime-profile.json` | Deep vuln research |
+| `agentic-deep-kimi` | Runtime-profile routed | Explicit long-horizon escalation after evaluation |
+| `writing` | Runtime-profile routed | Docs / prose |
+| `visual-engineering` | Runtime-profile routed | Ship UI |
+| `artistry` | Runtime-profile routed | Design direction |
+| `quick` | `runtime-profile.json` | Cheap fast tasks |
+| `deep` / `ultrabrain` | `runtime-profile.json` | Heavy / max reasoning |
+| `unspecified-low` / `unspecified-high` | Runtime-profile routed | Hyperplan critics |
 
 ---
 
@@ -226,11 +200,11 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 
 | Say | Effect |
 | --- | --- |
-| `ultrawork` / `ulw` | GLM 5.3 max ceiling |
+| `ultrawork` / `ulw` | Astra-led orchestration inside Sisyphus |
 | `team` | Team-mode expansion |
 | `hyperplan` / `hpp` / `/hyperplan` | Adversarial planning (from **sisyphus**) |
 | `/goal` | **Disabled** — OmO 4.19 goal hook breaks `/start-work`. Use `/start-work` → Atlas (`prompts/goal.md`) |
-| `/start-work [plan] [--worktree <path>] [--make-pr\|--ship]` | Atlas executes an approved plan and preserves the requested delivery mode |
+| `/start-work` | Atlas executes an approved Prometheus plan |
 
 ---
 
@@ -238,8 +212,8 @@ Native OpenCode `build` is disabled. `plan` stays demoted for hyperplan handoff 
 
 Lead: **sisyphus**. Specs in `teams/` are **symlinked** to `~/.omo/teams/` by `oc setup` (targets the live `~/.config/opencode` tree, not a secondary checkout).
 
-Direct members use `kind: subagent_type`: `sisyphus`, `atlas`, `sisyphus-junior`, or `hephaestus` (`teammate: allow`). Categories use `kind: category` and require a prompt.
-Hard-rejected as direct teammates: explore · librarian · oracle · metis · momus · multimodal-looker · prometheus.
+Eligible: `sisyphus`, `atlas`, `sisyphus-junior`, `hephaestus` (`teammate: allow`), or `kind: category`.  
+Hard-rejected as teammates: explore · librarian · oracle · metis · momus · multimodal-looker · prometheus.
 
 Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · tmux `main-vertical` / `inline`.
 
@@ -248,7 +222,7 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `explorers` | scout-code (`content-aware-fast`) + scout-docs (`quick`) |
 | `ship-feature` | forge (hephaestus) + junior + verifier (`bug-hunt`) |
 | `debug-team` | reproducer (`bug-hunt`) + root-cause (`content-aware-deep`) |
-| `review-panel` | arch (`arch-review`) + bugs (`bug-hunt`) + cleanup (`refactor-safe`) |
+| `review-panel` | arch (`content-aware-deep`) + bugs (`bug-hunt`) + cleanup (`refactor-safe`) |
 | `refactor-team` | analyzer (`arch-review`) + executor (`refactor-safe`) |
 | `docs-team` | api-docs + guide (`writing`) |
 | `content-aware-audit` | recon (`content-aware-fast`) + deep (`content-aware-deep`) |
@@ -259,8 +233,8 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 
 | Agent | Role | Provider / model | Key |
 | --- | --- | --- | --- |
-| `sisyphus` | **Default lead** | OpenRouter `z-ai/glm-5.3` | `OPENROUTER_API_KEY` |
-| `sisyphus-junior` | Team-eligible fast child | OpenRouter `z-ai/glm-5.3-flash` | `OPENROUTER_API_KEY` |
+| `sisyphus` | **Default lead** | Local subscription `gpt-6-astra` | OpenCodex |
+| `sisyphus-junior` | Team-eligible fast child | OpenRouter `deepseek-v4-flash-0731` | `OPENROUTER_API_KEY` |
 | `sisyphus-deepseek` | Optional lead | Native `deepseek/deepseek-v4-pro` | `DEEPSEEK_API_KEY` |
 | `sisyphus-deepseek-junior` | Lane-only fast child | Native `deepseek/deepseek-flash` | `DEEPSEEK_API_KEY` |
 | `sisyphus-venice-deepseek` | Optional lead | Venice `deepseek-v4-pro-0813` | `VENICE_API_KEY` |
@@ -268,27 +242,138 @@ Knobs: `max_parallel_members=4` · `max_members=5` · mailbox poll `1000ms` · t
 | `content-aware-research` / `-fast` / `-deep` | Edit-denied research | Venice DeepSeek only | `VENICE_API_KEY` |
 | `context-aware-hermes` | Edit-denied context analysis | OpenRouter Hermes 4 405B | `OPENROUTER_API_KEY` |
 
-Hephaestus, Prometheus, Atlas, and the consult subagents stay on OpenRouter. Invoke optional Sisyphus leads explicitly — they do not replace GLM `sisyphus`.
+Hephaestus and Atlas use local Codex Sol for implementation. Sisyphus, Prometheus, Oracle, Metis, Momus, and architecture/review categories use local Codex Astra. Explore/Librarian/quick work uses DeepSeek Flash. For material interactive implementation, `codex-router` runs the named Sisyphus chain Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle. The logical Prometheus stage uses OmO's callable demoted `plan` adapter; directly targeting the built-in `prometheus` coordinator is rejected by pinned OmO. Factory/Archon remains an explicit optional lifecycle. Specialized visual, writing, content-aware, Kimi, and Hermes routes remain explicit capability exceptions. Interactive Sol and Astra routes may recover only through the other qualified Codex subscription route; they never cross silently into a metered API.
 
 ## Model routing
 
-| Lane | Models | Used for |
+`runtime-profile.json` is the only hand-maintained runtime-route and
+export-policy matrix. The table below is generated from its runtime routes and
+`oc validate` rejects documentation drift.
+
+<!-- BEGIN GENERATED: runtime-routing -->
+<!-- Generated by scripts/render-routing-docs.py; do not edit this block manually. -->
+| Route | Normal primary | Pentest primary |
 | --- | --- | --- |
-| Orchestration | `z-ai/glm-5.3` | Sisyphus / Atlas / Prometheus / bug-hunt / refactor-safe / arch-review / metis |
-| Deep implement | GLM 5.3 · DeepSeek V4 Pro 0813 | Hephaestus / Oracle / Momus / ultrabrain (GLM 5.3) · deep (Pro 0813) |
-| Deep fallback | Qwen 3.8 Max · Kimi K2.7 Code | hephaestus / oracle / deep / bug-hunt / refactor-safe / sisyphus |
-| **Recon (unmoderated)** | DeepSeek V4 Pro 0813 · GLM 5.3 · MiniMax M3 | explore / librarian / deep (Pro 0813) · metis / arch-review (GLM) · multimodal-looker (Gemini) |
-| **Content-aware** | Venice DeepSeek V4 Pro 0813 / Pro / V4.1 Flash | `venice/*` only — never OpenRouter on this lane |
-| **Optional native Sisyphus** | `deepseek/deepseek-v4-pro` · `deepseek/deepseek-flash` | `sisyphus-deepseek` / `sisyphus-deepseek-junior` |
-| **Optional Venice Sisyphus** | `venice/deepseek-v4-pro-0813` · `venice/deepseek-v4-1-flash` | `sisyphus-venice-deepseek` / flash junior (edit allowed; not content-aware) |
-| Fast parallel | GLM 5.3 Flash · Venice DeepSeek V4.1 Flash | sisyphus-junior / quick (GLM Flash) · content-aware-fast (`venice/deepseek-v4-1-flash`) |
-| Housekeeping | `openrouter/deepseek/deepseek-v4.1-flash` | title / summary / compaction / default `small_model` |
-| Visual / writing | Gemini 3.1 Pro · 3.8 Flash | artistry / visual / writing |
-| Ceiling | `z-ai/glm-5.3` | ultrawork · unspecified-high |
+| `agents.atlas` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.codex-router` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.context-aware-hermes` | `openrouter/nousresearch/hermes-4-405b` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.explore` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.hephaestus` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.librarian` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.metis` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.momus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.multimodal-looker` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.oracle` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.plan` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.prometheus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-deepseek` | `deepseek/deepseek-v4-pro` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-deepseek-junior` | `deepseek/deepseek-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-junior` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-venice-deepseek` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `agents.sisyphus-venice-deepseek-flash-junior` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.agentic-deep-kimi` | `openrouter/moonshotai/kimi-k2.7-code` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.arch-review` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.artistry` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.bug-hunt` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.content-aware-deep` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.content-aware-fast` | `venice/deepseek-v4-1-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.deep` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.quick` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.refactor-safe` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.ultrabrain` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.unspecified-high` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.unspecified-low` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.visual-engineering` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
+| `categories.writing` | `openrouter/google/gemini-3.8-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 
-Recon routes never use Claude/GPT primaries or fallbacks — `oc validate` and `oc fix` enforce this. Check moderation policy: `oc models --moderation`; live probes: `oc models --probe`.
+Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with codex-subscription removed and OpenRouter ZDR constraints.
+<!-- END GENERATED: runtime-routing -->
 
-OpenRouter is the **main** gateway. GLM 5.3 stays unpinned (`require_parameters: true`) so [Auto Exacto](https://openrouter.ai/docs/guides/routing/auto-exacto) can pick among live tool-calling hosts. **Do not ship `:exacto` or `:nitro` as catalog / whitelist ids** — they are virtual request suffixes ([provider selection](https://openrouter.ai/docs/guides/routing/provider-selection), [Exacto](https://openrouter.ai/docs/guides/routing/model-variants/exacto), [Nitro](https://openrouter.ai/docs/guides/routing/model-variants/nitro)). Auto Exacto (quality-first) is the right default for coding; `:nitro` is throughput + priority tier and would trade reliability for speed. Content-aware and Venice Sisyphus stay on the Venice API (`venice/deepseek-v4-*`). Native Sisyphus stays on `https://api.deepseek.com`. Transient-only fallback retries capped at three. Request / stalled-chunk timeouts: **300s / 60s**.
+### Non-runtime route exports
+
+`oc profile export-route <profile> <name>` exports policies for external
+qualification without registering an OmO agent or category. The versioned JSON
+includes the exact repository revision and an explicit dirty-tree flag.
+
+The sole current export, `normal.security-strix-scan`, is restricted to
+synthetic data and `primary-only` admission. Its direct Strix/LiteLLM primary is
+`openrouter/deepseek/deepseek-v4-flash-0731`; the Pro entry remains source
+fallback metadata for outer-policy evaluation and is not admitted inside the
+Strix attempt. `normal-private` and `pentest` fail closed because OpenConfig's
+internal `-zdr-throughput` aliases cannot transfer their provider controls by
+model name alone. The export never appears in generated OmO configuration.
+
+<!-- BEGIN GENERATED: workflow-routing -->
+<!-- Generated by scripts/render-routing-docs.py; do not edit this block manually. -->
+`oc profile export-workflow-routes normal` defaults to the schema-v4 capability
+contract for integration layers such as the Sisyphus Factory Bridge. It returns
+the repository revision, dirty-tree state, a policy snapshot ID, and the exact
+model reference, provider, transport, billing, lifecycle state, and fallback
+references for each core capability.
+
+| Capability | Model reference | Provider / transport | Billing | Qualified | Workflow effort |
+| --- | --- | --- | --- | --- | --- |
+| `exploration` | `deepseek-flash-openrouter` | `pi` / `openrouter-pi` | `metered` | yes | `low` |
+| `implementation` | `sol-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `medium` |
+| `architecture` | `astra-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `high` |
+| `review` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
+| `adjudication` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
+
+All 5 workflow routes have empty fallback lists, and producer validation
+checks Factory/Archon surface support, transport identity, privacy, tools,
+modalities, workflow effort, lifecycle declarations, and catalog promotion gates
+before export. A gated route remains visible but cannot be silently promoted
+or used by the OpenConfig runtime. `normal-private` and `pentest` export no
+workflow routes. `--schema-version 3` emits the derived previous contract;
+`--schema-version 1` projects implementation and architecture to the legacy
+`standard`/`frontier` pair.
+
+`oc profile export-policy-manifest normal` adds the complete canonical
+cross-surface contract without changing the schema-v4 route export. It seals
+the declarative OpenCode agent/category bindings and these Factory/Archon
+aliases under a separate `manifest_snapshot_id`:
+
+| Factory/Archon alias | Capability | Default effort |
+| --- | --- | --- |
+| `@explorer` | `exploration` | `low` |
+| `@implementer` | `implementation` | `medium` |
+| `@architect` | `architecture` | `high` |
+| `@reviewer` | `review` | `high` |
+| `@adjudicator` | `adjudication` | `high` |
+
+Workflow node-to-alias assignments remain owned by the Archon workflow;
+the manifest does not reclassify OpenCode agents such as Metis or Momus.
+<!-- END GENERATED: workflow-routing -->
+
+OpenRouter owns heterogeneous metered model lanes such as DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol roles use the local OpenCodex service through the Codex subscription and never fall back automatically to OpenRouter. Specialized API routes retain only their documented capability-specific chains. Stream timeouts: **600s**.
+
+Runtime fallback is OpenConfig/OmO-owned. OpenConfig patches the pinned OmO
+package cache so transient primary-provider glitches retry the same primary
+model before model fallback. The native OmO `runtime_fallback` stays
+upstream-schema compatible with `timeout_seconds=20`; the custom
+retry knobs are OpenConfig-owned environment exports:
+`OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=3` and
+`OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS=20`. Thus pentest executes
+**Flash ZDR Throughput initial attempt + three Flash ZDR Throughput retries → exactly one Pro
+0813 ZDR Throughput attempt → terminal failure**. No GLM, GPT, Kimi, or other model can be
+selected. Quota, missing-key, model-not-found, 400/401/403, abort, and
+context-overflow failures do not retry or transition. Reapply/verify the patch
+with `oc plugin --fix`; `oc doctor` reports whether it is present.
+
+The same governed patch makes OmO's canonical `agents.*.models` priority
+arrays effective for `task(subagent_type=...)`: the first entry is the primary,
+the remaining entries are its fallback order, and supported per-entry settings
+are retained. Native agent registration consumes those arrays too, matching
+categories; `oc plugin --fix` fails closed if its pinned anchors drift.
+
+Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|normal-private|pentest` renders a complete machine-local generation under `~/.local/state/openconfig/{runtime,compat}/generations`; **`oc profile path` remains the stable runtime-overlay API** for integrations, while `oc profile compat-path` exposes the writable compatibility home and `oc profile env` returns the paired active config/XDG snapshot. `oc profile resolve <profile> <agents|categories> <name>` remains the stable runtime-route API; `oc profile export-route <profile> <name>` is the separate non-runtime policy API. Normal routes exploration to Flash, implementation to Sol, and architecture/review to Astra. Its OpenCode-only fallback pools are selected by billing class: Flash → GLM → MiniMax for metered exploration, Sol ↔ Astra for subscription work. The Factory/Archon workflow export remains a separate primary-only contract with empty fallback lists, including the qualified Opus review and adjudication lanes. Vision remains Gemini Pro → Gemini Flash → MiniMax, and the other specialized capability lanes remain explicit in the generated matrix. `normal-private` removes every non-OpenRouter provider, drops the normal interactive fallback pools, and maps routes with no OpenRouter rung to its Flash 0731 ZDR Throughput → Pro 0813 ZDR Throughput replacement. `pentest` remains stricter: every agent, category, small model, and helper is Flash 0731 ZDR Throughput, then the sole Pro 0813 ZDR Throughput fallback. The sequence is Flash initial + three Flash retries, exactly one Pro attempt, then terminal failure. There is deliberately no fake USD runtime hard-cap: exact observer costs are asynchronous, so only the existing evaluation campaign budgets are enforced synchronously.
+
+### Bounded model-routing eval
+
+`oc eval` prints a zero-cost DeepSeek/Kimi/GLM comparison plan. `oc eval --execute` runs three evidence-only cases with a default **$1 per-run cap**, a cumulative **$20 campaign cap**, and a **$2 account reserve**. Results and the conservative campaign ledger live under `~/.cache/openconfig/evals/model-routing/`; see `evals/model-routing/README.md` for the staged promotion gate. Kimi remains an explicit escalation lane until the canary demonstrates a measurable quality gain.
 
 ### Concurrency
 
@@ -302,7 +387,12 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 
 | Knob | Value |
 | --- | --- |
-| `background_task.defaultConcurrency` | **10** |
+| `background_task.defaultConcurrency` | **6** |
+| OpenRouter / Codex subscription / Anthropic | **8 / 4 / 2** |
+| DeepSeek Flash Floor / Gemini Flash | **10 / 10** |
+| GLM / MiniMax | **8 / 8** |
+| DeepSeek Pro / Kimi / Gemini Pro / Sol | **5 / 5 / 5 / 3** |
+| Hermes / Opus 5 / Fable | **2 / 1 / 1** |
 | Team parallel / max members | **4 / 5** |
 | Goal / stale / TTL | **off / 180s / 30m** |
 
@@ -312,9 +402,8 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 
 | Key | Required | Enables |
 | --- | --- | --- |
-| `OPENROUTER_API_KEY` | **yes** | GLM, OpenRouter DeepSeek, Gemini, MiniMax, Qwen, Kimi |
-| `VENICE_API_KEY` | content-aware + optional Venice Sisyphus | `venice/deepseek-v4-pro-0813` / `-pro` / `-1-flash` |
-| `DEEPSEEK_API_KEY` | optional native Sisyphus | `sisyphus-deepseek` / `sisyphus-deepseek-junior` — not OpenRouter |
+| `OPENROUTER_API_KEY` | **yes** | OpenRouter models |
+| Local OpenCodex on `127.0.0.1:10100` | **yes** for GPT subscription lane | Astra / Sol / Terra without a separate gateway key |
 | `EXA_API_KEY` | for websearch | OmO Exa |
 | `CONTEXT7_API_KEY` | recommended | Context7 |
 | `OPENROUTER_MGMT_KEY` | optional | `oc admin` |
@@ -322,33 +411,6 @@ Priority: `modelConcurrency` → `providerConcurrency` → `defaultConcurrency`.
 
 Copy `.env.example` → `.env` (`chmod 600`). Never commit `.env`.  
 `vault.json` is a **public template** (`op://Vault/Item/field` examples). Copy it to **`vault.local.json`** (gitignored) and put your own 1Password account / vault / item refs there. `oc secrets sync` (or `oc setup --sync-env`) merges local over public and imports **allowlisted keys only** from 1Password, then Infisical (`INFISICAL_DIR`), then Doppler — never a full vault dump, never `op run` / `infisical run`. Empty or example refs no-op.
-
----
-
-## Deployment protection
-
-Guard your production runs against credit exhaustion, provider outages, and rate limits.
-
-```bash
-oc deploy check                # Pre-deployment gate (credits, models, rate limits, git, signature)
-oc deploy lock                 # Prevent concurrent deploys (TTL 5m, PID-based)
-oc deploy unlock --force       # Force-release a stale lock
-oc deploy status               # Lock state + credit balance + alert log
-oc deploy quarantine           # Enter cost-saving mode (swap to cheaper models)
-oc deploy quarantine exit      # Restore from git
-oc deploy health 60            # Continuous credit heartbeat (every 60s)
-```
-
-| Guard | Threshold | Behavior |
-| --- | --- | --- |
-| Credit critical | `$10` | Blocks deploy, logs alert, suggests quarantine |
-| Credit warning | `$50` | Warns during gate check |
-| Credit caution | `$100` | Informational |
-| Rate limit | <10% remaining | Warns during gate check |
-| Circuit breaker | 8 consecutive failures | Trips → cooldown 30s → half-open retries (3) → notify |
-| Credit pressure | `$10` / `$50` / `$100` | `oc deploy quarantine` swaps to cheaper models; restore with `oc deploy quarantine exit` |
-
-Override thresholds via env: `OC_CREDIT_CRITICAL`, `OC_CREDIT_WARN`, `OC_CREDIT_CAUTION`, `OC_MODEL_PROBE_TIMEOUT`, `OC_DEPLOY_LOCK_TTL`.
 
 ---
 
@@ -363,7 +425,8 @@ Every OmO agent/category loads a `prompt_append` from `prompts/`. Profiles under
 | `prompts/agents/*.md` | Agent appends — **1:1** with OmO `agents` and `agents/*.md` |
 | `prompts/categories/*.md` | Category appends — **1:1** with OmO `categories` |
 | `prompts/profiles/*.md` | Profile briefs |
-| `agents/*.md` | OpenCode-native def for **every** OmO agent (frontmatter + pointer to `prompts/agents/<name>.md`) |
+| `agents/content-aware-research.md` | OpenCode primary-agent def (synced with prompts) |
+| `agents/codex-router.md` + `prompts/agents/codex-router.md` | Native definition + strict task-only OmO prompt for the Codex bridge |
 
 ---
 
@@ -376,15 +439,18 @@ oc new myapp --profile content-aware
 oc projects --list
 ```
 
-| Profile | Agent | Tuning |
-| --- | --- | --- |
-| `high` | sisyphus | Default GLM 5.3 · balanced tool_output |
-| `low` | sisyphus | Cost-first · smaller tool_output |
-| `fast` | hephaestus | Direct GLM 5.3 · skip ceremony |
-| `research` | sisyphus | Large tool_output · deep / ultrabrain / content-aware |
-| `debug` | sisyphus | Large tool_output · bug-hunt / debug-team |
-| `writing` | sisyphus | Gemini Flash small_model · writing category |
-| `content-aware` | content-aware-research | Edit deny · Pro + recon/audit skills |
+<!-- BEGIN GENERATED: scaffold-profiles -->
+<!-- Generated by scripts/render-routing-docs.py; do not edit this block manually. -->
+| Profile | Default agent | Main model | Small model |
+| --- | --- | --- | --- |
+| `high` | `sisyphus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `low` | `sisyphus` | `openrouter/deepseek/deepseek-v4-flash-0731` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `fast` | `hephaestus` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `research` | `sisyphus` | `codex-subscription/gpt-6-astra` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `debug` | `sisyphus` | `codex-subscription/gpt-5.6-sol` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `writing` | `sisyphus` | `openrouter/google/gemini-3.8-flash` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+| `content-aware` | `content-aware-research` | `venice/deepseek-v4-pro-0813` | `openrouter/deepseek/deepseek-v4-flash-0731` |
+<!-- END GENERATED: scaffold-profiles -->
 
 Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to `.opencode/profile.json`.
 
@@ -394,8 +460,10 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 
 - Allow-everything locally for normal tools (trusted box).
 - Hard-deny bash: `rm -rf /|~`, `mkfs`, `sudo`, `git push --force*`, `gh repo delete*`.
-- Providers allowed: OpenRouter (general) + Venice (`api.venice.ai` / `VENICE_API_KEY`, content-aware + optional Venice Sisyphus) + native DeepSeek (`api.deepseek.com` / `DEEPSEEK_API_KEY`). No direct OpenAI/Anthropic.
-- Server: `127.0.0.1:4097` · share disabled · mdns off.
+- Providers allowed: OpenRouter + local Codex subscription + Venice + native DeepSeek; direct paid OpenAI API routing is disabled in this fork.
+- Server: `127.0.0.1:4097` · share disabled · mdns off · Basic Auth via
+  `~/.local/state/opencode-codex-bridge/opencode-server-password` when managed
+  by the bridge.
 
 ---
 
@@ -414,17 +482,14 @@ Each project gets `opencode.json` + `AGENTS.md`. Do not set `OPENCODE_CONFIG` to
 opencode-configs/
 ├── oc · install.sh · setup.sh · doctor.sh · validate.sh · fix.sh
 ├── models.sh · versions.sh · cleanup.sh · signature.sh · locate.sh
-├── deploy-guard.sh · diagnose.sh · maintain.sh · run.sh · opencode.sh
-├── launch-desktop.sh · serve-desktop.sh · export-t3.py · sync-t3.py
-├── openrouter-admin.sh · t3-opencode.json
 ├── opencode.json · oh-my-openagent.json · tui.json
-├── versions.json · signature.json · projects.json · vault.json · AGENTS.md
-├── .github/workflows/check.yml · tests/
-├── agents/*.md (every OmO agent) · profiles/ · prompts/ · teams/ · skills/
-├── .env.example  (vault.local.json is gitignored)
-└── zshrc.snippet · ghostty.conf · tmux.conf · bunfig.toml
+├── versions.json · signature.json · projects.json · AGENTS.md
+├── agents/content-aware-research.md · agents/codex-router.md
+├── profiles/ · prompts/ · teams/ · skills/
+├── .env.example
+└── zshrc.snippet · ghostty.conf · tmux.conf
 
-~/.config/opencode  →  this repo
+~/.config/opencode  →  ~/.local/state/openconfig/compat/current
 ~/Projects/         →  oc new home
 ~/.omo/teams/       →  team specs
 ~/.opencode-backups/→  backups + heal/install logs
@@ -436,8 +501,10 @@ opencode-configs/
 
 ```bash
 oc signature && oc test && oc validate && oc versions && oc doctor
-oc deploy check                    # pre-deployment gate (credits, models, git, signature)
-bunx oh-my-openagent@4.19.4 doctor   # upstream: System OK
+python3 scripts/render-routing-docs.py --check
+oc plugin doctor                     # pin cache + OpenConfig OmO patch
+# Optional raw upstream/schema debug:
+oc plugin doctor --upstream
 ```
 
 Hermetic checks (no API keys, no live `~/.config/opencode` — same as GitHub Actions `.github/workflows/check.yml`):
@@ -455,11 +522,13 @@ Idempotency: re-running install / setup / heal / fix on a healthy box must not c
 
 ## Upstream
 
+This fork is the canonical install source. `jesseoue/opencode-configs` remains the comparison upstream, pinned in `signature.json` by full reference commit; upstream prose is informative, while executable JSON plus local validation remain authoritative.
+
 | Layer | Docs | Source |
 | --- | --- | --- |
 | OpenCode | [opencode.ai/docs](https://opencode.ai/docs) | [anomalyco/opencode](https://github.com/anomalyco/opencode) |
 | OmO | [omo.vibetip.help/docs](https://omo.vibetip.help/docs) | [code-yeongyu/oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) |
-| OpenRouter | [openrouter.ai/docs](https://openrouter.ai/docs) | GLM 5.3 / DeepSeek V4 routing |
+| OpenRouter | [openrouter.ai/docs](https://openrouter.ai/docs) | Provider routing / model variants |
 | Context7 | [context7.com](https://context7.com) | [upstash/context7](https://github.com/upstash/context7) |
 | Exa | [docs.exa.ai](https://docs.exa.ai) | [exa-labs](https://github.com/exa-labs) |
 
@@ -496,18 +565,79 @@ Installer pulls OpenCode from `https://opencode.ai/install` and OmO from npm `oh
 - Cloudflare AI Gateway / Claude Code bridge imports
 - Packaging as npm / shipping `node_modules` into the config dir
 - Turning this repo into an application
+# Compatibility config home
 
-### T3 local and Railway synchronization
+`/Volumes/PERSO/OpenConfig` is immutable source. Setup renders each profile to
+immutable runtime and writable compatibility generations at
+`~/.local/state/openconfig/{runtime,compat}/generations/<generation-id>`.
+`~/.config/opencode` points atomically to `compat/current`, not to the Git
+checkout. The view contains effective profile config plus wrappers back to the
+source `oc`/launch/admin scripts and a linked `.env`; sessions remain in
+OpenCode's normal data directory. `oc profile env --shell` resolves the paired
+`OPENCODE_CONFIG_DIR` and `XDG_CONFIG_HOME` from one selected profile.
+For diagnostics, `oc profile snapshot` returns one lock-consistent JSON
+observation (`desiredProfile`, raw applied marker, paired current paths, and
+expected v3 identity); it never renders, activates, repairs, or switches.
+`runtime/current` and `active-profile` are stable aliases through that same
+commit pointer. The XDG snapshot (`compat/current/xdg`) is rendered inside the
+same compatibility generation. Staging occurs under unreferenced `.staging`
+directories; only a complete, validated generation is published by replacing
+`compat/current`. Its fingerprint covers the generator, copied configuration,
+and every source-side component reached by the compat view (`oc`, profile and
+launch wrappers, the zsh snippet, and `lib/`) by path, type, mode, and bytes;
+it never hashes `.env`: secrets remain a dynamic linked input. Compatibility identity records only whether `.env` exists and
+its resolved path, so setup can expose a newly created `.env` without making
+secret-value edits regenerate a profile. Runtime and compatibility manifests detect drift in managed
+payloads and generated links (including the source/lib/snippet/runtime links).
+The compatibility identity also inventories immediate non-OpenCode XDG
+siblings by name/type/resolved target, never their contents or secrets. Raw
+OpenCode package artifacts are intentionally outside these manifests and do
+not force needless regeneration. A future operator-approved native alias may likewise target
+`compat/current/.omo.jsonc`, a complete `[opencode]` envelope that preserves
+unmanaged root keys. Its generated native routes use OmO 4.19.4 `models`
+priority arrays (not legacy `model` + `fallback_models`) and carry both
+`2026-07-opencode-config-unification` and `2026-08-reasoning-unification`
+markers, so OmO startup has no native migration to write. `runtime-profile.json`
+remains the routing SSoT and retains its profile-oriented route representation.
+The normal generated `codex-router` agent definition (apart from its canonical
+profile model frontmatter) and `content-aware-deep` prompt remain at their
+tracked baselines; the authoring mirror `prompts/agents/codex-router.md` is
+copied byte-for-byte. Only the pentest generation adds a soft cost-aware overlay
+to the effective router definition and deep category prompt: Flash
+reconnaissance/deduplication before Pro adjudication, bounded evidence batches
+and resumed-gap work, and explicit unverified gaps after the target tool-call
+rounds. This prompt guidance is not a hard runtime cap and does not change
+routes, permissions, or global OmO limits.
+Runtime-profile never creates that native symlink itself:
+`oc setup`/install do so only after profile/envelope/source consensus and make
+a recoverable backup carrying the original mode and SHA-256. Until setup has
+done that, regular native OmO config remains journal-protected and a later
+`oc profile` reader rolls an interrupted switch back before reporting.
 
-OpenCode 1.18.30 is the verified compatibility floor for this shared setup.
-Local T3 uses `serve-desktop.sh` on `127.0.0.1:4097`; run
-`python3 sync-t3.py` to synchronize its OpenCode instance and curated models.
-This operation preserves other providers and backs up settings before changes.
+`oc profile normal|normal-private|pentest` commits the desired profile immediately. When a
+LaunchAgent is present it writes `applied-profile.json` only after a fresh
+launchd-owned bridge `/healthz` identity (schema, PID/listener, upstream and
+new instance ID), OpenCode health, and the expected `codex-router` model all verify.
+The pre-restart instance ID is captured from the exact health schema even when
+the bridge is legitimately returning 503 while its upstream recovers, so that
+an ineffective restart cannot reuse that process as fresh proof. A
+v3 marker binds that proof to the selected profile, runtime fingerprint and
+generation, compatibility generation/identities/manifest, and model. A
+restart failure exits non-zero and leaves the marker absent; without a
+LaunchAgent the command succeeds as explicitly **desired-only** and asks for
+`oc launch`.
+OpenConfig treats `~/.omo/omo.jsonc` as an OpenConfig-owned generated alias;
+direct OmO writers are unsupported because they may reject or replace that
+symlink. If
+`~/.omo/.migration-journal.json` exists, `oc profile` and setup fail closed;
+inspect and explicitly resolve that OmO migration before permitting any native
+write, especially where its journal names a source-checkout file.
 
-For Railway T3, run `python3 export-t3.py /path/to/buzz-relay/t3/openconfig`.
-The export carries the full agents, model catalog, prompts, skills, and teams,
-with Linux shell and absolute instruction paths. It includes no credentials.
-Railway's managed installer and private OpenCode launcher consume this snapshot;
-provider and research-tool credentials stay in the private persistent volume.
-Run `oc validate` after changes and verify real OpenRouter and Venice agent
-requests before calling the integration complete.
+The one-time native migration accepts no `[opencode]` semantic drift except
+the known Sisyphus `prompt_append` relocation from the managed legacy profile
+path to `file://~/.config/opencode/prompts/agents/sisyphus.md`. OmO rejects a
+direct absolute prompt path below the immutable `~/.local/state` generation;
+the allowed stable config-home alias resolves through `compat/current` to the
+same selected generation and is covered by its applied identity. Both paths
+and the selected profile are checked exactly; every other difference blocks
+before backup.

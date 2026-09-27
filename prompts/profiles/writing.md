@@ -1,10 +1,10 @@
-# Profile: writing (Sisyphus + writing category / Gemini 3.8 Flash)
+# Profile: writing (Sisyphus + writing category)
 
 Clear docs from source of truth. Accurate APIs, examples, constraints. No fluff.
 
 ## Routing
 
-- Delegate prose to the `writing` category (Gemini 3.8 Flash) or `docs-team`.
+- Delegate prose to the `writing` category or `docs-team`. The active runtime capability and its canonical retry policy own model selection and failure behavior.
 - Always ground examples in Context7 or local source — never invent APIs.
 - Escalate only for hard synthesis (`deep` / ultrabrain).
 

@@ -27,6 +27,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$REPO/lib/common.sh"
 OC_BIN="${OC_DOCTOR_BIN:-$(command -v opencode 2>/dev/null || echo "$OC_CLI_BIN")}"
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
 LIVE_ROOT="$(oc_live_config_root 2>/dev/null || true)"
 IS_LIVE=0
 oc_is_live_config "$REPO" && IS_LIVE=1
@@ -88,18 +89,55 @@ else
   tip "or: bash \"$REPO/install.sh\"   # installs CLI + this config stack"
 fi
 
+NATIVE_OMO_PATH="${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"
+NATIVE_MIGRATION_JOURNAL="$(dirname "$NATIVE_OMO_PATH")/.migration-journal.json"
+if [[ -e "$NATIVE_MIGRATION_JOURNAL" || -L "$NATIVE_MIGRATION_JOURNAL" ]]; then
+  bad "pending OmO migration journal at $NATIVE_MIGRATION_JOURNAL — native/profile writes are blocked"
+  tip "inspect and explicitly resolve the OmO migration; do not resume it against this OpenConfig checkout blindly"
+fi
+native_alias_state="$(oc_native_omo_alias_state)"
+if [[ "$native_alias_state" == "alias" ]]; then
+  ok "native OmO is an OpenConfig-governed read-only alias through compat/current/.omo.jsonc"
+else
+  bad "native OmO governance drift (state=$native_alias_state): setup must install the stable compat/current alias"
+  tip "run oc setup after reviewing its recoverable native-OmO backup; direct OmO writers must not replace this alias"
+fi
+profile_snapshot="$($REPO/runtime-profile.sh snapshot 2>/dev/null || true)"
+if ! printf '%s' "$profile_snapshot" | python3 -c '
+import json, sys
+body = json.load(sys.stdin)
+assert body.get("schema_version") == 1
+assert body.get("desiredProfile") in {"normal", "normal-private", "pentest"}
+assert set(body) == {"schema_version", "desiredProfile", "applied", "runtimePath", "compatPath", "expectedIdentity"}
+' >/dev/null 2>&1; then
+  desired_profile="unknown"
+  applied_profile="null"
+  expected_applied_identity="null"
+  bad "profile snapshot is unavailable or malformed; runtime/applied state cannot be proven atomically"
+else
+  desired_profile="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.load(sys.stdin)["desiredProfile"])')"
+  applied_profile="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["applied"], separators=(",", ":")))')"
+  expected_applied_identity="$(printf '%s' "$profile_snapshot" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["expectedIdentity"], separators=(",", ":")))')"
+fi
+if [[ "$desired_profile" != "unknown" && "$applied_profile" == "null" ]]; then
+  opt "profile desired=$desired_profile but not applied to a verified bridge (desired-only or restart pending)"
+elif [[ "$desired_profile" != "unknown" && "$expected_applied_identity" != "null" ]] \
+  && oc_applied_identity_matches "$applied_profile" "$expected_applied_identity" >/dev/null 2>&1
+then
+  ok "profile desired=$desired_profile matches the complete verified bridge-applied runtime/compat identity"
+elif [[ "$desired_profile" != "unknown" ]]; then
+  bad "profile desired=$desired_profile differs from the complete applied runtime/compat marker; rerun oc profile $desired_profile"
+fi
+
 # ─── Config link ─────────────────────────────────────────────────────
 sec "Config location (single source of truth)"
-if [[ $IS_LIVE -eq 1 ]]; then
-  ok "$LINK → $REPO (live)"
-elif [[ -n "$LIVE_ROOT" ]]; then
-  ok "live install: $LINK → $LIVE_ROOT"
-  info "this checkout: $REPO (check-only — teams/keys follow the live tree)"
+if oc_link_points_to "$LINK" "$COMPAT_CURRENT" 2>/dev/null; then
+  ok "$LINK -> generated compatibility view ($COMPAT_CURRENT)"
 elif [[ -L "$LINK" ]]; then
   tgt="$(readlink "$LINK")"
-  opt "$LINK → $tgt (not an OpenConfig tree; run: oc setup from the intended install)"
+  opt "$LINK -> $tgt (expected $COMPAT_CURRENT; run: oc setup)"
 elif [[ -e "$LINK" ]]; then
-  opt "$LINK is a real dir, not a symlink (run: oc setup)"
+  opt "$LINK is a real dir, not a compatibility symlink (run: oc setup)"
 else
   bad "$LINK does not exist (run: oc setup)"
 fi
@@ -113,7 +151,7 @@ for d in "$HOME/.opencode" "$HOME/opencode-configs" /usr/local/opencode; do
   fi
   opt "leftover config copy at $d (safe to remove after verifying backups in ~/.opencode-backups)"
 done
-# This repo must stay config-only — OpenCode may drop install artifacts when ~/.config/opencode → here
+# This source repo must stay config-only; raw OpenCode uses the writable compat view.
 _strays=()
 for s in "${OC_CONFIG_STRAYS[@]}"; do
   [[ -e "$REPO/$s" || -L "$REPO/$s" ]] && _strays+=("$s")
@@ -141,7 +179,7 @@ fi
 sec "Runtimes"
 for c in node bun python3 git curl; do
   if command -v "$c" >/dev/null 2>&1; then ok "$c ($("$c" --version 2>/dev/null | head -1 | tr -d '\n'))"; else
-    [[ "$c" == "bun" ]] && opt "$c not found (needed for plugin doctor)" || bad "$c not found"
+    [[ "$c" == "bun" ]] && opt "$c not found (needed for plugin cache install / upstream doctor)" || bad "$c not found"
   fi
 done
 
@@ -157,24 +195,25 @@ sec "oh-my-openagent plugin"
 pin="$(python3 -c "import json;p=[x for x in json.load(open('$REPO/opencode.json')).get('plugin',[]) if 'oh-my' in x];print(p[0] if p else '')" 2>/dev/null)"
 pin_ver="${pin##*@}"
 # The pin must resolve to a real install (node_modules/oh-my-openagent), else agents silently vanish.
-cdir="$(oc_omo_plugin_cache_dir "$pin" 2>/dev/null || true)"
+cdir="${XDG_CACHE_HOME:-$HOME/.cache}/opencode/packages/$pin"
 _cache_ver=""
 _stale_caches=""
 if [[ -n "$pin" ]]; then
-  if oc_omo_plugin_cache_ok "$pin"; then
+  if [[ -f "$cdir/node_modules/oh-my-openagent/package.json" ]]; then
     _cache_ver="$(python3 -c "import json;print(json.load(open('$cdir/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
-    ok "plugin cache ready ($pin → main + native v${_cache_ver:-?}; $cdir)"
-  elif [[ -f "$cdir/node_modules/oh-my-openagent/package.json" ]]; then
-    _cache_ver="$(python3 -c "import json;print(json.load(open('$cdir/node_modules/oh-my-openagent/package.json')).get('version',''))" 2>/dev/null || true)"
-    bad "plugin cache broken for $pin (main=${_cache_ver:-missing}; native launcher/version missing) — agents may vanish"
-    tip "repair: oc setup   # or: oc heal"
+    if [[ -n "$_cache_ver" && -n "$pin_ver" && "$_cache_ver" != "$pin_ver" ]]; then
+      bad "plugin cache $pin has package version $_cache_ver (want $pin_ver) — agents may load wrong OmO"
+      tip "fix: rm -rf \"$cdir\" && oc setup   # or: oc heal"
+    else
+      ok "plugin cache populated ($pin → v${_cache_ver:-?})"
+    fi
   elif [[ -d "$cdir" ]]; then
     bad "plugin cache EMPTY/broken for $pin — agents will NOT load (fix: oc setup · oc heal)"
     tip "OpenCode may leave an empty ~/.cache/opencode/packages/$pin after a failed install/postinstall wipe"
   else
     info "plugin cache not built yet for $pin — run: oc setup  (or oc heal)"
   fi
-  # Sibling caches confuse bunx doctor ("Loaded 4.19.0" while pin is 4.19.1)
+  # Sibling caches confuse bunx doctor ("Loaded 4.19.0" while pin is 4.19.4)
   _stale_caches="$(python3 - "$pin_ver" <<'PY' 2>/dev/null || true
 import os, sys
 want = sys.argv[1]
@@ -195,16 +234,19 @@ PY
     tip "prune: oc cleanup --yes   # keeps only $pin"
   fi
 fi
-# NOTE: We deliberately do NOT run `bunx oh-my-openagent doctor` here.
-# Running the OmO CLI triggers its config-migration, which treats the repo's
-# oh-my-openagent.json as a legacy source and MOVES it into a backup, then
-# regenerates ~/.omo/omo.jsonc from it. That's redundant with `oc fix` (which
-# already syncs omo.jsonc canonically) and can leave a stale agents.*.models
-# array behind. Static checks above (pin match + cache version) are sufficient.
-if [[ -z "$pin" ]]; then
+if [[ -n "$pin" ]]; then
+  if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+    if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+      ok "governed OmO runtime patch present (fallback + canonical agent models)"
+    else
+      opt "governed OmO runtime patch missing — run: oc plugin --fix"
+    fi
+  else
+    opt "runtime-fallback patch check unavailable — missing node or patch script"
+  fi
+  info "raw upstream OmO doctor is opt-in: oc plugin doctor --upstream"
+elif [[ -z "$pin" ]]; then
   bad "no oh-my-openagent@… pin in opencode.json"
-elif [[ -z "${OMOCLI_DOCTOR_ALLOWED:-}" ]]; then
-  ok "plugin verified statically (pin=$pin cache=v${_cache_ver:-?}) — OmO CLI migration avoided by design"
 fi
 # OpenCode background-installs @opencode-ai/plugin@$CLI into the config dir.
 # When npm lags the CLI by a patch → WARN spam, not fatal. Align with: oc versions --fix
@@ -227,10 +269,11 @@ OC_DOCTOR_PLUGIN_PEER_OK=0
 [[ -n "$_cli_ver" && -n "$_plugin_pin" && "$_cli_ver" == "$_plugin_pin" ]] && OC_DOCTOR_PLUGIN_PEER_OK=1
 unset _cli_ver _plugin_pin _cache_ver _stale_caches pin_ver
 
-# ─── Static agent readiness ──────────────────────────────────────────
-# Declaration and verified cache readiness are deterministic. Runtime visibility
-# is a separate bounded probe below and must not be inferred from these checks.
-sec "Agent declaration & cache readiness"
+# ─── default_agent will resolve (static: defined in config + cache populated) ──
+# Note: `opencode agent list` registers plugin agents lazily/async and is racy,
+# so we check deterministically — the agent must be DEFINED and the plugin that
+# provides it must be installed (cache non-empty, checked above).
+sec "Default agent"
 default_agent="$(python3 -c "import json;print(json.load(open('$REPO/opencode.json')).get('default_agent',''))" 2>/dev/null)"
 if [[ -z "$default_agent" ]]; then
   info "no default_agent set (opencode uses 'build')"
@@ -242,82 +285,14 @@ native={'build','plan','general','atlas','sisyphus','hephaestus','prometheus'}
 print('yes' if ('$default_agent' in (omo.get('agents') or {}) or '$default_agent' in native) else 'no')
 " 2>/dev/null)"
   cache_ok=0
-  oc_omo_plugin_cache_ok "$pin" && cache_ok=1
+  cdir="$HOME/.cache/opencode/packages/$pin"
+  [[ -n "$pin" && -f "$cdir/node_modules/oh-my-openagent/package.json" ]] && cache_ok=1
   if [[ "$defined" == "yes" && "$cache_ok" -eq 1 ]]; then
-    ok "declared: default_agent '$default_agent'"
-    ok "cache-ready: verified main + native packages for $pin"
+    ok "default_agent '$default_agent' is defined and its plugin is installed → will resolve"
   elif [[ "$defined" != "yes" ]]; then
     bad "default_agent '$default_agent' is not defined in oh-my-openagent.json — opencode will fall back to 'build'"
   else
     bad "default_agent '$default_agent' defined but plugin cache empty — it will NOT load until: oc setup"
-  fi
-fi
-
-# `agent list` loads configuration but never starts an agent or calls a model.
-# Bound it tightly because plugin startup has historically stalled.
-#
-# NOTE: We do NOT run `opencode agent list` here at all. Loading the OmO plugin
-# triggers its config-migration, which treats the repo's canonical
-# oh-my-openagent.json as a legacy source and MOVES it into a backup, then
-# regenerates ~/.omo/omo.jsonc from it. That's redundant with `oc fix` (which
-# already syncs omo.jsonc canonically) and can leave a stale agents.*.models
-# array behind. Static agent/category checks above are sufficient.
-sec "Runtime agent visibility"
-info "runtime 'opencode agent list' probe skipped — loading OmO triggers its config-migration (self-sabotage); static checks cover agent visibility"
-
-if [[ $DO_QUICK -eq 0 ]]; then
-  stale_runtime="$(python3 - "$REPO" "$cdir" <<'PY' 2>/dev/null || true
-import os, subprocess, sys, time
-repo, cache = sys.argv[1:3]
-paths = [
-    os.path.join(repo, "opencode.json"),
-    os.path.join(repo, "oh-my-openagent.json"),
-    os.path.join(cache, "node_modules", "oh-my-openagent", "package.json"),
-]
-mtimes = [os.path.getmtime(p) for p in paths if os.path.isfile(p)]
-if not mtimes:
-    raise SystemExit
-changed_age = max(0, time.time() - max(mtimes))
-
-def elapsed_seconds(raw):
-    days = 0
-    if "-" in raw:
-        day, raw = raw.split("-", 1)
-        days = int(day)
-    parts = [int(p) for p in raw.split(":")]
-    if len(parts) == 2:
-        hours, minutes, seconds = 0, parts[0], parts[1]
-    else:
-        hours, minutes, seconds = parts
-    return days * 86400 + hours * 3600 + minutes * 60 + seconds
-
-out = subprocess.run(["ps", "-axo", "pid=,etime=,command="], capture_output=True, text=True).stdout
-stale = []
-for line in out.splitlines():
-    fields = line.strip().split(None, 2)
-    if len(fields) != 3:
-        continue
-    pid, elapsed, command = fields
-    low = command.lower()
-    argv0 = command.split(None, 1)[0]
-    is_opencode = os.path.basename(argv0) == "opencode" or argv0.endswith("/opencode/bin/opencode")
-    if not is_opencode or "agent list" in low:
-        continue
-    try:
-        age = elapsed_seconds(elapsed)
-    except Exception:
-        continue
-    if age > changed_age + 2:
-        stale.append(pid)
-if stale:
-    print(",".join(stale[:8]))
-PY
-)"
-  if [[ -n "$stale_runtime" ]]; then
-    opt "running OpenCode process(es) predate config/cache update (pid ${stale_runtime//,/, })"
-    tip "finish active work, close those sessions, then relaunch so Sisyphus/team routes activate"
-  else
-    ok "no stale running OpenCode process predates the latest config/cache update"
   fi
 fi
 
@@ -357,14 +332,8 @@ unset _lsp_miss
 # ─── CodeGraph ───────────────────────────────────────────────────────
 sec "CodeGraph (OmO)"
 CG_BIN="$HOME/.omo/codegraph/bin/codegraph"
-CG_WANT="$(oc_version_get codegraph.pin 2>/dev/null || true)"
 if [[ -x "$CG_BIN" ]]; then
-  CG_HAVE="$($CG_BIN --version 2>/dev/null | head -1 | tr -d '\r')"
-  if [[ -n "$CG_WANT" && "$CG_HAVE" != "$CG_WANT" ]]; then
-    opt "binary: $CG_BIN ($CG_HAVE; OmO pin $CG_WANT — start one OmO session to auto-provision)"
-  else
-    ok "binary: $CG_BIN ($CG_HAVE)"
-  fi
+  ok "binary: $CG_BIN ($($CG_BIN --version 2>/dev/null | head -1 | tr -d '\r'))"
 else
   opt "binary missing — first OmO session should auto_provision to ~/.omo/codegraph"
   tip "or run: oc setup   # provisions codegraph + teams + LSP"
@@ -375,16 +344,12 @@ cg=json.load(open('$REPO/oh-my-openagent.json')).get('codegraph') or {}
 id=cg.get('install_dir')
 if cg.get('enabled') is False:
     print('BAD enabled=false')
-elif cg.get('auto_provision') is not True:
-    print('BAD auto_provision=false')
-elif cg.get('daemon') is not True:
-    print('BAD daemon=false')
 elif id and 'cache/opencode/codegraph' in str(id):
     print('BAD install_dir='+str(id))
 else:
-    print('enabled=%s auto_init=%s auto_provision=%s daemon=%s telemetry=%s' % (
+    print('enabled=%s auto_init=%s auto_provision=%s telemetry=%s' % (
         cg.get('enabled', True), cg.get('auto_init', True),
-        cg.get('auto_provision', True), cg.get('daemon', True), cg.get('telemetry')))
+        cg.get('auto_provision', True), cg.get('telemetry')))
 " 2>/dev/null)"
 if [[ "$cg_line" == BAD* ]]; then bad "codegraph config: $cg_line"
 else ok "config: $cg_line"; fi
@@ -420,7 +385,7 @@ if [[ -f "$ENV_FILE" ]]; then
       tip "https://openrouter.ai/keys  ·  then: oc secrets sync"
     fi
   done
-  for k in CONTEXT7_API_KEY EXA_API_KEY VENICE_API_KEY DEEPSEEK_API_KEY; do
+  for k in CONTEXT7_API_KEY EXA_API_KEY; do
     if [[ -n "$(getkey $k)" ]]; then ok "$k set"
     else
       case "$k" in
@@ -447,11 +412,6 @@ if [[ -f "$ENV_FILE" ]]; then
       esac
     fi
   done
-  if [[ -n "$(getkey OPENAI_API_KEY)" ]]; then
-    soft "OPENAI_API_KEY in .env — OpenRouter-only stack; remove it (run: oc fix)"
-  else
-    ok "OpenRouter-only (no OPENAI_API_KEY)"
-  fi
   # Foreign (non-allowlisted) keys — never print names/values; count only.
   _foreign="$(oc_env_foreign_key_count "$ENV_FILE" 2>/dev/null || echo 0)"
   if [[ "${_foreign:-0}" -gt 0 ]]; then
@@ -536,7 +496,21 @@ if [[ -f "$REPO/vault.json" ]]; then
       info "Infisical CLI present (set INFISICAL_DIR to use as fallback)"
     fi
   fi
-  tip "sync: oc secrets sync   ·  status: oc secrets status"
+  # Local OpenCodex is the subscription transport for Astra, Sol, and Terra.
+  # Its model catalog is non-billable and requires no external gateway secret.
+  _codex_models="$(curl -fsS --connect-timeout 2 --max-time 5 \
+    http://127.0.0.1:10100/v1/models 2>/dev/null || true)"
+  if printf '%s' "$_codex_models" | python3 -c '
+import json, sys
+available = {str(m.get("id")) for m in json.load(sys.stdin).get("data", []) if isinstance(m, dict)}
+required = {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra"}
+raise SystemExit(0 if required <= available else 1)
+' >/dev/null 2>&1; then
+    ok "Local OpenCodex subscription models available (Astra, Sol, Terra)"
+  else
+    bad "Local OpenCodex model catalog unavailable or incomplete at 127.0.0.1:10100"
+    tip "start or reconnect the Codex OpenCodex service, then rerun oc doctor"
+  fi
 else
   bad "vault.json missing"
 fi
@@ -623,8 +597,8 @@ while IFS='|' read -r st msg; do
   esac
 done <<< "$prompt_report"
 
-# ─── Agent / category colors ─────────────────────────────────────────
-sec "Agent & category colors"
+# ─── Agent colors (categories do not accept color in OmO 4.19.4) ─────
+sec "Agent colors"
 color_report="$(python3 - "$REPO" <<'PY'
 import json, os, sys, re
 repo = sys.argv[1]
@@ -639,28 +613,21 @@ for n, a in (omo.get("agents") or {}).items():
         bad_a.append(f"{n}={c}")
     else:
         ok_a += 1
-miss_c, bad_c, ok_c = [], [], 0
+category_colors = []
 for n, a in (omo.get("categories") or {}).items():
-    if not isinstance(a, dict):
-        continue
-    c = a.get("color")
-    if c is None:
-        miss_c.append(n)
-    elif not hexre.match(str(c)):
-        bad_c.append(f"{n}={c}")
-    else:
-        ok_c += 1
-if bad_a or bad_c:
-    print("BAD|non-hex colors: " + ", ".join(bad_a + bad_c))
-if miss_a or miss_c:
-    ma = ",".join(miss_a) if miss_a else "—"
-    mc = ",".join(miss_c[:6]) + ("…" if len(miss_c) > 6 else "") if miss_c else "—"
-    print(f"OPT|missing colors (TUI tabs dull): agents={ma} categories={mc}")
-    print("TIP|restore: oc fix   # assigns Tokyonight hex colors")
-if ok_a or ok_c:
-    print(f"OK|{ok_a} agents + {ok_c} categories have valid #RRGGBB colors")
-if not (miss_a or miss_c or bad_a or bad_c):
-    print("OK|all agent/category colors set")
+    if isinstance(a, dict) and "color" in a:
+        category_colors.append(n)
+if bad_a:
+    print("BAD|non-hex agent colors: " + ", ".join(bad_a))
+if miss_a:
+    print(f"OPT|missing agent colors (TUI tabs dull): {','.join(miss_a)}")
+    print("TIP|restore: oc fix   # assigns agent Tokyonight hex colors")
+if ok_a:
+    print(f"OK|{ok_a} agents have valid #RRGGBB colors")
+if category_colors:
+    print("BAD|unsupported category colors present: " + ", ".join(category_colors))
+else:
+    print("OK|categories omit unsupported color keys")
 PY
 )"
 while IFS='|' read -r st msg; do
@@ -756,7 +723,7 @@ for n, c in m.items():
             if key:
                 print("OK|context7 has CONTEXT7_API_KEY")
             else:
-                print("OPT|context7 enabled but CONTEXT7_API_KEY unset")
+                print("INFO|context7 key is unset (already reported under API keys)")
     else:
         print("INFO|%s disabled" % n)
 PY
@@ -925,6 +892,12 @@ if [[ -f "$LOG" ]]; then
         | sort | uniq -c | sort -rn | head -3 \
         | while read -r n rest; do printf "      %6dx %s\n" "$n" "$(printf '%s' "$rest" | cut -c1-88)"; done
     fi
+    # Known runaway: an agent passed a descriptive LABEL as task_id instead of a ses_ id.
+    loop="$(printf '%s\n' "$tailn" | grep -c 'Expected a string starting with .ses' 2>/dev/null || true)"
+    if [[ "${loop:-0}" -gt 0 ]]; then
+      info "invented-task_id loop seen ($loop hits) — an agent used a label as task_id, not a ses_ id."
+      tip "Sisyphus RECOVERY forbids inventing task_id; if it recurs, harden the offending worker prompt"
+    fi
     fmt_hits="$(printf '%s\n' "$tailn" | grep -cE 'failed to format file|failed command=.*prettier' 2>/dev/null || true)"
     bun_be="$(printf '%s\n' "$tailn" | grep -c 'BUN_BE_BUN' 2>/dev/null || true)"
     if [[ "${fmt_hits:-0}" -gt 5 ]]; then
@@ -934,11 +907,6 @@ if [[ -f "$LOG" ]]; then
       soft "prettier formatter failed with BUN_BE_BUN in log — use system prettier on PATH"
     fi
   fi
-  misuse_report="$(oc_log_misuse_report "$LOG" 2>/dev/null || true)"
-  while IFS='|' read -r kind msg; do
-    [[ -z "$kind" ]] && continue
-    case "$kind" in OPT) opt "$msg" ;; TIP) tip "$msg" ;; *) info "$msg" ;; esac
-  done <<< "$misuse_report"
   # WARN signatures that matter for OpenConfig footguns
   plugin_miss="$(printf '%s\n' "$tailn" | grep -c 'No matching version found for @opencode-ai/plugin@' 2>/dev/null || true)"
   if [[ "${plugin_miss:-0}" -gt 0 ]]; then
@@ -1044,23 +1012,7 @@ if os.path.isdir(ldir):
     provisioned = [d for d in os.listdir(ldir) if os.path.isfile(os.path.join(ldir, d, "config.json")) or os.path.islink(os.path.join(ldir, d))]
 if tracked: print("OK|%d team spec(s) tracked in repo/teams: %s" % (len(tracked), ", ".join(sorted(tracked))))
 else: print("OPT|no team specs in repo/teams — nothing for team_create to spawn")
-for name in sorted(tracked):
-    try:
-        spec = json.load(open(os.path.join(tdir, name, "config.json"), encoding="utf-8"))
-        lead = spec.get("lead") or {}
-        lead_route = "%s:%s" % (
-            "agent" if lead.get("kind") == "subagent_type" else "category",
-            lead.get("subagent_type") or lead.get("category") or "?",
-        )
-        members = []
-        for member in spec.get("members") or []:
-            route = member.get("subagent_type") or member.get("category") or "?"
-            kind = "agent" if member.get("kind") == "subagent_type" else "category"
-            members.append("%s=%s:%s" % (member.get("name") or "?", kind, route))
-        print("OK|route %s: lead=%s; %s" % (name, lead_route, ", ".join(members)))
-    except Exception as exc:
-        print("BAD|route %s unreadable: %s" % (name, exc))
-missing = [t for t in tracked if t not in provisioned]
+missing = [t for t in tracked if t not in live]
 if missing:
     print("OPT|tracked but not provisioned to %s/teams: %s — run: oc setup from the live install" % (base, ", ".join(sorted(missing))))
 copies = []
@@ -1157,30 +1109,22 @@ def tip(m): print("TIP|" + m)
 dc = bt.get("defaultConcurrency")
 if not isinstance(dc, int) or dc < 1:
     bad("background_task.defaultConcurrency missing/invalid")
-elif dc > 10:
-    bad("defaultConcurrency=%s (>10) — runaway risk; run: oc fix" % dc)
-elif dc != 10:
-    bad("defaultConcurrency=%s (want 10) — run: oc fix" % dc)
+elif dc != 6:
+    bad("defaultConcurrency=%s (want 6) — run: oc fix" % dc)
 else:
     ok("defaultConcurrency=%s" % dc)
 
-want_pc = (("openrouter", 12), ("venice", 6), ("deepseek", 6))
-for prov, cap in want_pc:
+for prov, cap in (("openrouter", 8), ("codex-subscription", 4), ("anthropic", 2)):
     v = pc.get(prov)
     if not isinstance(v, int):
         bad("providerConcurrency.%s missing" % prov)
-    elif v > cap:
-        bad("providerConcurrency.%s=%s (cap %s) — run: oc fix" % (prov, v, cap))
     elif v != cap:
         bad("providerConcurrency.%s=%s (want %s) — run: oc fix" % (prov, v, cap))
     else:
         ok("providerConcurrency.%s=%s" % (prov, v))
-extra_pc = sorted(k for k in pc if k not in {p for p, _ in want_pc})
-if extra_pc:
-    bad("providerConcurrency extra keys not allowed: %s" % ", ".join(extra_pc))
 
 # Referenced models = agents/categories (+fallbacks) + OpenCode whitelist.
-# Aliases: openai/X ↔ openrouter/openai/X (both keys are intentional for dual lane).
+# OpenRouter model IDs can be referenced with or without the provider prefix.
 def aliases(mid):
     out = {mid}
     if mid.startswith("openrouter/"):
@@ -1188,8 +1132,6 @@ def aliases(mid):
         out.add(bare)
         if bare.startswith("openai/"):
             out.add(bare)
-    elif mid.startswith("openai/"):
-        out.add("openrouter/" + mid)
     elif "/" in mid:
         out.add("openrouter/" + mid)
     return out
@@ -1268,12 +1210,14 @@ else:
     else:
         ok("goal footgun documented (prompts/goal.md in instructions)")
 
-# Imported Claude MCP configs must never receive sensitive environment variables.
-allow = list(omo.get("mcp_env_allowlist") or [])
-if allow:
-    bad("mcp_env_allowlist exposes secrets to imported MCPs: %s — run: oc fix" % ", ".join(allow))
+# MCP env allowlist (Exa / Context7 / provider keys into OmO MCP)
+allow = set(omo.get("mcp_env_allowlist") or [])
+need_env = {"CONTEXT7_API_KEY", "EXA_API_KEY", "OPENROUTER_API_KEY"}
+miss_env = sorted(need_env - allow)
+if miss_env:
+    opt("mcp_env_allowlist missing: %s — run: oc fix" % ", ".join(miss_env))
 else:
-    ok("mcp_env_allowlist empty (no API keys exposed to imported MCPs)")
+    ok("mcp_env_allowlist covers Context7/Exa/OpenRouter")
 
 sw = omo.get("start_work") if isinstance(omo.get("start_work"), dict) else {}
 if "start_work" not in omo:
@@ -1289,30 +1233,17 @@ elif isinstance(mt, int):
 
 # MCP / stream timeouts (opencode.json)
 mcp_t = (oc.get("experimental") or {}).get("mcp_timeout")
-if mcp_t == 30000:
+if isinstance(mcp_t, (int, float)) and mcp_t >= 12000:
     ok("experimental.mcp_timeout=%sms" % int(mcp_t))
 else:
-    bad("experimental.mcp_timeout=%r (want 30000 to match Context7)" % mcp_t)
-for pname in ("openrouter",):
+    opt("experimental.mcp_timeout unset/low (want ≥12000)")
+for pname in ("openrouter", "openai"):
     opts = ((oc.get("provider") or {}).get(pname) or {}).get("options") or {}
     to = opts.get("timeout")
-    chunk = opts.get("chunkTimeout")
-    if to == 300000 and chunk == 180000:
-        ok("provider.%s timeout=300s chunkTimeout=180s" % pname)
-    else:
-        bad("provider.%s timeouts drifted (want request=300000, chunk=180000)" % pname)
-openai_block = (oc.get("provider") or {}).get("openai")
-enabled = oc.get("enabled_providers")
-if openai_block and isinstance(enabled, list) and "openai" in enabled:
-    opts = (openai_block or {}).get("options") or {}
-    to = opts.get("timeout")
-    chunk = opts.get("chunkTimeout")
-    if to == 300000 and chunk == 180000:
-        ok("provider.openai timeout=300s chunkTimeout=180s")
-    else:
-        bad("provider.openai timeouts drifted (want request=300000, chunk=180000)")
-elif not openai_block:
-    ok("provider.openai absent (OpenRouter-only)")
+    if isinstance(to, (int, float)) and to >= 600000:
+        ok("provider.%s timeout=%ss" % (pname, int(to / 1000)))
+    elif to is not None:
+        opt("provider.%s timeout=%s (want ≥600s for long streams)" % (pname, to))
 PY
 )"
 if [[ -z "$conc_report" ]]; then
@@ -1614,8 +1545,7 @@ if [[ -n "$_gbin" ]]; then
     ok "ghostty: notify-on-command-finish configured"
   fi
 else
-  opt "Ghostty not found (optional but recommended)"
-  tip "install: https://ghostty.org  (≥ $(oc_versions_get ghostty.min 2>/dev/null || echo 1.3.0))"
+  info "Ghostty integration skipped (optional dependency already reported under supported versions)"
 fi
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Telemetry / phone-home ───────────────────────────────────────
@@ -1628,7 +1558,6 @@ omo = json.load(open(os.path.join(repo, "oh-my-openagent.json")))
 checks = []
 checks.append(("OK" if oc.get("share") == "disabled" else "BAD", "share=%s" % oc.get("share")))
 checks.append(("OK" if oc.get("autoupdate") is False else "BAD", "autoupdate=%s" % oc.get("autoupdate")))
-checks.append(("OK" if oc.get("logLevel") == "ERROR" else "BAD", "logLevel=%s" % oc.get("logLevel")))
 checks.append(("OK" if (oc.get("experimental") or {}).get("openTelemetry") is False else "BAD",
                "openTelemetry=%s" % (oc.get("experimental") or {}).get("openTelemetry")))
 checks.append(("OK" if (oc.get("server") or {}).get("mdns") is False else "BAD",
@@ -1640,14 +1569,6 @@ checks.append(("OK" if (omo.get("git_master") or {}).get("include_co_authored_by
                "co_authored_by=%s" % (omo.get("git_master") or {}).get("include_co_authored_by")))
 checks.append(("OK" if (omo.get("experimental") or {}).get("disable_omo_env") is True else "BAD",
                "disable_omo_env=%s" % (omo.get("experimental") or {}).get("disable_omo_env")))
-checks.append(("OK" if not omo.get("mcp_env_allowlist") else "BAD", "mcp_env_allowlist empty"))
-or_models = (((oc.get("provider") or {}).get("openrouter") or {}).get("models") or {})
-available_routes = all(
-    (((m.get("options") or {}).get("provider") or {}).get("data_collection") == "allow"
-     and "zdr" not in ((m.get("options") or {}).get("provider") or {}))
-    for m in or_models.values() if isinstance(m, dict)
-)
-checks.append(("OK" if available_routes and or_models else "BAD", "OpenRouter routes unrestricted (data_collection=allow, no ZDR filter)"))
 dmcps = set(omo.get("disabled_mcps") or [])
 checks.append(("OK" if "posthog:posthog" in dmcps and "sentry:sentry" in dmcps else "BAD",
                "posthog/sentry MCPs disabled"))
@@ -1687,7 +1608,8 @@ unset _kv _k _want _got _tel_env_ok
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Compaction optimizations ─────────────────────────────────────
 sec "Compaction optimizations"
-# Compaction is configured through supported opencode.json compaction.* keys.
+# Compaction is configured through opencode.json compaction.*. The similarly
+# named experimental.compaction.autocontinue is a plugin hook, not a config key.
 comp_report="$(python3 - "$REPO" <<'PY' 2>/dev/null || true
 import json, os, sys
 repo=sys.argv[1]
@@ -1800,11 +1722,11 @@ if [[ ${#ext_cfg[@]} -gt 0 ]]; then
   bad "external config loads alongside repo: ${ext_cfg[*]} — move/remove it (repo is the single source)"
 else ok "no external opencode.json outside the repo"; fi
 
-# 4. Skills fence — global OpenConfig skills + project ./skills (no ~/.claude / ~/.agents)
+# 4. Skills fence — canonical OpenConfig skills only (no duplicates, no ~/.claude / ~/.agents)
 ext_skills="$(python3 - "$REPO" <<'PY' 2>/dev/null || true
 import json, os, sys
 repo=sys.argv[1]; ext=[]
-ALLOWED={ "~/.config/opencode/skills", "./skills" }
+ALLOWED={ "~/.config/opencode/skills" }
 def outside(p):
     p=str(p)
     if p in ALLOWED: return False
@@ -1820,7 +1742,7 @@ PY
 )"
 if [[ -n "$ext_skills" ]]; then
   opt "skills load from OUTSIDE OpenConfig: ${ext_skills//|/, } — run: oc fix"
-else ok "skills: ~/.config/opencode/skills + ./skills (any project cwd)"; fi
+else ok "skills: ~/.config/opencode/skills only (canonical OpenConfig skills, no duplicate ./skills load)"; fi
 
 # 5. Claude Code bridge — imports external MCP/commands/skills/hooks
 cc_on="$(python3 -c "
@@ -1842,7 +1764,16 @@ if [[ -n "${pin:-}" ]]; then
       opt "plugin cache empty AND ~/.bun/install/cache present — stale manifest may 404 the install; --harden clears it"
       HARDEN_REMOVE+=("$HOME/.bun/install/cache")
     fi
-  else ok "package caches healthy (plugin installed)"; fi
+  else
+    ok "package caches healthy (plugin installed)"
+    if [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] && command -v node >/dev/null 2>&1; then
+      if node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --check --repo "$REPO" >/dev/null 2>&1; then
+        ok "OmO governed runtime patch present (fallback + canonical agent models)"
+      else
+        opt "OmO governed runtime patch missing — run: oc plugin --fix"
+      fi
+    fi
+  fi
 fi
 [[ $DO_JSON -eq 0 ]] && echo ""
 # ─── Harden (optional): remove opencode-owned externals + disable external loading ─

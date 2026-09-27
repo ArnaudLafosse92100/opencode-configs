@@ -205,6 +205,7 @@ oc_print_script_help() {
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   oc_harden_shell
   oc_harden_home || return 1
+  [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
   oc_harden_xdg || return 1
   oc_set_standard_paths
   if [[ -n "${REPO:-}" ]] || [[ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/opencode.json" ]]; then
@@ -232,9 +233,13 @@ OC_ENV_ALLOWLIST=(
   OMO_CODEX_SEND_ANONYMOUS_TELEMETRY
   CODEGRAPH_TELEMETRY
   OTEL_SDK_DISABLED
+  OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK
+  OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS
 )
 
-# Install/runtime junk OpenCode may drop into the config repo.
+# Install/runtime junk OpenCode may drop into the immutable source repository.
+# Compatibility profile homes are intentionally writable and must never be
+# scrubbed by session launch paths.
 OC_CONFIG_STRAYS=(
   node_modules
   package.json
@@ -247,11 +252,158 @@ OC_CONFIG_STRAYS=(
   .omo
   .runtime
   .sisyphus
-  .codegraph
   command
   .opencode
   plugins
 )
+
+oc_compat_current_path() {
+  if [[ -n "${OC_RUNTIME_STATE_DIR:-}" ]]; then
+    printf '%s/compat/current\n' "${OC_RUNTIME_STATE_DIR%/}"
+  else
+    printf '%s/openconfig/compat/current\n' "${XDG_STATE_HOME}"
+  fi
+}
+
+# Native OmO is an OpenConfig-governed generated endpoint.  Its regular-file
+# to stable-alias migration is explicit (setup/install only), recoverable, and
+# blocked whenever OmO has its own unfinished migration journal.
+oc_native_omo_path() { printf '%s\n' "${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"; }
+oc_native_omo_journal_path() { printf '%s/.migration-journal.json\n' "$(dirname "$(oc_native_omo_path)")"; }
+
+oc_native_omo_envelope_valid() {
+  local file="${1:?file}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" validate-native "$file" --require-envelope >/dev/null 2>&1
+}
+
+oc_native_omo_regular_valid() {
+  local file="${1:?file}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" validate-native "$file" >/dev/null 2>&1
+}
+
+oc_native_omo_opencode_digest() {
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" native-opencode-digest "${1:?file}"
+}
+
+oc_native_omo_migration_equivalent() {
+  local source="${1:?source}" target="${2:?target}" profile="${3:?profile}"
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" native-opencode-equivalent "$source" "$target" "$profile" >/dev/null 2>&1
+}
+
+# Prints alias|regular|missing|wrong-symlink|broken-alias|invalid-alias|invalid.
+# This does not follow
+# the leaf symlink while identifying the governed native path.
+oc_native_omo_alias_state() {
+  local native target state active resolved expected
+  native="$(oc_native_omo_path)"
+  target="$(oc_compat_current_path)/.omo.jsonc"
+  if [[ -L "$native" ]]; then
+    resolved="$(oc_readlink_abs "$native" 2>/dev/null || true)"
+    if [[ "$resolved" == "$target" ]]; then
+      [[ -f "$target" ]] || { printf 'broken-alias\n'; return; }
+      oc_native_omo_envelope_valid "$target" && { printf 'alias\n'; return; }
+      printf 'invalid-alias\n'; return
+    fi
+    printf 'wrong-symlink\n'; return
+  fi
+  [[ -e "$native" ]] || { printf 'missing\n'; return; }
+  oc_native_omo_regular_valid "$native" && printf 'regular\n' || printf 'invalid\n'
+}
+
+# Requires a rendered compat current view with matching profile marker, then
+# copies a valid regular native file into the governed backup root and installs
+# only the stable compat/current alias after every recovery proof is durable.
+# Never call from runtime activation.
+oc_provision_native_omo_alias() {
+  local repo="${1:?repo}" native journal target state active target_real marker_real repo_real sha mode backup_sha backup_mode metadata source_digest target_digest state_root profile_marker alias_tmp
+  native="$(oc_native_omo_path)"
+  journal="$(oc_native_omo_journal_path)"
+  target="$(oc_compat_current_path)/.omo.jsonc"
+  state="$(oc_native_omo_alias_state)"
+  [[ ! -e "$journal" && ! -L "$journal" ]] || { echo "pending OmO migration journal: $journal" >&2; return 2; }
+  [[ -f "$target" ]] && oc_native_omo_envelope_valid "$target" || { echo "invalid or missing generated OmO envelope: $target" >&2; return 2; }
+  state_root="${OC_RUNTIME_STATE_DIR:-${XDG_STATE_HOME}/openconfig}"
+  active="$(cat "${state_root}/active-profile" 2>/dev/null || true)"
+  target_real="$(realpath "$target" 2>/dev/null || true)"
+  marker_real="$(realpath "$(dirname "$target")/.openconfig-source" 2>/dev/null || true)"
+  repo_real="$(realpath "$repo" 2>/dev/null || true)"
+  profile_marker="$(cat "$(dirname "$target")/.active-profile" 2>/dev/null || true)"
+  [[ "$active" =~ ^(normal|normal-private|pentest)$ && "$target_real" && "$profile_marker" == "$active" && "$marker_real" == "$repo_real" ]] \
+    || { echo "compat profile/envelope/source consensus failed (active=${active:-missing}, envelope=$target_real, source=$marker_real)" >&2; return 2; }
+  case "$state" in
+    alias) return 0 ;;
+    regular)
+      source_digest="$(oc_native_omo_opencode_digest "$native")" || return 2
+      target_digest="$(oc_native_omo_opencode_digest "$target")" || return 2
+      if [[ "$source_digest" == "missing" || "$source_digest" == "$target_digest" ]] \
+        || oc_native_omo_migration_equivalent "$native" "$target" "$active"; then
+        :
+      else
+        echo "existing native [opencode] diverges from rendered compatibility envelope" >&2
+        return 2
+      fi
+      sha="$(shasum -a 256 "$native" | awk '{print $1}')"
+      mode="$(stat -f '%Lp' "$native" 2>/dev/null || stat -c '%a' "$native" 2>/dev/null || echo unknown)"
+      # Copy first: a metadata failure must leave the valid regular native
+      # config usable and retryable. We replace it only after every proof is
+      # durable and re-validated.
+      oc_backup_copy "$native" "omo-native" || return 2
+      backup_sha="$(shasum -a 256 "$OC_BACKUP_PATH" | awk '{print $1}')"
+      backup_mode="$(stat -f '%Lp' "$OC_BACKUP_PATH" 2>/dev/null || stat -c '%a' "$OC_BACKUP_PATH" 2>/dev/null || echo unknown)"
+      [[ "$backup_sha" == "$sha" && "$backup_mode" == "$mode" ]] || { echo "native OmO backup hash/mode mismatch; refusing alias" >&2; return 2; }
+      metadata="$(dirname "$OC_BACKUP_PATH")/openconfig-native-omo-migration.json"
+      if [[ "${OC_NATIVE_OMO_METADATA_FAIL:-0}" == 1 ]]; then
+        echo "native OmO migration metadata write was injected to fail; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      fi
+      python3 - "$metadata" "$native" "$sha" "$mode" "$target" <<'PY' || {
+import json, os, sys
+destination, source, digest, mode, target = sys.argv[1:]
+temporary = f"{destination}.tmp-{os.getpid()}"
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"schema_version": 1, "source": source, "sha256": digest, "mode": mode, "alias_target": target}, handle, sort_keys=True)
+    handle.write("\n")
+os.chmod(temporary, 0o600)
+os.replace(temporary, destination)
+PY
+        echo "native OmO migration metadata write failed; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      }
+      # Re-read every proof immediately before publishing the alias. A failed
+      # metadata write leaves the regular native file intact; a later external
+      # mutation is never reported as a successful migration.
+      [[ -f "$native" && ! -L "$native" && -f "$OC_BACKUP_PATH" ]] || { echo "native OmO source/backup state changed after backup; refusing alias" >&2; return 2; }
+      [[ "$(shasum -a 256 "$native" | awk '{print $1}')" == "$sha" ]] || { echo "native OmO source changed after backup; refusing alias" >&2; return 2; }
+      [[ "$(stat -f '%Lp' "$native" 2>/dev/null || stat -c '%a' "$native" 2>/dev/null || echo unknown)" == "$mode" ]] || { echo "native OmO source mode changed after backup; refusing alias" >&2; return 2; }
+      backup_sha="$(shasum -a 256 "$OC_BACKUP_PATH" | awk '{print $1}')"
+      backup_mode="$(stat -f '%Lp' "$OC_BACKUP_PATH" 2>/dev/null || stat -c '%a' "$OC_BACKUP_PATH" 2>/dev/null || echo unknown)"
+      [[ "$backup_sha" == "$sha" && "$backup_mode" == "$mode" ]] || { echo "native OmO backup changed after metadata write; refusing alias" >&2; return 2; }
+      python3 - "$metadata" "$native" "$sha" "$mode" "$target" <<'PY' || {
+import json, os, sys
+metadata, source, digest, mode, target = sys.argv[1:]
+with open(metadata, encoding="utf-8") as handle:
+    payload = json.load(handle)
+if payload != {"schema_version": 1, "source": source, "sha256": digest, "mode": mode, "alias_target": target}:
+    raise SystemExit(1)
+if os.stat(metadata).st_mode & 0o777 != 0o600:
+    raise SystemExit(1)
+PY
+        echo "native OmO migration metadata validation failed; backup retained at $OC_BACKUP_PATH" >&2
+        return 2
+      }
+      alias_tmp="${native}.openconfig-alias.$$"
+      rm -f "$alias_tmp"
+      ln -s "$target" "$alias_tmp" || { echo "native OmO alias staging failed; backup retained at $OC_BACKUP_PATH" >&2; return 2; }
+      mv -f "$alias_tmp" "$native" || { rm -f "$alias_tmp"; echo "native OmO alias publish failed; regular native and backup retained" >&2; return 2; }
+      ;;
+    missing)
+      mkdir -p "$(dirname "$native")"
+      ln -s "$target" "$native"
+      ;;
+    *) echo "refusing native OmO alias migration: state=$state ($native)" >&2; return 2 ;;
+  esac
+  [[ "$(oc_native_omo_alias_state)" == alias ]] || { echo "native OmO alias verification failed" >&2; return 2; }
+}
 
 # ── Branding (OpenConfig — `oc`) ─────────────────────────────────────
 # Shared chrome for install / setup / oc help. Product name is OpenConfig;
@@ -385,10 +537,65 @@ oc_telemetry_off() {
         OTEL_EXPORTER_OTLP_METRICS_ENDPOINT OTEL_EXPORTER_OTLP_LOGS_ENDPOINT \
         OTEL_EXPORTER_OTLP_HEADERS OPENCODE_OTLP_ENDPOINT 2>/dev/null || true
   export OTEL_SDK_DISABLED=true
+  # OpenConfig-owned OmO runtime fallback knobs. Keep custom behavior out of
+  # native runtime_fallback JSON so upstream OmO schema/doctor stay clean.
+  export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK="${OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK:-2}"
+  export OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS="${OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS:-20}"
   export OPENCODE_DISABLE_EXTERNAL_SKILLS="${OPENCODE_DISABLE_EXTERNAL_SKILLS:-1}"
   export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS="${OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:-1}"
   export OPENCODE_DISABLE_LSP_DOWNLOAD="${OPENCODE_DISABLE_LSP_DOWNLOAD:-1}"
   export OPENCODE_FAST_BOOT="${OPENCODE_FAST_BOOT:-1}"
+}
+
+# Read the paired config/XDG/profile snapshot as one producer result.  Do not
+# use `eval "$(...)"`: command-substitution failure is otherwise masked and a
+# caller can continue with inherited (possibly stale) runtime paths.  The
+# runtime-profile producer emits shell-escaped assignments from our pinned
+# generator; after evaluating them, still validate the small fixed contract.
+oc_load_runtime_profile_env() {
+  local runtime_profile_bin="${1:?runtime-profile command}" runtime_snapshot
+
+  # These must never survive a failed producer invocation.
+  unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+  if ! runtime_snapshot="$("$runtime_profile_bin" env --shell 2>/dev/null)"; then
+    echo "OpenConfig runtime profile snapshot unavailable" >&2
+    return 1
+  fi
+  if ! eval "$runtime_snapshot"; then
+    unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+    echo "OpenConfig runtime profile snapshot is invalid" >&2
+    return 1
+  fi
+  if [[ "${OPENCODE_CONFIG_DIR:-}" != /* || "${XDG_CONFIG_HOME:-}" != /* \
+    || "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal && "${OPENCONFIG_RUNTIME_PROFILE:-}" != normal-private && "${OPENCONFIG_RUNTIME_PROFILE:-}" != pentest ]]; then
+    unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+    echo "OpenConfig runtime profile snapshot is invalid" >&2
+    return 1
+  fi
+  export OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE
+}
+
+# The pinned OmO hook reads this before its first prompt watchdog. Keep the
+# profile split explicit here; model/rung-specific recovery remains governed by
+# the patched runtime and never invents a lineage identity or a USD hard cap.
+oc_apply_profile_retry_policy() {
+  case "${OPENCONFIG_RUNTIME_PROFILE:-normal}" in
+    pentest) export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=3 ;;
+    normal|normal-private) export OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK=2 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Applied markers are bridge health evidence only when they bind the complete
+# immutable runtime+compat identity selected by compat/current.
+oc_applied_identity_matches() {
+  local marker="${1:?applied marker JSON}" expected="${2:?expected identity JSON}"
+  python3 - "$marker" "$expected" <<'PY'
+import json, sys
+marker, expected = (json.loads(value) for value in sys.argv[1:])
+fields = ("schema_version", "profile", "fingerprint", "generation", "compat_generation", "xdg_identity", "compat_identity", "compat_manifest_sha256", "model")
+raise SystemExit(0 if all(marker.get(field) == expected.get(field) for field in fields) else 1)
+PY
 }
 
 # Remove install/runtime strays from the config repo. Prints removed names on stdout.
@@ -416,7 +623,7 @@ oc_is_cli_install_dir() {
   # Treat as CLI install when the only "interesting" entries are bin + install junk
   local extra
   extra="$(find "$d" -maxdepth 1 -mindepth 1 \
-    ! -name bin ! -name .gitignore \
+    ! -name bin ! -name .gitignore ! -name .DS_Store \
     ! -name node_modules ! -name package.json ! -name package-lock.json ! -name bun.lock ! -name bun.lockb \
     2>/dev/null | head -1)"
   [[ -z "$extra" ]]
@@ -1011,75 +1218,6 @@ except Exception:
 PY
 }
 
-# Remove KEY from a dotenv file (no-op if missing).
-# Usage: oc_remove_env_key "$file" KEY
-oc_remove_env_key() {
-  local file="${1:?}" key="${2:?}"
-  [[ -f "$file" ]] || return 0
-  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
-    echo "oc: invalid env key: $key" >&2
-    return 1
-  }
-  python3 - "$file" "$key" <<'PY'
-import os, sys, tempfile
-path, key = sys.argv[1], sys.argv[2]
-lines = []
-removed = False
-with open(path, encoding="utf-8") as f:
-    for raw in f:
-        line = raw.rstrip("\n")
-        stripped = line.strip()
-        body = stripped[7:].lstrip() if stripped.startswith("export ") else stripped
-        if body and not body.startswith("#") and "=" in body:
-            k = body.split("=", 1)[0].strip()
-            if k == key:
-                removed = True
-                continue
-        lines.append(line)
-if not removed:
-    sys.exit(0)
-dir_name = os.path.dirname(path) or "."
-fd, tmp = tempfile.mkstemp(prefix=".env.", dir=dir_name, text=True)
-try:
-    with os.fdopen(fd, "w", encoding="utf-8") as out:
-        if lines:
-            out.write("\n".join(lines) + "\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, path)
-except Exception:
-    try:
-        os.unlink(tmp)
-    except OSError:
-        pass
-    raise
-PY
-}
-
-# OpenRouter-only stack: strip OPENAI_API_KEY from .env (prevents direct-lane 401 noise).
-# Prints: CLEARED|reason  or  OK|reason
-# Usage: oc_scrub_openai_env_key "$repo/opencode.json" "$repo/.env"
-oc_scrub_openai_env_key() {
-  local oc_json="${1:?}" env_file="${2:?}"
-  [[ -f "$oc_json" && -f "$env_file" ]] || return 0
-  local active oai
-  active="$(python3 - "$oc_json" <<'PY' 2>/dev/null || echo 0
-import json, sys
-cfg = json.load(open(sys.argv[1], encoding="utf-8"))
-enabled = cfg.get("enabled_providers")
-print(1 if isinstance(enabled, list) and "openai" in enabled else 0)
-PY
-)"
-  oai="$(oc_get_env_key "$env_file" OPENAI_API_KEY 2>/dev/null || true)"
-  [[ -n "$oai" ]] || { printf 'OK|OPENAI_API_KEY unset\n'; return 0; }
-  if [[ "$active" == "1" ]]; then
-    printf 'OK|direct OpenAI enabled — key kept\n'
-    return 0
-  fi
-  oc_backup_copy "$env_file" "openai-key-scrub" >/dev/null 2>&1 || true
-  oc_remove_env_key "$env_file" OPENAI_API_KEY
-  printf 'CLEARED|OpenRouter-only — removed OPENAI_API_KEY from .env\n'
-}
-
 # Ensure every KEY= from .env.example exists in dest .env.
 # Never overwrites a non-empty value. Safe for upgrades when new keys are added.
 # Usage: oc_ensure_env_keys_from_example "$env_file" "$example_file"
@@ -1661,11 +1799,12 @@ oc_strip_ansi() {
   printf '%s' "$*" | sed $'s/\x1b\\[[0-9;]*[A-Za-z]//g'
 }
 
-# Redact credentials before any text reaches a maintenance log.
+# Redact credentials before provider diagnostics or maintenance output can be
+# logged. Keep this centralized so every shell caller applies the same rules.
 oc_redact_secrets() {
   sed -E \
     -e 's/(Authorization:[[:space:]]*Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1<redacted>/Ig' \
-    -e 's/((API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Za-z0-9_-]*[[:space:]]*[:=][[:space:]]*)[^[:space:]\"'\"']+/\1<redacted>/Ig' \
+    -e 's/((API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Za-z0-9_-]*[[:space:]]*[:=][[:space:]]*)[^[:space:]"]+/\1<redacted>/Ig' \
     -e 's/(sk-(or-v1-|proj-)?)[A-Za-z0-9_-]{16,}/\1<redacted>/g' \
     -e 's/(gh[pousr]_)[A-Za-z0-9]{16,}/\1<redacted>/g'
 }
@@ -1686,6 +1825,8 @@ oc_log_open() {
   {
     echo "# opencode-configs ${kind} log"
     echo "# started: $(oc_log_ts)"
+    echo "# host: $(uname -n 2>/dev/null || echo unknown)"
+    echo "# user: $(id -un 2>/dev/null || echo unknown)"
     echo "# pid: $$"
     echo "# ----"
   } >"$OC_LOG_FILE"
@@ -1925,8 +2066,46 @@ oc_default_workspace_name() {
   printf '%s\n' "$name"
 }
 
+# True only for the scratch workspace that OpenConfig generated and whose
+# prompt paths point outside the current canonical checkout. Arbitrary project
+# configs are never classified as generated and are therefore never rewritten.
+oc_generated_workspace_config_stale() {
+  local dest="${1:-}" repo="${REPO:-}"
+  [[ -n "$dest" && -n "$repo" && -f "$dest/AGENTS.md" && -f "$dest/opencode.json" ]] || return 1
+  grep -qF 'Scratch workspace for `oc launch` (OpenConfig).' "$dest/AGENTS.md" 2>/dev/null || return 1
+  python3 - "$dest/opencode.json" "$repo" <<'PY'
+import json, os, sys
+
+config_path, repo = sys.argv[1:3]
+try:
+    data = json.load(open(config_path, encoding="utf-8"))
+except Exception:
+    sys.exit(1)
+
+repo = os.path.realpath(repo)
+for value in data.get("instructions") or []:
+    if not isinstance(value, str) or not os.path.isabs(value):
+        continue
+    normalized = os.path.realpath(value)
+    is_openconfig_prompt = normalized.endswith("/prompts/core.md") or "/prompts/profiles/" in normalized
+    if is_openconfig_prompt and not normalized.startswith(repo + os.sep):
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+# Refresh only a provably generated scratch config. A copy is kept in the
+# normal OpenConfig backup tree before the canonical profile is rendered.
+oc_refresh_generated_workspace_config() {
+  local dest="${1:-}" profile="${2:-$(oc_default_profile)}"
+  oc_generated_workspace_config_stale "$dest" || return 0
+  oc_backup_copy "$dest/opencode.json" "launch-workspace-config" >/dev/null || return 1
+  oc_write_project_opencode_json "$profile" "$dest/opencode.json"
+}
+
 # Ensure a clean launch workspace subdirectory under the projects home.
-# Creates AGENTS.md + project opencode.json when missing; scrubs install strays.
+# Creates AGENTS.md + project opencode.json when missing, repairs only stale
+# generated configs, and scrubs install strays.
 # Prints absolute path. Never returns the bare projects home.
 oc_ensure_launch_workspace() {
   local home name dest profile
@@ -1971,6 +2150,11 @@ EOF
         '  "instructions": ["AGENTS.md"]' \
         '}' >"$dest/opencode.json"
     fi
+  fi
+  if [[ -n "${REPO:-}" && -f "${REPO}/profiles/${profile}.json" ]]; then
+    oc_refresh_generated_workspace_config "$dest" "$profile" || return 1
+    mkdir -p "$dest/.opencode"
+    ln -sfn "$REPO/profiles/$profile.json" "$dest/.opencode/profile.json"
   fi
   if [[ ! -f "$dest/.gitignore" ]]; then
     printf '%s\n' \
@@ -2097,8 +2281,7 @@ PY
 
 
 # ── Distribution host (encoded) ──────────────────────────────────────
-# signature.json github_b64 holds the clone base URL. Kept encoded so the
-# tree has no distribution-host owner literals; decode only at runtime.
+# signature.json github_b64 + github_ref identify the canonical distribution.
 oc_github_url() {
   local sig="${1:-${REPO:?}/signature.json}"
   python3 - "$sig" <<'PY'
@@ -2109,6 +2292,19 @@ if not b64:
     sys.stderr.write("oc: signature.json missing github_b64\n")
     sys.exit(2)
 print(base64.b64decode(b64).decode("ascii").rstrip("/"))
+PY
+}
+
+oc_github_ref() {
+  local sig="${1:-${REPO:?}/signature.json}"
+  python3 - "$sig" <<'PY'
+import json, sys
+sig = json.load(open(sys.argv[1], encoding="utf-8"))
+ref = str(sig.get("github_ref") or "").strip()
+if not ref or ref.startswith("-") or any(ch.isspace() for ch in ref):
+    sys.stderr.write("oc: signature.json missing/invalid github_ref\n")
+    sys.exit(2)
+print(ref)
 PY
 }
 
@@ -2141,7 +2337,7 @@ oc_github_raw_url() {
 }
 
 # ── Project identity signature ───────────────────────────────────────
-# signature.json proves this tree is OpenConfig (jesseoue/opencode-configs),
+# signature.json proves this tree is OpenConfig (openconfig/opencode-configs),
 # not a random OpenCode clone. Fingerprint covers files[]; markers cover branding.
 
 # Compute fingerprint for REPO (or $1). Prints sha256 hex (no prefix).
@@ -2204,8 +2400,8 @@ if sig.get("product") != "OpenConfig":
 if sig.get("cli") != "oc":
     fail(f"cli={sig.get('cli')!r} (expected oc)")
 sid = sig.get("id") or ""
-if sid != "jesseoue/opencode-configs":
-    fail(f"id={sid!r} (expected jesseoue/opencode-configs)")
+if sid != "openconfig/opencode-configs":
+    fail(f"id={sid!r} (expected openconfig/opencode-configs)")
 
 for m in sig.get("markers") or []:
     rel = m.get("path") or ""
@@ -2317,12 +2513,23 @@ raise SystemExit(1)
 PY
 }
 
+oc_patch_omo_runtime_fallback() {
+  [[ -n "${REPO:-}" ]] || return 0
+  [[ -f "$REPO/scripts/patch-omo-runtime-fallback.mjs" ]] || return 0
+  command -v node >/dev/null 2>&1 || {
+    echo "oc: node required to patch OmO runtime fallback" >&2
+    return 1
+  }
+  node "$REPO/scripts/patch-omo-runtime-fallback.mjs" --apply --repo "$REPO" >/dev/null
+}
+
 # Cost-free runtime visibility probe. Loads agent declarations only; never starts
 # an agent or sends a model request. Output is KIND|message for doctor/tests.
 oc_agent_visibility_report() {
   local bin="${1:-${OC_CLI_BIN:-opencode}}" repo="${2:-${REPO:-.}}" timeout_s="${3:-8}"
   python3 - "$bin" "$repo" "$timeout_s" <<'PY'
 import glob, json, os, re, subprocess, sys, time
+
 oc, repo, timeout_s = sys.argv[1], sys.argv[2], float(sys.argv[3])
 expected = {"sisyphus"}
 for path in glob.glob(os.path.join(repo, "teams", "*", "config.json")):
@@ -2333,10 +2540,15 @@ for path in glob.glob(os.path.join(repo, "teams", "*", "config.json")):
     for route in [team.get("lead") or {}, *(team.get("members") or [])]:
         if isinstance(route, dict) and route.get("kind") == "subagent_type":
             expected.add(str(route.get("subagent_type") or "").lower())
+
 started = time.monotonic()
 try:
     proc = subprocess.run(
-        [oc, "agent", "list"], cwd=repo, capture_output=True, text=True, timeout=timeout_s,
+        [oc, "agent", "list"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=timeout_s,
         env={**os.environ, "TERM": os.environ.get("TERM", "xterm-256color")},
     )
 except subprocess.TimeoutExpired:
@@ -2345,10 +2557,12 @@ except subprocess.TimeoutExpired:
 except Exception as exc:
     print("OPT|runtime visibility probe failed (%s)" % str(exc)[:120])
     raise SystemExit
+
 if proc.returncode:
     detail = (proc.stderr or proc.stdout or "no output").strip().splitlines()
     print("OPT|runtime visibility probe exited %d: %s" % (proc.returncode, (detail[-1] if detail else "no output")[:120]))
     raise SystemExit
+
 visible = set()
 for line in proc.stdout.splitlines():
     match = re.match(r"^(.+?) \((?:primary|subagent)\)\s*$", line)
@@ -2368,11 +2582,13 @@ oc_log_misuse_report() {
   local log="${1:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode/log/opencode.log}"
   python3 - "$log" <<'PY'
 import collections, re, sys
+
 try:
     with open(sys.argv[1], encoding="utf-8", errors="replace") as fh:
         text = "".join(collections.deque(fh, maxlen=20000))
 except OSError:
     raise SystemExit
+
 ses = len(re.findall(r"Expected a string starting with .ses|task_id.*must.*ses_", text, re.I))
 bg = len(re.findall(r"Expected a string starting with .bg|task_id.*must.*bg_", text, re.I))
 poll = len(re.findall(r"background_output[^\n]*block=true|block=true[^\n]*background_output", text, re.I))
@@ -2383,7 +2599,7 @@ if bg:
     print(f"OPT|background transcript id misuse ({bg} hits): background_output(task_id=…) accepts only real bg_… ids")
     print("TIP|do not convert ses_… to bg_… or invent an id; retain the exact bg_… returned at launch")
 if poll:
-    print(f"OPT|blocking background_output misuse ({poll} hits) can stall orchestration")
+    print(f"OPT|blocking background_output misuse (%s hits) can stall orchestration" % poll)
     print("TIP|use block=false only for an immediate peek; otherwise end the turn and consume the completion notification")
 PY
 }
@@ -2421,6 +2637,7 @@ oc_ensure_omo_plugin_cache() {
   ver="${pin#oh-my-openagent@}"
   cdir="$(oc_omo_plugin_cache_dir "$pin")" || return 1
   if oc_omo_plugin_cache_ok "$pin"; then
+    oc_patch_omo_runtime_fallback || return 1
     return 0
   fi
   if ! command -v bun >/dev/null 2>&1; then
@@ -2463,6 +2680,7 @@ PKGJSON
     echo "oc: plugin cache still missing node_modules/oh-my-openagent after install ($pin)" >&2
     return 1
   fi
+  oc_patch_omo_runtime_fallback || return 1
   return 0
 }
 

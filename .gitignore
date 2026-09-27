@@ -19,18 +19,21 @@
 !versions.json
 !vault.json
 !signature.json
-!t3-opencode.json
+!runtime-profile.json
 !tui.json
 !tmux.conf
 !zshrc.snippet
 !opencode.json
 !oh-my-openagent.json
 !oc
+!.github/
+!.github/**
+!docs/
 
 # ── Allowlist: scripts ──────────────────────────────────────────────
 !*.sh
-!export-t3.py
-!sync-t3.py
+!scripts/
+!scripts/**
 
 # ── Allowlist: trees (dir + contents) ───────────────────────────────
 !agents/
@@ -47,8 +50,8 @@
 !teams/**
 !tests/
 !tests/**
-!.github/
-!.github/**
+!evals/
+!evals/**
 
 # ── Never track — even inside allowlisted trees ─────────────────────
 # Secrets

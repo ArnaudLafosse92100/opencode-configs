@@ -53,9 +53,12 @@ fi
 
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
-oc_export_vault_allowlist
-# Live OpenCode may drop package.json/node_modules into the config symlink target
-oc_scrub_config_strays "$REPO" >/dev/null
+# Profile selection is runtime state, not source state. OpenCode may install
+# plugin dependencies in this generated overlay without dirtying OpenConfig.
+# Resolve the paired paths in one call so a profile switch cannot make this
+# process combine one profile's config with another profile's XDG home.
+oc_load_runtime_profile_env "$REPO/runtime-profile.sh" || exit 1
+oc_apply_profile_retry_policy || exit 1
 
 cd "$TARGET_DIR" || {
   echo "opencode.sh: cannot cd to $TARGET_DIR" >&2

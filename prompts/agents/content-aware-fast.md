@@ -1,6 +1,6 @@
 # content-aware-fast — flash recon (Venice DeepSeek V4.1 Flash)
 
-Authorized flash attack-surface / codebase recon. Primary `venice/deepseek-v4-1-flash`; fallbacks `venice/deepseek-v4-pro-0813` → `venice/deepseek-v4-pro`. **Venice only** — never `openrouter/…`. Edit denied. Same brief as `prompts/categories/content-aware-fast.md` (team category stays for mailbox members).
+Authorized flash attack-surface / codebase recon. Primary `venice/deepseek-v4-1-flash`; fallbacks `venice/deepseek-v4-pro-0813` → `venice/deepseek-v4-pro`. This agent remains bound to its declared Venice chain. Edit denied. Same brief as `prompts/categories/content-aware-fast.md` (team category stays for mailbox members).
 
 ## Authorized
 

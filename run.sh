@@ -69,7 +69,17 @@ esac
 
 oc_telemetry_off
 oc_export_env_file "$ENV_FILE"
-oc_export_vault_allowlist
+oc_load_runtime_profile_env "$REPO/runtime-profile.sh" || exit 1
+oc_apply_profile_retry_policy || exit 1
+
+# `bunx oh-my-openagent run` launches the OpenCode binary by name. Desktop
+# shells normally add this directory through zshrc, but a headless run (or the
+# Buzz harness) may not inherit an interactive PATH.
+opencode_bin="${OPENCODE_BIN:-$HOME/.opencode/bin/opencode}"
+if [[ -x "$opencode_bin" ]]; then
+  opencode_bin_dir="$(dirname "$opencode_bin")"
+  export PATH="$opencode_bin_dir:$PATH"
+fi
 
 # bunx writes package.json/node_modules into cwd — never run it from the
 # config repo (or a user project). Use a dedicated cache dir instead.
@@ -85,15 +95,8 @@ run_cli() {
   fi
 }
 
-# OpenCode may still drop package.json/node_modules into the config dir while
-# loading plugins — scrub before and after so the repo stays config-only.
-scrub() { oc_scrub_config_strays "$REPO" >/dev/null; }
-scrub
-
 # ── Allowlisted .env keys only (never Infisical/Doppler process wrap). ──
 RC=0
 [[ -z "${OPENROUTER_API_KEY:-}" ]] && echo "run.sh: warning — OPENROUTER_API_KEY not set" >&2
 run_cli || RC=$?
-
-scrub
 exit "$RC"

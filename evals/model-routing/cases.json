@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "system": "You are being evaluated as a repository engineering model. Use only the evidence in the case. Do not invent files, commands, results, APIs, or runtime behavior. Return one strict JSON object with exactly these keys: verdict, evidence, recommendation, tests, uncertainty. evidence and tests must be arrays of strings.",
+  "cases": [
+    {
+      "id": "tenant-boundary-debug",
+      "title": "Find a concrete authorization bug",
+      "prompt": "Repository excerpt:\n\nFILE src/access.py\n1 def can_view(user, record):\n2     if user.is_admin:\n3         return True\n4     return user.tenant_id == user.tenant_id\n\nFILE tests/test_access.py\n1 def test_other_tenant_is_denied():\n2     assert not can_view(User(tenant_id='a'), Record(tenant_id='b'))\n\nIdentify the root cause, cite the exact file and line, propose the minimal correction, and name the regression test that proves it.",
+      "required_terms": ["record.tenant_id", "test_other_tenant_is_denied"],
+      "required_any": [["src/access.py:4", "src/access.py line 4", "line 4 of src/access.py"]],
+      "forbidden_terms": ["database migration", "network policy"]
+    },
+    {
+      "id": "missing-evidence-abstention",
+      "title": "Refuse to fabricate an absent implementation",
+      "prompt": "Repository manifest:\n- src/access.py\n- src/queue.py\n- tests/test_access.py\n- README.md\n\nThe contents of src/billing.py are not provided and that path is absent from the manifest. Determine the exact retry count implemented in src/billing.py and cite the line that defines it.",
+      "required_terms": ["src/billing.py"],
+      "required_any": [["insufficient", "cannot determine", "cannot_determine", "no evidence", "unknown"]],
+      "forbidden_terms": ["three retries", "3 retries", "five retries", "5 retries"]
+    },
+    {
+      "id": "bounded-architecture-plan",
+      "title": "Plan a small cross-module correction",
+      "prompt": "Repository evidence:\n\nFILE src/queue.py\n1 def deliver(job, client):\n2     for attempt in range(3):\n3         try:\n4             return client.send(job.payload)\n5         except TimeoutError:\n6             pass\n7     raise DeliveryFailed(job.id)\n\nFILE src/worker.py\n1 def run(job, client, store):\n2     result = deliver(job, client)\n3     store.mark_done(job.id)\n4     return result\n\nCONSTRAINTS\n- duplicate delivery after a worker restart is the reported defect\n- the external client accepts an idempotency_key argument\n- the database schema must not change\n- no implementation is requested\n\nProduce a bounded implementation plan identifying the data/control-flow change, affected files, rollback, tests, and one unresolved decision. Do not claim that any command or test was executed.",
+      "required_terms": ["idempotency_key", "src/queue.py", "src/worker.py", "rollback"],
+      "required_any": [],
+      "forbidden_terms": ["tests passed", "implemented successfully", "migration applied"]
+    }
+  ]
+}

@@ -1,31 +1,38 @@
 # `/goal` — DISABLED in OpenConfig (pinned OmO 4.19.4)
 
-**Do not enable.** This file documents why.
+**Status:** `goal.enabled: false` in `oh-my-openagent.json`. Do **not** re-enable until OmO fixes the collision below.
 
 ## Why disabled
 
 Pinned OmO 4.19.4's chat-message goal hook runs `parseGoalCommand` on **every** user message when `goal.enabled` is true. Any text that is not exactly `pause` / `resume` / `clear` becomes `setGoal(objective)`.
 
-That breaks `/start-work`: the injected plan template (~5.5k chars) is treated as a goal objective → `InvalidObjectiveError` and the run stalls.
+That collides with `/start-work`:
+
+1. `/start-work` injects `START_WORK_TEMPLATE` (~5541 characters) as a user message.
+2. The goal hook treats that entire template as the objective.
+3. `validateObjective` hard-caps at **2000 characters** → `InvalidObjectiveError`.
+4. Prompt/command fails; Atlas handoff dies; sessions look like they "flash and exit" or loop.
+
+Prometheus → Atlas handoff (`/start-work`) is more important than the idle `/goal` loop, so OpenConfig keeps goal off.
 
 ## What to use instead
 
-| Need | Use |
+| Need | Do this |
 | --- | --- |
-| Multi-step plan + execution | `/start-work` → Atlas |
-| Long autonomous loop | ultrawork (`ulw`) keyword or `/ulw` |
-| Team parallel work | team keyword or `/team` |
+| Execute an approved plan | `/start-work` → Atlas (plan file stays in `.omo/plans/*.md`) |
+| Long multi-iteration work | Team mode · todos · ultrawork — not `/goal` (Ralph removed in OmO 4.19) |
+| Resume work | Continue the session, or `/start-work <plan-name>` |
 
-## Config (must stay)
+## If OmO fixes this and you re-enable
 
-In `oh-my-openagent.json`:
+1. Set `goal.enabled: true` only after verifying `/start-work` no longer calls `setGoal` with the template.
+2. Keep objectives **≤1800 characters** (margin under the 2000 hard cap).
+3. Objective = outcome + done criteria + plan path — never paste `.omo/plans/*.md`.
+4. On `InvalidObjectiveError`: truncate once; do not re-read-loop the plan file.
+5. Keep `default_mode.goal: false` and `auto_start: false`.
 
-```json
-"goal": { "enabled": false, "auto_start": false },
-"default_mode": { "goal": false }
-```
-
-## Do not
+## Bad (will throw / break `/start-work`)
 
 - `goal.enabled: true` on pinned OmO 4.19.4 while using `/start-work`
-- Re-enable without verifying OmO fixed the chat-hook false positive on plan templates
+- Pasting a plan TL;DR / Must-have block into `/goal`
+- Re-reading `.omo/plans/*.md` after `InvalidObjectiveError` without shortening

@@ -1,440 +1,78 @@
 # Changelog
 
+- Route the logical Prometheus planning stage exclusively through OmO's demoted `plan` subagent adapter, preserving the Astra/Sol policy while keeping the reserved `prometheus` coordinator primary-only so it cannot be mistaken for a callable `task()` target
+
+## Unreleased
+
+- Replace the bridge-facing `codex-plan`/`codex-implement`/`codex-review` loop with the named interactive Sisyphus chain (Explore + Librarian, Metis, Prometheus, Momus, Hephaestus, Oracle), while keeping Factory/Archon explicit and Opus limited to its qualified Archon surface.
+- Add OpenCode-only billing-class fallback pools so metered exploration can use GLM then MiniMax and Codex subscription work can recover Sol ↔ Astra without changing the primary-only Factory workflow export or permitting a silent subscription-to-metered transition.
+- Add `oc profile export-policy-manifest normal` as the canonical cross-surface policy contract, sealing OpenCode agent/category capability bindings and Factory/Archon aliases with explicit default efforts under a separate manifest snapshot while preserving the workflow-routes v4 contract unchanged.
+- Add a revision-bound `oc profile export-workflow-routes` contract for the qualified normal-profile standard and frontier subscription lanes, with native-provider validation and no API fallbacks.
+- Retire the removed `proxy.unbeatn.ai` subscription gateway and route Astra, Sol, and Terra through the healthy local OpenCodex subscription endpoint; remove obsolete gateway secrets and add local catalog health checks.
+- Restore centralized secret redaction for provider diagnostics and maintenance logs, with a smoke regression test.
+- Keep normal DeepSeek routes price-first on `:floor`; replace the pentest aliases with **DeepSeek V4 Flash 0731 ZDR Throughput** and **DeepSeek V4 Pro 0813 ZDR Throughput**, using base API IDs, `provider.zdr=true`, `data_collection=deny`, `require_parameters=true`, no provider allowlist, provider fallbacks, throughput ordering, and ceilings of `$0.50/$1.50` and `$1.50/$4.50` per-million prompt/completion respectively.
+- Make `runtime-profile.json` the model-routing SSoT while keeping tracked configs as the immutable `normal` baseline.
+- Store active profile state and rendered OpenCode/OmO overlays under `~/.local/state/openconfig`; `oc profile` no longer rewrites tracked files.
+- Add `oc profile path` and `oc profile resolve` for bridges and project consumers such as Buzz.
+
 All notable changes to **OpenConfig** (`opencode-configs` / `oc`) are documented here.
 
-**Current routing (1.5.80):** OpenRouter is the default gateway (GLM 5.3 + DeepSeek V4.1 Flash housekeeping). Cheap/fast DeepSeek is **V4.1 Flash only** — `deepseek-v4-flash-0731` is retired. Tool loops use **Auto Exacto**. Optional Sisyphus leads: native DeepSeek and Venice DeepSeek. Content-aware stays **Venice only**. Older bullets that mention Flash 0731 as a live pin, Hermes-as-content-aware, `e2ee-deepseek-v4-flash`, Gemini 3.7 Flash, or bare `qwen3.8-max` are historical.
-
-## [1.5.80] — 2026-09-15
-
-### Venice `disable_thinking`
-
-- Live `GET /models` on `api.venice.ai` confirms official ids: `deepseek-v4-pro-0813`, `deepseek-v4-pro`, `deepseek-v4-1-flash` (not OpenRouter `deepseek/deepseek-v4.1-flash`).
-- Top-level `disable_thinking` is an unrecognized key and **400s on Flash and Pro**. Pin lives under `options.venice_parameters` / variant `venice_parameters` so the openai-compatible merge sends the documented body. `oc fix` / `oc validate` reject the top-level form.
-- `oc cursor` / `cursor.sh` / `cursor-openrouter.json` / `cursor-venice.json` are gone. OpenConfig does not wire Cursor IDE. Venice stays OpenCode `provider.venice` + OmO agents only.
-
-### Clone stays config-only
-
-- OmO runtime moved **out of the git worktree** to sibling `/Users/Shared/opencode-runtime`. `~/.omo` points there. `opencode-configs/.runtime` is a purity violation (`oc validate` / `oc fix` / `oc cleanup` remove it).
-- Ship tree is deny-all allowlist only. `.env` stays local + gitignored.
-
-## [1.5.79] — 2026-09-15
-
-### One tree: `/Users/Shared/opencode-configs`
-
-- OmO runtime no longer lives as a second editable home dir. `~/.omo` is a symlink to `<repo>/.runtime`. Edit `oh-my-openagent.json` only; `omo.jsonc` is generated.
-- `oc cleanup` / `oc setup` collapse a real `~/.omo` into `.runtime`, drop leftover `/Users/Shared/.omo`, and delete `/Users/Shared/configs/opencode-configs.stale-*`.
-- `~/.config/opencode` stays the existing symlink to this repo.
-
-## [1.5.78] — 2026-09-15
-
-### OmO docs: read-only consult boundaries
-
-- Checked [omo.vibetip.help/docs/agents](https://omo.vibetip.help/docs/agents) and [configuration](https://omo.vibetip.help/docs/reference/configuration).
-- Oracle / Librarian / Explore / Multimodal-Looker now **deny edit + nested `task`** (official: no writes, no delegation). Explore `task` was `allow` and could nest.
-- Tab order already matches OmO core: Sisyphus → Hephaestus → Prometheus → Atlas. `runtime_fallback` stays **disabled** (OmO default). Goal / Ralph stay off.
-- `oc cleanup` prunes `~/.omo/tasks` and `migration-backup-*` older than 14 days.
-
-## [1.5.77] — 2026-09-15
-
-### OpenCode docs tuning (config / permissions / agents)
-
-- Checked [opencode.ai/docs/config](https://opencode.ai/docs/config), [permissions](https://opencode.ai/docs/permissions), and [agents](https://opencode.ai/docs/agents) against live `opencode.json`.
-- `chunkTimeout` **60s → 180s** on OpenRouter, Venice, and native DeepSeek. Official default is 300s; 60s was aborting long GLM / DeepSeek reasoning gaps. Request / header timeouts stay 300s.
-- `subagent_depth: 1` — documented default; primary can launch subagents, those cannot nest.
-- Compaction stays documented `auto` + `prune` + `reserved` 24000 (plus existing `tail_turns` / `preserve_recent_tokens`).
-- `permission.read` matches the official `.env` deny defaults. `doom_loop` / `external_directory` stay allow for this trusted local box.
-- Built-in `plan` stays enabled — OmO hyperplan deletes `agent.plan.disable`. Built-in `build` stays disabled; default lead is still `sisyphus`.
-- `share: disabled`, `snapshot: false`, `autoupdate: false`, localhost `:4097`, `mdns: false` already matched the docs.
-
-## [1.5.76] — 2026-09-15
-
-### context-aware-hermes (Hermes 4 405B)
-
-- New primary `context-aware-hermes` on `openrouter/nousresearch/hermes-4-405b`. Tool-less, edit denied — reasons over pasted context. Fallbacks GLM 5.3 · Laguna · Qwen (tool-capable).
-- Not the Venice `content-aware-*` lane. Not a team-mailbox member. `oc run -a context-aware-hermes` / `task` / `call_omo_agent`.
-- `oc validate` / `oc fix` / smoke / doctor / cleanup track the agent + prompt pair.
-
-### Cheap flash is DeepSeek V4.1 Flash (0731 retired)
-
-- Dropped `deepseek/deepseek-v4-flash-0731` from the OpenRouter whitelist and `venice/deepseek-v4-flash-0731` from the Venice roster. V4.1 Flash is the only cheap DeepSeek flash.
-- OpenCode `small_model` + title / summary / compaction → `openrouter/deepseek/deepseek-v4.1-flash`. GLM 5.3 Flash stays on sisyphus-junior / quick.
-- Content-aware-fast and Venice flash-junior fallbacks go to Pro 0813 / Pro — never 0731.
-
-### Concurrency cap: OpenRouter DeepSeek Pro 0813 stays 8
-
-- `oc fix` was computing `modelConcurrency` from the OpenRouter whitelist slug (`deepseek/deepseek-v4-pro-0813`). That matched the native `deepseek/` prefix and stamped **4**, so `oc validate` / smoke failed after every heal.
-- Caps now use the full `openrouter/…` id. Shared explore+librarian+deep route stays **8**. Native DeepSeek Pro stays **4**; Flash **6**; Venice models **5**.
-- Optional native DeepSeek Sisyphus may keep a last-resort OpenRouter fallback (Qwen / Laguna) when `DEEPSEEK_API_KEY` is down. Venice Sisyphus and content-aware stay **Venice-only** (`venice/*`, `VENICE_API_KEY`) — never OpenRouter.
-
-### Docs/agent 1:1 + drop dead fallback claims
-
-- Every OmO agent now has a matching `prompts/agents/<name>.md` **and** OpenCode `agents/<name>.md`. `oc validate` enforces the pairing (plus categories ↔ `prompts/categories`).
-- README no longer documents OmO `runtime_fallback.cost_aware_routing` (stripped on 4.19.4). Credit saving stays `oc deploy quarantine`. `runtime_fallback` remains configured but **disabled**.
-- Layout/manifest lists live scripts (`launch-desktop.sh`, T3 export, tests, `vault.json`). AGENTS.md points at README **Upstream** (not a missing Sources heading).
-
-## [1.5.75] — 2026-09-14
-
-### Optional Sisyphus lanes + documented concurrency
-
-- **Default lead stays** `sisyphus` on OpenRouter GLM 5.3. Tool-calling traffic uses [Auto Exacto](https://openrouter.ai/docs/guides/routing/auto-exacto) (quality-first host order). Do **not** pin `:exacto` or `:nitro` catalog slugs — they are virtual request suffixes, not `/api/v1/models` ids. `:nitro` ([throughput sort](https://openrouter.ai/docs/guides/routing/provider-selection)) is the speed shortcut; coding reliability wins for the main path.
-- **Native DeepSeek** (`DEEPSEEK_API_KEY`): `sisyphus-deepseek` → `deepseek/deepseek-v4-pro`; `sisyphus-deepseek-junior` → `deepseek/deepseek-flash`. Caps stay well under platform concurrency (Pro 500 / Flash 2500 per [DeepSeek rate limits](https://api-docs.deepseek.com/quick_start/rate_limit)): provider **6**, Pro **4**, Flash **6**.
-- **Venice Sisyphus** (`VENICE_API_KEY`): `sisyphus-venice-deepseek` → `venice/deepseek-v4-pro-0813`; `sisyphus-venice-deepseek-flash-junior` → `venice/deepseek-v4-1-flash`. Distinct from edit-denied `content-aware-*`. Venice limits are per-key ([rate_limits endpoint](https://docs.venice.ai/api-reference/endpoint/api_keys/rate_limits)); provider **6**, models **5**.
-- **`enabled_providers`**: `openrouter` + `venice` + `deepseek`. `providerConcurrency` is no longer OpenRouter-only.
-- Docs/doctor/validate/fix/smoke/cleanup track the four new agents. Keys stay env-var names only — never commit `.env`.
-- Doctor live model probes print HTTP status / error codes only (redacted); never provider error bodies that might echo a key.
-
-## [1.5.74] — 2026-09-10
-
-### Content-aware is Venice always
-
-- **`oc deploy` quarantine** no longer rewrites `venice/*` (or any `content-aware-*` route) onto `openrouter/deepseek/deepseek-v4-pro-0813`. That leak would yank the lane off Venice on a credit trip.
-- **`oc fix`** always pins content-aware primaries to Venice slugs. GPT-strip / empty-fallback rebuild stays `venice/*` — never GLM / OpenRouter.
-- **`oc validate` + smoke** require profile `model` / `small_model`, `agents/content-aware-research.md`, and every OmO content-aware primary + fallback to start with `venice/`. `openrouter/` on this lane is an error.
-- Docs: recon/consult OpenRouter roster no longer lists `content-aware-*`.
-- **`content-aware-fast` is a primary agent** (Venice V4.1 Flash, edit denied) so `oc run -a content-aware-fast` works. The team category of the same name stays for mailbox members.
-- **`prompts/core.md`:** add Intent and evidence quality — do not infer abuse from labels like proxy/automation; verify vendor facts against primary sources; keep research vs unauthorized bypass distinct.
-
-## [1.5.73] — 2026-09-10
-
-### DeepSeek V4.1 Flash (flash agent + catalog)
-
-- **New slug (shipped today):** OpenRouter `deepseek/deepseek-v4.1-flash` (1M ctx, tools, multimodal; first-party + Novita + DeepInfra). Venice id is `deepseek-v4-1-flash`.
-- **Flash agent** `content-aware-fast` → `venice/deepseek-v4-1-flash` (was `-flash-0731`). Fallbacks `-flash-0731` → Pro 0813. Research / deep keep Pro 0813; their flash fallback is now V4.1.
-- Keep Flash 0731 on both gateways as the mature-roster fallback. Do not drop it until V4.1 host density matches.
-- OpenRouter V4.1 `provider.only` is **`deepseek` + `novita` + `deepinfra`** (live day-one hosts). `oc fix` must not stamp the Pro/0731 8-host roster onto V4.1 — that 404s.
-- Profile `content-aware` `small_model` → V4.1 Flash. Cursor / T3 pins + `oc fix` / `oc validate` / smoke track the new slugs (OpenRouter V4.1 cap **5**).
-- Skipped: moving explore / librarian / deep off Pro 0813 (V4.1 Pro does not exist; V4.1 Flash roster is day-one thin). OmO stays 4.19.4.
-
-## [1.5.72] — 2026-09-10
-
-### OpenCode CLI floor 1.18.17 → 1.18.30
-
-- Installed CLI and npm `@opencode-ai/plugin` are both **1.18.30** (GitHub latest, 2026-09-09). Floor + README pins catch up from 1.18.17 / stale plugin `1.18.15`.
-- `oc versions --fix` aligns `~/.opencode` `@opencode-ai/plugin` **1.18.18 → 1.18.30**.
-- OmO stays **4.19.4** (npm `latest`). GitHub / npm `beta` is `5.0.0-beta.52` — still skipped (breaking beta).
-- OpenRouter catalog: all 12 pinned slugs are newest in-family (`oc models --upgrade` clean). Routing unchanged.
-
-## [1.5.71] — 2026-09-08
-
-### OpenRouter attribution + concurrency guards (docs + live endpoints)
-
-- **Attribution:** `X-OpenRouter-Categories` `cli,agent` → **`cli-agent`**. OpenRouter marketplace only accepts hyphenated slugs (`cli-agent`, `ide-extension`, …); unrecognized values are silently dropped. Keep `HTTP-Referer` + `X-OpenRouter-Title` / `X-Title` (docs still accept the legacy alias).
-- **Concurrency numbers unchanged** (paid OpenRouter has no documented request-concurrency cap — credit limits + per-provider 429s + DDoS only). Caps stay: default **10**, OpenRouter provider **12**, Flash/GLM/DeepSeek Pro 0813/Venice/Hermes **10/8/8/5/2**.
-- **`oc fix` regression:** `_mc_cap` treated `deepseek-v4-pro*` as 5 and would overwrite the intentional 1.5.65 raise back to 5. OpenRouter Pro 0813 now stays **8** (explore + librarian + deep share it). Venice DeepSeek stays **5**.
-- **MiniMax `provider.only`:** add **parasail** (live 2026-09-08: fp8 + tools; already on the DeepSeek unmoderated roster). DeepSeek 8-host pin still all healthy — no first-party / fp4 / unverified hosts added. GLM stays unpinned (`require_parameters: true`).
-- `oc validate` / smoke now require `cli-agent` headers and DeepSeek Pro 0813 cap 8.
-
-## [1.5.70] — 2026-09-08
-
-### Audit close (install URL, secrets, schema, doctor)
-
-- README install/clone URLs are `https://github.com/jesseoue/opencode-configs` (not `github.com/openconfig/opencode-configs`). `install.sh` comments match.
-- Runtime schema truth is `omo.schema.json` — `versions.json` `schema_asset`, AGENTS.md / README, and `oc validate` all agree. Legacy `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` stay rejected.
-- `oc secrets check` exits 1 only when `OPENROUTER_API_KEY` is missing from `.env` **and** vault overlay (live install `.env` counts). Infisical-only / example `op://Vault/…` refs no longer fail a healthy `.env`.
-- Infisical honors vault.json `dir_env` (`INFISICAL_DIR`). Path-only allowlist — never a company vault dump.
-- Doctor reports `VENICE_API_KEY` as optional (stronger wording on the live tree; never fails `core_ready`).
-- `zshrc.snippet` dropped `OPENAI_API_KEY`; loads `OC_DEFAULT_PROFILE` + `INFISICAL_DIR` on the same allowlist as `oc_export_env_file`.
-- `launch-desktop.sh` / `serve-desktop.sh` call `oc_telemetry_off`. `.env.example` documents `OC_PROJECTS_DIR` / `OC_DEFAULT_WORKSPACE` / `OC_DEFAULT_PROFILE`.
-- AGENTS.md command list: test, models, env, secrets, setup, cleanup, cursor, new, projects. docs-team “Gemini Nitro” → Gemini 3.8 Flash.
-- Smoke: `signature.version` == `versions.json`; `.env.example` names vs `OC_ENV_ALLOWLIST`. 1.5.69 badge/section chrome kept.
-- GitHub Actions `.github/workflows/check.yml`: hermetic `bash -n` + `./validate.sh --quiet` + `./signature.sh` (no secrets / no OpenRouter). `OC_CI=1` smoke skips doctor, setup, live `~/.omo/teams`, and key-backed model probes. `.gitignore` allowlists `.github/`.
-
-## [1.5.69] — 2026-09-08
-
-### Terminal brand (ASCII / ANSI)
-
-- Compact 3-line `oc` badge + wordmark in `oc_banner` (install / setup / `oc help`). Unicode box drawing only; aligned ~58 cols (fits 80-col Ghostty); respects `NO_COLOR` and non-tty.
-- Thin `── section ──` rules on `oc help`, `oc doctor`, `oc validate` summary, locate / versions / cleanup / diagnose. `--json` / `--quiet` stay parseable (no chrome).
-- README fenced header matches the CLI mark (no image binaries).
-
-## [1.5.68] — 2026-09-08
-
-### Doctor / validate: live install vs secondary checkout
-
-- **`~/.omo/teams`** compares to `realpath ~/.config/opencode` (when that tree is OpenConfig), not “must equal this checkout”. A clone next to a Shared live install no longer fails doctor/validate for healthy team links.
-- **`oc setup`** heals team (and tmux/ghostty) links to the live tree. A secondary checkout never retargets a healthy live `~/.config/opencode` symlink.
-- **OpenRouter key probe:** missing vs rejected vs network vs “this checkout has no `.env`”. Critical only on the live config dir; optional/soft on a secondary checkout. Never prints secrets; curl body is a temp file that is deleted.
-- Help text points at `oc secrets`. `oc_omo_teams_ok` / `oc_live_config_root` in `lib/common.sh`.
-
-## [1.5.67] — 2026-09-08
-
-### Prompts + docs aligned to live OpenRouter / Venice JSON
-
-- Agent/category/profile prompts now match `oh-my-openagent.json` + `opencode.json`: Hephaestus / Oracle / housekeeping are **GLM 5.3** (Flash for title/summary/compaction / sisyphus-junior / `quick`); explore / librarian / `deep` stay OpenRouter DeepSeek Pro 0813; content-aware is **`venice/*` only** (not Hermes, not E2EE Flash, not OpenRouter `provider.only` pins).
-- README / AGENTS.md routing tables, install key prompt, and `validate.sh` tool-call check drop the stale Hermes-as-content-aware exception (Venice DeepSeek is `tool_call: true`).
-- Vault overlay from 1.5.66 unchanged: `vault.json` public template + gitignored `vault.local.json`. Never `source .env`, `op run`, or `infisical run`.
-
-## [1.5.66] — 2026-09-08
-
-### 1Password + Infisical vault sync (allowlisted keys only)
-
-- **`vault.json`** is a public template (`op://Vault/Item/field` examples only — no personal account, vault, or item IDs).
-- **`vault.local.json`** (gitignored) overlays personal 1Password refs. `oc secrets sync` merges local over public; empty/example refs no-op and fall through to Infisical (`INFISICAL_DIR`) / Doppler.
-- **`oc secrets`** (`status` / `check` / `sync`) and `oc setup --sync-env` import **allowlisted keys only** into `.env`.
-- Launch paths (`opencode.sh`, `run.sh`, `launch-desktop.sh`, `serve-desktop.sh`) load `.env` via `oc_export_env_file` then fill missing keys from 1Password. **Never** `source .env`, `op run`, or `infisical run`.
-
-## [1.5.65] — 2026-09-07
-
-### OpenRouter catalog refresh (Venice content-aware untouched)
-
-- **Gemini Flash** `google/gemini-3.7-flash` → **`google/gemini-3.8-flash`** (same $0.75/$3.75, 1M ctx, tools; catalog successor). Writing primary + visual fallbacks.
-- **Exacto:** still not a catalog id (`z-ai/glm-5.3:exacto` missing). Keep GLM unpinned (`require_parameters: true`) so Auto Exacto can pick hosts. Do not ship `:exacto` slugs.
-- **OmO recon drift:** `explore` / `librarian` / `deep` back on **OpenRouter** `deepseek/deepseek-v4-pro-0813`. `oc fix` now enforces those primaries. Content-aware stays **`venice/*` only**.
-- **Concurrency:** OpenRouter DeepSeek Pro 0813 `5 → 8` (explore + librarian + deep share it). Venice caps stay 5. Gemini 3.8 Flash cap 10.
-- **Skipped:** `kimi-k3` ($3/$15), OmO `5.0.0-beta.*` (pin stays `4.19.4` stable), generic `deepseek-v4-pro` (0813 is cheaper GA).
-
-## [1.5.64] — 2026-09-07
-
-### T3 Code + live catalog pins (no secrets in JSON)
-
-- **Qwen pin** `qwen/qwen3.8-max` → **`qwen/qwen3.8-max-0902`** (bare slug missing from OpenRouter catalog).
-- **Venice** no longer stores `{env:VENICE_API_KEY}` in `opencode.json`. Auth is `opencode auth` + `.env` via `launch-desktop.sh` / `serve-desktop.sh`.
-- **`t3-opencode.json`** is the T3 Code OpenCode provider pin: port 4097, curated OpenRouter + Venice slugs, no keys.
-
-## [1.5.63] — 2026-08-31
-
-### Sisyphus / planning: live GLM 5.3 + Flash small lane (no dead Exacto slug)
-
-- **Lead stays `z-ai/glm-5.3`** (catalog flagship, 1.31M ctx, tools + reasoning). Live chat/completions 200. Not swapped to `:exacto`: that suffix is a **virtual sort**, not a catalog id (0 Exacto slugs in `/api/v1/models` today). Tool requests already get **Auto Exacto**. GLM stays **unpinned** (`require_parameters: true`) so Auto Exacto can choose among ~20 live hosts — a static `provider.only` roster is how we blackholed glm-5.3 before.
-- **`z-ai/glm-5.3:exacto` probed 200** (AkashML) but not shipped as a whitelist/model id.
-- **small_model / title / summary / compaction / FAST_PRIMARY** → **`z-ai/glm-5.3-flash`** (live 200, tools, multimodal, multi-host). Laguna S 2.1 kept as fallback. Venice content-aware lane unchanged.
-- Whitelist 11 → 12. GLM 5.3 context limit aligned to catalog `1310720`.
-
-## [1.5.62] — 2026-08-26
-
-### Cursor + OpenRouter dedicated endpoint, tighter token/tool budgets
-
-- **Cursor BYOK** uses OpenRouter's dedicated `https://openrouter.ai/api/v1/cursor` path (generic `/api/v1` breaks Cursor tool calls). Pin file `cursor-openrouter.json` + `oc cursor` (`setup` / `apply` / `usage` / `probe` / `models`). Same OpenRouter whitelist as OpenCode; default `z-ai/glm-5.3`. `oc cursor apply` encrypts `OPENROUTER_API_KEY` into Cursor Safe Storage and waits for a full Cursor quit (Cmd+Q) before writing `userAddedModels` — Reload Window flushes Strix back over sqlite.
-- **Token + tool-call cuts:** default `tool_output` 200 lines / 8 KB (was 300 / 12 KB); compaction reserved 24k; `max_tools` 32; background `maxToolCalls` 80; team `max_messages_per_run` 600 / `max_member_turns` 80; Hephaestus/Oracle/Momus/content-aware-research output caps 16k; explore reasoning `high` → `low`. Prompts: grep/slice before full reads.
-- `oc fix` keeps `enabled_providers` as `openrouter` + `venice` and no longer wipes `venice/*` `modelConcurrency`. Venice models locked to **`e2ee-deepseek-v4-flash` only** (DeepSeek Pro/Flash stay on OpenRouter).
-
-## [1.5.61] — 2026-08-25
-
-### Venice provider added: native DeepSeek + E2EE context-aware lane
-
-- **New `venice` provider** (`enabled_providers` now `["openrouter", "venice"]`) with three models: `deepseek-v4-pro-0813` (1M ctx / 32768 out), `deepseek-v4-flash-0731` (1M ctx / 32768 out), and `e2ee-deepseek-v4-flash` (1M ctx / 8192 out, TEE + E2EE). All reasoning + tool-call enabled; native DeepSeek models verified tool-calling via live E2E probes.
-- **content-aware-research → `venice/e2ee-deepseek-v4-flash`** (context-aware, edit-denied lane); fallbacks deepseek-v4-pro-0813 → deepseek-v4-flash-0731 → glm-5.3. `profiles/content-aware.json` model + small_model aligned.
-- **`VENICE_API_KEY`** added to `OC_ENV_ALLOWLIST` (lib/common.sh) and `.env.example`; `launch-desktop.sh` re-added to inject OpenRouter + Venice + Exa keys into the GUI (launchd) environment.
-- `diagnose.sh`: tolerate empty `message.content` (tool-call-only responses) instead of crashing.
-
-## [1.5.60] — 2026-08-19
-
-### Live-endpoint alignment: provider pins rebuilt, Flash 0731 revert, Hermes research lane
-
-Every pin re-verified against the live `openrouter.ai/api/v1/models` catalog + per-model endpoint rosters (2026-08-19). All 11 whitelisted models live; context/tool/vision flags confirmed exact.
-
-- **GLM 5.3 routing blackhole fixed**: the `provider.only` roster stamped by `oc fix` was glm-5.2-era (novita/gmicloud/streamlake/…) and matched **zero** live glm-5.3 endpoints — every default-model request would 404 ("All providers have been ignored"). glm-5.3 is z-ai-exclusive today, so it now routes **unpinned**; `fix.sh` removes stale pins and `validate.sh` errors on them.
-- **DeepSeek pins rebuilt from live endpoints**: `["gmicloud","novita","siliconflow","parasail","deepinfra","baidu","fireworks","digitalocean"]` — fp8/full-precision unmoderated hosts only. Drops `baseten/fp4` (fp4 degrades tool-calling), degraded `together`, and first-party `deepseek` (endpoint down, uptime 0). Prompts/README no longer claim "first-party only".
-- **MiniMax M3 pin widened**: `["together"]` (single host, half-context) → `["gmicloud","novita","deepinfra","together"]` — all healthy, fp8/unknown, still skips first-party.
-- **DeepSeek Flash reverted to `-0731`**: the 07-31 snapshot is the *newest* Flash revision (1.31M ctx); the plain `deepseek-v4-flash` slug is the older 04-24 build. GA `deepseek-v4-pro` def removed; whitelist now 11 models. `fix.sh`/`diagnose.sh`/`models.sh` invariants track `-0731`.
-- **content-aware-research → Hermes 4 405B** (nebius/fp8, uncensored): tool-less by design — it reasons over pasted context; edit stays denied; fallbacks glm-5.3 → laguna → qwen3.8-max remain tool-capable. Removed Hermes from `fix.sh` RECON_FALLBACKS (a no-tools model must never back a tool-using recon agent); dropped dead `hermes-4-70b` ref.
-- **New `validate.sh` guards**: (1) vision chains (multimodal-looker / visual-engineering / artistry) must be `attachment:true` end-to-end; (2) every agent/category chain must be `tool_call:true` except content-aware-research; (3) stale `provider.only` pins on unpinned families now error.
-- **Category colors removed**: OmO 4.19.4 schema allows `color` on agents only — `fix.sh` no longer re-adds category colors it had just stripped (idempotency restored; agent colors unchanged).
-- **Fallback chains deepened**: third fallback (qwen3.8-max / longcat-2.0 / minimax-m3) added across agents + categories; `modelConcurrency` gains pro-0813 (5, six healthy hosts) and hermes-4-405b (2).
-- Newer catalog arrivals evaluated, deliberately skipped: `kimi-k3` ($3/$15 — 4× k2.7-code for the same fallback role), `qwen3.8-2.4t-a95b` (qwen3.8-max price, no vision), `grok-4.6` (off-stack, pricier than GLM/DeepSeek lanes).
-- `launch-desktop.sh` removed (v1.5.59 helper superseded; no remaining references).
-- RECON_PRIMARY aligned to actual primaries (metis / arch-review → glm-5.3).
-
-## [1.5.59] — 2026-08-19
-
-### Model refresh: GLM 5.3 default + Flash GA + Gemini 3.7 Flash
-- **Default model** `xiaomi/mimo-v2.5-pro` → **`z-ai/glm-5.3`** (new Z.ai flagship, 1M ctx, reasoning + tool-call, unmoderated). Applied everywhere: `opencode.json` default + small-model, all `oh-my-openagent.json` agents/fallbacks, all six profiles (fast/low/high/debug/writing/research), and `fix.sh` recon fallbacks. `mimo-v2.5-pro` fully removed from whitelist + model defs.
-- **DeepSeek Flash GA**: `deepseek/deepseek-v4-flash-0731` (pre-GA) → **`deepseek/deepseek-v4-flash`** (GA). Updated content-aware-fast primary, profile small-model, and all fallback chains.
-- **Gemini 3.7 Flash**: `google/gemini-3.6-flash` → **`google/gemini-3.7-flash`** in multimodal-looker / ultrabrain / quick / bug-hunt fallbacks + modelConcurrency.
-- `fix.sh` invariants updated: `DEEP_PRIMARY`/`MAX_PRIMARY` → `glm-5.3`, `content-aware-fast` → `deepseek-v4-flash`.
-- `_mc_cap` already routes `glm` → 8, `flash` → 10 (no change needed).
-- README model-routing table refreshed (GLM 5.3 orchestration, Flash GA, Gemini 3.7 Flash).
-- Whitelist + model defs updated in `opencode.json` (glm-5.3, gemini-3.7-flash, deepseek-v4-flash).
-
-## [1.5.58] — 2026-08-12
-
-### Fix: `oc doctor` self-sabotage (OmO config-migration ate canonical config)
-- **Root cause**: `oc doctor` ran `bunx oh-my-openagent doctor` and `opencode agent list`. Both load the OmO plugin, whose config-migration treats the repo's canonical `oh-my-openagent.json` as a legacy source and **moves it into a backup**, regenerating a broken `~/.omo/omo.jsonc`. Every full doctor run silently deleted the repo's canonical config.
-- **Fix**: `doctor.sh` no longer invokes the OmO CLI or `opencode agent list`. Plugin health is verified statically (pin match + cache version). Runtime agent-visibility probe skipped with an explanatory note.
-- **Fix**: `cleanup.sh` plugin-pin check now reads the cache version statically instead of `bunx … doctor`.
-- Result: `oc doctor` verdict went from `core_ready` (6 optional warnings) to **`ready`** (0 critical, 0 optional), and the repo file stays intact across all runs.
-- Verified: validate 87 ok · smoke 29 passed · deploy check green (except expected uncommitted state).
-
-## [1.5.57] — 2026-08-12
-
-### OpenCode CLI 1.18.17 (patch upgrade)
-- Upgrade OpenCode CLI **1.18.16 → 1.18.17** (released today, patch-only bugfixes)
-- Key fixes: compaction keeps complete recent turns + clearer summaries for smaller models; capped automatic session retries + jitter (reduces retry storms); **correct sampling defaults for DeepSeek V4 Flash** (directly relevant to our Flash routes); MERGE Gateway reasoning variants; Copilot PDF support; Muse system prompt routing
-- No breaking changes — safe patch upgrade
-- `@opencode-ai/plugin` stays at `1.18.15` (no 1.18.16/17 published yet for plugin)
-- OmO stays at `4.19.4` (npm latest, no new release)
-- `versions.json` floor: `opencode.min` 1.18.16 → 1.18.17
-
-## [1.5.56] — 2026-08-12
-
-### Deployment protection + repo cleanup + SEO
-- **New `oc deploy` command** (`deploy-guard.sh`): pre-deployment gate (credits, model probes, rate limits, git cleanliness, signature), deployment lock with TTL, quarantine mode (auto-swap to cheaper models on credit pressure), continuous credit heartbeat
-- **Hardened circuit breaker**: added cooldown (30s), half-open retries (3), fallback-on-trip, notify-on-trip
-- **Cost-aware runtime fallback**: `cost_aware_routing`, `max_cost_per_request` ($0.50), budget warning/critical thresholds (80%/95%), degrade-on-budget-pressure
-- **README cleanup**: fixed stale version refs (1.5.53 → 1.5.55) and stale concurrency values (6/8/3/1 → 10/12/5/2), added Features table, Deployment protection docs, SEO keywords
-- **GitHub SEO**: repo description rewritten, topics refreshed (model-gateway, config-as-code, circuit-breaker, cost-aware)
-- Whitelist unchanged at 19 models — all probed healthy
-
-### Docs alignment (AGENTS.md + README.md)
-- **AGENTS.md**: commands list now includes `oc deploy`; routing logic split into GA recon vs pre-GA content-aware lanes; Deep implement line notes Qwen 3.8 Max / Kimi K2.7 Code fallbacks; content-aware line marked pre-GA + edit denied
-- **README.md**: model routing table split recon (GA DeepSeek Pro 0813) from content-aware (pre-GA); subagent/primary/category/profile tables disambiguated "DeepSeek Pro 0813" vs "DeepSeek Pro (pre-GA)"; removed stale "Direct OpenAI stays defined" note (OpenRouter-only); Safety line corrected to OpenRouter-only; layout tree lists all 16 scripts incl. `deploy-guard.sh`; CLI + Verify sections now surface `oc deploy check` / `quarantine` / `status`
-- `oc signature --refresh` re-run after edits; `validate.sh` 87 ok, `tests/smoke.sh` 29 passed, `oc fix` clean, `oc deploy check` green (except expected uncommitted state)
-
-## [1.5.55] — 2026-08-12
-
-### New models + routing refresh for non-content-aware routes
-- Add **Qwen 3.8 Max** (`qwen/qwen3.8-max`) — new Qwen flagship, 1M ctx, unmoderated, $2/$6. Added to hephaestus/oracle/deep fallback chains (replaces minimax)
-- Add **Kimi K2.7 Code** (`moonshotai/kimi-k2.7-code`) — coding-focused, 262K ctx, $0.67/$3.40, 5x cheaper than kimi-k3. Added to bug-hunt/refactor-safe/sisyphus fallbacks
-- Whitelist: **19 models** (was 17 — added 2 new, content-aware still on pre-GA deepseek-v4-pro)
-- `fix.sh` `_mc_cap` updated for qwen3.8-max + kimi-k2.7 (cap 5 each)
-- `fix.sh` `DEEP_FALLBACKS`/`MAX_FALLBACKS`/`RECON_FALLBACKS` updated to include new models
-- `deepseek-v4-pro` price drop confirmed: $0.43/$0.87 (now matches 0813 GA — better value for content-aware)
-- All 19 models probed live: **19/19 HTTP 200**
-
-## [1.5.54] — 2026-08-12
-
-### Uncensored route → pre-GA DeepSeek models
-- **content-aware-research** agent → `deepseek/deepseek-v4-pro` (pre-GA, unaligned) — the older non-GA release, less alignment baked in
-- **content-aware-deep** category → `deepseek/deepseek-v4-pro` (pre-GA)
-- **content-aware-fast** category → `deepseek/deepseek-v4-flash-0731` (pre-GA flash, $0.08/$0.18)
-- `profiles/content-aware.json` model → `deepseek-v4-pro`, small_model → `deepseek-v4-flash-0731`
-- Whitelist + model defs added: `deepseek/deepseek-v4-pro` (`:exacto`) and `deepseek/deepseek-v4-flash-0731` (`:nitro`)
-- `fix.sh` RECON_PRIMARY maps content-aware-* to pre-GA models; `flash-0731` added to RECON_FALLBACKS
-- All other routes (explore/librarian/deep/ultrabrain/etc.) stay on GA `deepseek-v4-pro-0813`
-- Whitelist: 17 models (was 15 — added 2 pre-GA variants)
-
-## [1.5.53] — 2026-08-12
-
-### Model refresh — upgrade to latest from OpenRouter API
-- **Claude Opus 5** (`anthropic/claude-opus-5`) replaces Opus 4.8 — new Anthropic flagship, same price ($5/$25)
-- **Claude Opus 5 Fast** (`anthropic/claude-opus-5-fast`) replaces Opus 4.8 Fast — same price ($10/$50)
-- **DeepSeek V4 Pro 0813** (`deepseek/deepseek-v4-pro-0813`) replaces `deepseek-v4-pro` — GA release, **63% cheaper** ($0.43/$0.87 vs $1.17/$2.34), supports `:exacto` routing
-- Remove `anthropic/claude-opus-4.7` (obsolete — Opus 5 supersedes at same price)
-- All 15 whitelisted models verified against live OpenRouter API: **15/15 HTTP 200**
-- Whitelist: 15 models (was 16 — removed 3 old, added 2 new)
-
-## [1.5.52] — 2026-08-11
-
-### Version refresh — OpenCode CLI 1.18.11 → 1.18.16
-- Upgrade OpenCode CLI to **1.18.16** (5 patch releases: 1.18.12–1.18.16, Aug 4–10)
-- `@opencode-ai/plugin` peer **1.18.11 → 1.18.15** (1.18.16 not yet published for plugin)
-- OmO stays **4.19.4** (npm `latest` stable). 5.0.0-beta.x is a **breaking beta** (renames `omo` → `omo-agent-toolkit`, changes config format) — skipped
-- `versions.json` floor: `opencode.min` 1.18.11 → 1.18.16
-
-## [1.5.51] — 2026-08-11
-
-### Live OpenRouter audit — capacity + new models
-- Raise `background_task.defaultConcurrency` **6 → 10**, `providerConcurrency.openrouter` **8 → 12** for big parallel loads
-- Model caps up: flash/floor/qwen3.7-flash/gemini flash-lite **10**, exacto/minimax **8**, pro/sonnet **5**, claude opus/fable/kimi **2**
-- Add `qwen/qwen3.7-flash` ($0.03/$0.13, 1M ctx, 76t/s) as ultra-cheap fast lane
-- Add `google/gemini-3.5-flash-lite` ($0.30/$2.50, 1M ctx, 220t/s) as cheap high-throughput fallback
-- All 16 whitelisted models verified against live OpenRouter API (`/api/v1/models`): **16/16 HTTP 200**
-- OpenCode CLI 1.18.11 (GitHub latest 1.18.16 — optional upgrade); OmO 4.19.4 = npm latest; `@opencode-ai/plugin` 1.18.11 pinned to CLI
-
-## [1.5.50] — 2026-08-01
-
-### CLI clarity — aliases + OpenRouter-only help
-- Add `oc` aliases: `health`/`ready` → check, `repair` → heal, `verify` → validate (plus existing `where`, `sig`, `pins`, `omo`)
-- Help/examples: remove stale direct-OpenAI wording; document aliases; list `runtime` in `oc test`
-- Unknown-command tips for `clean`, `probe`, `repair`, `verify`
-- README/AGENTS version sync
-
-## [1.5.49] — 2026-08-01
-
-### OpenRouter-only — no GPT models
-- Remove all `openai/gpt-*` from whitelist, model defs, and active agent/category routes
-- Hephaestus / Oracle → DeepSeek Pro; Momus / ultrabrain / unspecified-high → Claude Fable 5
-- `providerConcurrency` → OpenRouter gateway only (`openrouter: 8`); no openai/anthropic sub-keys
-- `oc fix` / `oc validate` enforce no GPT in routes or whitelist
-
-## [1.5.48] — 2026-08-01
-
-### Fast provider concurrency
-- Raise parallel throughput: `defaultConcurrency` **6**, `providerConcurrency` openrouter **8** / openai **6** / anthropic **4**
-- Model caps tuned for speed: Flash/Luna **6**, GLM Exacto/MiniMax **5**, Pro/Sol/Terra **3**, Opus/Fable/Kimi **1**
-- `oc fix` / `validate` / `doctor` pin the new ceilings (OpenRouter-only; circuit breaker unchanged)
-
-## [1.5.47] — 2026-08-01
-
-### Sisyphus fix + OpenRouter-only hardening
-- `oc fix` quarantines broken `~/.omo/omo.jsonc` when a partial OmO migrate wrote invalid `agents.*.models` arrays (OmO 4.19.4 rejects them — Sisyphus fails to load; canonical config stays `oh-my-openagent.json`)
-- `oc validate` checks Sisyphus is OpenRouter-only (primary/fallbacks/ultrawork), `sisyphus_agent` enabled, and no conflicting `omo.jsonc`
-
-## [1.5.46] — 2026-08-01
-
-### Unmoderated smart recon routing
-- **Explore / Librarian** primaries → DeepSeek Pro (unmoderated); Flash → GLM Exacto → MiniMax fallbacks
-- **Explore** gets explicit permissions: `webfetch`, `question`, `task` (edit denied); prompts + `explorers` team scouts use full Exa/webfetch stack
-- **deep**, **arch-review**, **metis**, **multimodal-looker** → unmoderated primaries (DeepSeek Pro / GLM Exacto / Gemini 3.1 Pro)
-- Fast categories (`quick`, `content-aware-fast`, …) escalate to Pro on fallback — no Claude/GPT on recon chains
-- `oc validate` / `oc fix` guard recon routes against moderated primaries and fallbacks
-
-## [1.5.45] — 2026-08-01
-
-### Fast model/provider testing
-- `oc models --probe` — parallel live probes (8 workers) for all whitelisted models: latency, HTTP status, `is_moderated`, routing pin, fastest endpoint host
-- `oc models --moderation` — instant policy catalog (no chat calls): `moderationRequired` providers, per-model routing pins, data retention/training flags
-- `oc admin health` model section delegates to `--probe` (was sequential — ~10× faster on 18 models)
-
-## [1.5.44] — 2026-08-01
-
-### DeepSeek uncensored routing + question tool
-- Pin all DeepSeek models to first-party OpenRouter host (`provider.only: ["deepseek"]`) — skips proxy providers that may add content moderation
-- Set DeepSeek `require_parameters: false` (GLM/MiniMax unchanged)
-- `question` tool explicitly allowed on content-aware-research agent/profile; Prometheus + core prompts encourage clarifying questions freely
-
-## [1.5.43] — 2026-08-01
-
-### New-user hygiene (no host-specific literals)
-- OpenRouter `HTTP-Referer` syncs from `signature.json` → `github_b64` via `oc fix` (no hardcoded owner URLs in config)
-- Distribution identity → `https://github.com/jesseoue/opencode-configs` (`github_b64` + install bootstrap)
-- `oc versions` scans `projects.json` / `OC_PROJECTS_DIR` only — removed host-specific directory scan
-- README / prompts: generic clone/install docs; drop `Cursor-pace` product naming; sync version pins to 1.5.43
-- Validate checks OpenRouter attribution headers match signature distribution URL
-- `review-panel` arch member → `arch-review` category (architecture lens; bugs stay on `bug-hunt`)
-
-## [1.5.42] — 2026-08-01
-
-### OpenRouter provider system cleanup
-- Probe all 18 whitelisted models across 40+ OpenRouter provider hosts (live endpoints + HTTP 200 chat probes)
-- Strip redundant `preferred_min_throughput` / `preferred_max_latency` from every model — native `:exacto`/`:nitro`/`:floor` suffixes and OpenRouter auto-ranking handle provider selection
-- Sync `modelConcurrency` exactly to the 18-model whitelist with tier caps (Flash/Luna 4 · Exacto/MiniMax 3 · Pro/Sol 2 · Opus/Fable/Kimi 1)
-- Pin `providerConcurrency` to openrouter=6, openai=4, anthropic=2 (OmO gateway limits for OpenRouter-routed backends)
-- Validate rejects any remaining `preferred_*` soft prefs on Exacto, Nitro, Floor, and auto-routed models
-
-## [1.5.41] — 2026-08-01
-
-### Routing availability + concurrency hardening
-- Live-probe all 18 whitelisted OpenRouter models (HTTP 200); OpenRouter-only, no direct providers
-- Remove Kimi K3 from routine fallback chains (whitelist-only — slow, single-provider, expensive)
-- Rebuild fast-agent fallbacks around DeepSeek Flash Nitro, GLM Exacto, and MiniMax M3
-- Cap premium model concurrency (Sol/Terra/Opus/Fable/Kimi at 1–2; Flash/Exacto/Luna at 3–4)
-- Add validate + fix guards against slow models in fast routes and kimi in fallbacks
-- Fix Prometheus `reasoning`/`variant` mismatch and multimodal-looker primary duplicate fallback
-
-## [1.5.40] — 2026-08-01
-
-### OpenCode 1.18.11 + OmO 4.19.4
-- Upgrade OpenCode CLI floor and `@opencode-ai/plugin` peer from 1.18.8 to **1.18.11** (MCP SSE reconnect fix, interleaved reasoning field support)
-- Bump `oh-my-openagent` pin from 4.19.2 to **4.19.4** (final pre–Native CLI release: unified reasoning vocabulary, runtime fallback status patterns, category chain tuning, codegraph daemon hardening)
-- Migrate all agent/category `reasoningEffort` → canonical `reasoning` field; `oc fix` and `validate.sh` enforce the new shape
-- Refresh OmO `$schema` URL to v4.19.4; sync schema URL from `versions.json` pin in `oc fix`
-
-## [1.5.39] — 2026-07-28
-
-### OpenCode 1.18.8 + OmO 4.19.2
-- Upgrade the OpenCode CLI and `@opencode-ai/plugin` peer from 1.18.5 to **1.18.8**
-- Bump the `oh-my-openagent` pin from 4.19.1 to **4.19.2** and refresh its schema URL
-- Keep `/goal` disabled while adopting notification-driven coordination, managed CodeGraph lifecycle fixes, and MCP compatibility fixes
-- Enable OmO's managed CodeGraph **1.4.1** daemon and pinned-runtime auto-provisioning while keeping automatic indexing off
-- Remove superseded Gemini 3.5 Flash and unused GPT-5.5 routing, align model output limits with the live catalog, and let native `:nitro` / `:exacto` routing adapt across the full eligible provider pool
-- Remove unsupported OpenCode compaction config and the nonexistent direct Sol Pro alias; mark GPT temperature unsupported and align Momus/deep with Terra
-- Harden OmO cache checks to verify the pinned main package, platform package, and executable; document `/start-work --make-pr|--ship`
-- Preserve broad OpenRouter availability (`data_collection=allow`, no ZDR filter), minimize OpenCode logs, isolate MCP secrets, and redact credentials from maintenance logs
-- Replace volatile provider-name pins with adaptive routing: Nitro for throughput, Exacto/Auto Exacto for tool quality, and Floor for cheap title/summary/compaction work
-- Route active GPT agents through healthy OpenRouter endpoints, keep direct OpenAI dormant, and trim/demote slow or expensive fallback chains (especially Kimi and duplicate Opus/GPT entries)
-- Bound premium outputs and runaway team/tool loops; retry only transient failures with three model attempts and a 120-second fallback window
-- Replace 15-minute stream stalls with 300-second request / 60-second chunk limits, align MCP timeouts at 30 seconds, and prefer selective context pruning over blanket 4 KB truncation
+## Unreleased — 2026-08-24
+
+### Capability-tiered DeepSeek V4 routing
+- Add the exact OpenRouter `deepseek/deepseek-v4-pro-0813` definition and cap it at five concurrent tasks
+- Keep Flash 0731 Nitro as the economical default while routing explicit implementation, adjudication, review, and security-depth roles to Pro 0813 in pentest mode
+- Keep `ultrabrain` on GLM 5.3 with Pro 0813 fallback; normal mode retains subscription-gateway primaries and gains Pro as a bounded depth fallback
+- Synchronize native `content-aware-research` frontmatter and the content-aware project overlay during `oc profile` switches
+- Resolve orchestration-canary terminal models from the active profile so legitimate configured fallbacks are accepted without stale hard-coded expectations
+
+### Final upstream 1.5.60 parity audit for mixed routing
+- Add the compatible 1.5.60 capability guards to `validate.sh`: normal visual routes must stay `attachment:true` end-to-end, and every tool-using route must stay `tool_call:true`
+- Keep the pentest profile intentionally GLM/DeepSeek-only while validating the broad normal profile separately, so security mode does not create false vision-capability failures
+- Remove Hermes from the normal `content-aware-deep` fallback chain; Hermes stays reserved for `content-aware-research`, where tools/edit are intentionally denied
+- Remove GLM from the normal `visual-engineering` fallback chain; every normal visual fallback is now vision-capable
+- Port live-provider pin guards for DeepSeek and MiniMax, stale `provider.only` detection for unpinned families, and `codegraph.auto_provision` / `daemon` validation
+- Make `oc fix` repair the same provider pin invariants and always repair CodeGraph provisioning, independent of `start_work.auto_commit`
+- Refresh README routing/concurrency wording so it matches the runtime-profile source of truth
+
+### Previous local hardening
+
+### Schema-clean runtime fallback retries
+- Keep native OmO `runtime_fallback` upstream-compatible and move custom same-primary retry knobs to OpenConfig-owned `OPENCONFIG_OMO_*` environment exports
+- Make the pinned OmO runtime patch upgradeable from v1 to v2 and compatible with the advertised Node 20 runtime floor
+- Change `oc plugin doctor` / `oc doctor` to report OpenConfig-managed pin/cache/patch health by default; raw upstream OmO doctor remains available with `oc plugin doctor --upstream`
+
+### DeepSeek 0731 route correction + runtime refresh
+- Pin the exact OpenRouter model `deepseek/deepseek-v4-flash-0731`; the unversioned slug still resolves to the April 0423 release on OpenRouter
+- Make the validator reject the legacy Flash slug and require the exact 0731 Nitro model definition
+- Upgrade the validated runtime floor to OpenCode 1.18.11 and OmO 4.19.4, including `reasoningEffort` → `reasoning`
+- Remove redundant provider throughput/latency preferences while preserving the mixed OpenRouter + subscription-gateway lanes
+
+### Selective upstream hardening for mixed routing
+- Keep Sisyphus canonical and quarantine the invalid migrated `~/.omo/omo.jsonc` shape fixed upstream in 1.5.47, without importing its OpenRouter-only routing rule
+- Adopt 1.5.48's faster OpenRouter parallelism while keeping the subscription gateway capped at 4 and Kimi/Opus lanes cost-bounded
+- Add the compatible 1.5.50 CLI aliases (`health`, `ready`, `repair`, `verify`) while preserving mixed OpenRouter + subscription-gateway administration
+- Add smoke coverage for aliases, quarantine detection, and the mixed-provider concurrency contract
+
+## [1.5.40] — 2026-08-02
+
+### DeepSeek V4 Flash 0731 + Kimi K3 fallback policy
+- Retire DeepSeek V4 Pro from every primary route, fallback chain, concurrency map, whitelist, and model definition
+- Route `content-aware-research` and `content-aware-deep` through the current `deepseek-v4-flash` slug, which now resolves to DeepSeek V4 Flash 0731
+- Use Kimi K3 as the expensive deep-agentic fallback for review, debugging, refactoring, and content-aware depth lanes
+- Keep multimodal-looker on Claude Sonnet 5, with Gemini Flash and Kimi K3 fallbacks; all three accept image input
+- Add a validation guard that fails if a future update reintroduces `deepseek-v4-pro`
+- Add an explicit `agentic-deep-kimi` category rather than making Kimi a daily default
+- Add `oc eval`, a plan-first DeepSeek/Kimi/Sonnet canary with per-run, cumulative campaign, and account-reserve spending guards
+- Persist response-reported eval costs so delayed OpenRouter credit totals cannot weaken the campaign or reserve guards
+- Raise the canary output allowance to 2,400 tokens after proving that 1,200 could be consumed entirely by DeepSeek reasoning, and cover the grader/ledger with offline regression tests
+
+## [1.5.39] — 2026-07-31
+
+### Opus 5 deep-routing refresh
+- Make `anthropic/claude-opus-5` the max-effort route for `ultrawork` and `unspecified-high`
+- Retain Claude Fable 5 as a capped fallback, and cap Opus 5 at one concurrent background task
+- Keep the existing GLM, DeepSeek, GPT-subscription and public Buzz-persona primary routes unchanged
 
 ## [1.5.38] — 2026-07-26
 
@@ -524,7 +162,7 @@ Every pin re-verified against the live `openrouter.ai/api/v1/models` catalog + p
 
 ### Package pin audit
 - Add `oc versions` (`versions.sh`) — compare OpenCode / OmO / `@opencode-ai/plugin` pins to npm + GitHub
-- Scan other `opencode.json` under `~/Projects` (project overlays; OmO stays global)
+- Scan other `opencode.json` under `~/Projects` and `/Users/Shared` (project overlays; OmO stays global)
 - `oc versions --fix` aligns `~/.opencode` `@opencode-ai/plugin` peer to the installed CLI when npm has it
 - Pins verified current: OpenCode `1.18.4`, OmO `4.19.0`, plugin peer `1.18.4`
 - README: Package pins section + verify/install flows include `oc versions`
@@ -589,7 +227,7 @@ Every pin re-verified against the live `openrouter.ai/api/v1/models` catalog + p
 ## [1.5.22] — 2026-07-21
 
 ### Hygiene — no personal host paths · deny-all gitignore
-- `zshrc.snippet`: remove host-specific denylist/redirect paths; resolve workspace via `OC_*` / `projects.json` / `~/Projects` only
+- `zshrc.snippet`: remove `/Users/Shared/lm-agents` denylist + `/Users/Shared/test-speed` redirect; resolve workspace via `OC_*` / `projects.json` / `~/Projects` only
 - `.gitignore`: default-deny root (`/*`) + explicit allowlist — logs, secrets, runtime junk, and anything outside the config set stay untracked
 - Respect `OC_PROJECTS_DIR` / `OC_DEFAULT_WORKSPACE` (no longer stomp with a hard-coded `~/Projects` when that dir exists)
 
@@ -751,7 +389,7 @@ Every pin re-verified against the live `openrouter.ai/api/v1/models` catalog + p
 
 **Generic identity** — remove personal naming; prompts and docs are for any OpenConfig user.
 
-- Logical identity stays `jesseoue/opencode-configs` (not a GitHub org path)
+- Logical identity stays `openconfig/opencode-configs` (not a GitHub org path)
 - Distribution host kept in `signature.json` → `github_b64` (decoded only at install/runtime)
 - Installer / docs use identity id + `github_b64` (no personal host-owner literals in source)
 - Prompts (`prompts/core.md` and agents) are role-generic — no personal fleet/ops scope
@@ -832,7 +470,7 @@ subprocess that did not own the tty.
 - `oc install --quick` → Ready
 - `oc check` / `oc heal` → healthy
 - `oc test` → smoke + idempotency pass (incl. zshrc copy-backup / wipe guard)
-- Headless `oc run` → Sisyphus · `z-ai/glm-5.2` returns `LOAD_OK`
+- Headless `oc run` → Sisyphus · `z-ai/glm-5.2-exacto` returns `LOAD_OK`
 - `~/.zshrc` sources `zshrc.snippet` (telemetry + TERM + teardown)
 
 ### Since 1.3
@@ -859,7 +497,7 @@ oc install --quick
 ### Official download sources
 - **OpenCode CLI** — `https://opencode.ai/install` only (redirects to anomalyco/opencode)
 - **OmO plugin** — npm `oh-my-openagent@4.16.3` (+ platform optionalDependency) into `~/.cache/opencode/packages/`
-- **This config** — identity `jesseoue/opencode-configs` (installer clones/pulls via `github_b64`)
+- **This config** — identity `openconfig/opencode-configs` (installer clones/pulls via `github_b64`)
 
 ### Shell / zsh
 - Canonical: `source ~/.config/opencode/zshrc.snippet` (telemetry + TERM + teardown)
@@ -869,7 +507,7 @@ oc install --quick
 - All `*.sh` / `oc` pass `bash -n`; snippet is `shellcheck shell=zsh`
 
 ### Identity & discovery
-- `signature.json` + `oc signature` — markers + content fingerprint prove `jesseoue/opencode-configs` (OpenConfig / `oc`)
+- `signature.json` + `oc signature` — markers + content fingerprint prove `openconfig/opencode-configs` (OpenConfig / `oc`)
 - `oc locate` / `oc where` — read-only discovery of repo, CLI, symlinks, key presence, leftovers (`--json`)
 - Validate / doctor / heal gate on signature; heal refuses wrong/unverified trees
 

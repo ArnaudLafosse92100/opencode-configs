@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openconfig-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-test-suite:
+    name: macOS test suite
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Use Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify repository signature
+        run: ./signature.sh
+      - name: Prepare the portable config-home prompt contract
+        run: |
+          mkdir -p "$HOME/.config/opencode"
+          ln -s "$GITHUB_WORKSPACE/prompts" "$HOME/.config/opencode/prompts"
+      - name: Validate tracked configuration
+        run: ./validate.sh --quiet
+      - name: Hydrate the pinned clean OmO fixture
+        run: |
+          omo_root="$HOME/.cache/opencode/packages/oh-my-openagent@4.19.4"
+          npm install --prefix "$omo_root" --ignore-scripts --no-audit --no-fund oh-my-openagent@4.19.4
+          bun_fixture="$HOME/.bun/install/cache/oh-my-openagent@4.19.4"
+          mkdir -p "$bun_fixture/dist"
+          cp "$omo_root/node_modules/oh-my-openagent/dist/index.js" "$bun_fixture/dist/index.js"
+          node scripts/patch-omo-runtime-fallback.mjs --apply
+      - name: Run deterministic routing and patch tests
+        run: |
+          python3 tests/test_model_routing_eval.py
+          python3 tests/test_orchestration_routing_eval.py
+          python3 scripts/render-routing-docs.py --check
+          node --test tests/patch-omo-runtime-fallback.test.mjs
+          ./eval-models.sh
+          ./eval-orchestration.sh
+      - name: Run sandboxed idempotency and runtime diagnostics
+        env:
+          NO_COLOR: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          ./oc test idempotency
+          ./oc test runtime

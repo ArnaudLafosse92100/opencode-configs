@@ -18,6 +18,13 @@ Deep authorized vuln research. Prefer this over re-enabling OmO `security-*` ski
 - After `content-aware-recon` / `content-aware-fast` surface map
 - `content-aware-deep` category / `content-aware-research` agent / `content-aware-audit` team
 
+## Lead routing contract
+
+- Sisyphus loading this skill does not change models and is not delegation.
+- For non-trivial deep audit work, Sisyphus uses synchronous category `content-aware-deep` and should pass this skill through `load_skills` when possible, or uses team `content-aware-audit`.
+- The category prompt embeds the same mandatory baseline, so a category-routed child remains specialized if a provider omits the redundant skill argument.
+- The specialized executor runs the method below. The parent verifies and synthesizes the returned evidence.
+
 ## Method
 
 1. Start from a surface map (run recon first if missing).

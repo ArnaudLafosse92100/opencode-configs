@@ -14,15 +14,16 @@
 #   • Claude family: require_parameters=false, model temperature=false
 #   • permission: drop bogus "write"; drop "doom_loop" inside the bash pattern map
 #   • normalize the oh-my-* plugin pin
-#   • lock skills.paths to repo-local ./skills (drop external ~/.claude, ~/.agents dirs)
+#   • lock skills.paths to canonical OpenConfig skills (drop duplicate/external imports)
 # Repairs (oh-my-openagent.json):
-#   • agent color -> hex (or removed); strip hidden/steps/thinking/providerOptions
+#   • reasoningEffort -> reasoning; agent color -> hex (or removed)
+#   • strip hidden/steps/thinking/providerOptions
 #   • keyword_detector.enabled_expansions -> only valid enum values
 #   • lock skills.sources to ./skills; disable the Claude Code bridge (no external imports)
 #   • goal.enabled/auto_start + default_mode.goal -> false (OmO 4.19 /start-work footgun)
 #   • drop deprecated ralph_loop (Goals replaced Ralph on OmO 4.19)
-#   • sync canonical ~/.omo/omo.jsonc from oh-my-openagent.json (wrapped under
-#     "[opencode]" with the canonical omo.schema.json — the runtime loads omo.jsonc)
+#   • quarantine broken ~/.omo/omo.jsonc when migrated agents.models break Sisyphus
+#
 # Usage:
 #   ./fix.sh                       repair + format + validate
 #   ./fix.sh --dry-run             show what would change, write nothing
@@ -49,7 +50,7 @@ export OC_FIX_STAMP="$STAMP"
 c_g=$'\033[32m'; c_y=$'\033[33m'; c_b=$'\033[36m'; c_0=$'\033[0m'
 
 DRY=$DRY python3 - "$REPO" ${SETS[@]+"${SETS[@]}"} <<'PY'
-import json, sys, os, re, copy, shutil
+import base64, importlib.util, json, sys, os, re, copy, shutil
 
 repo = sys.argv[1]
 sets = sys.argv[2:]
@@ -58,20 +59,17 @@ changes = []
 stamp = os.environ.get("OC_FIX_STAMP") or ""
 backup_root = os.environ.get("OC_BACKUP_ROOT") or os.path.expanduser("~/.opencode-backups")
 
-def github_repo_url():
-    import base64
-    sig_path = os.path.join(repo, "signature.json")
-    try:
-        sig = json.load(open(sig_path, encoding="utf-8"))
-    except OSError:
-        return "https://github.com/jesseoue/opencode-configs"
-    b64 = (sig.get("github_b64") or "").strip()
-    if not b64:
-        return "https://github.com/jesseoue/opencode-configs"
-    try:
-        return base64.b64decode(b64).decode("ascii").rstrip("/")
-    except Exception:
-        return "https://github.com/jesseoue/opencode-configs"
+# Native OmO JSONC has one canonical parser/classifier in the generation
+# runtime. Loading it here prevents a second, subtly different migration
+# detector from ever treating OmO 4.19.4's valid `[opencode].*.models` form as
+# broken.
+runtime_profile_path = os.path.join(repo, "scripts", "runtime-profile.py")
+runtime_spec = importlib.util.spec_from_file_location("openconfig_runtime_profile", runtime_profile_path)
+if runtime_spec is None or runtime_spec.loader is None:
+    raise SystemExit("unable to load canonical native OmO parser")
+runtime_profile = importlib.util.module_from_spec(runtime_spec)
+sys.modules[runtime_spec.name] = runtime_profile
+runtime_spec.loader.exec_module(runtime_profile)
 
 def load(p): return json.load(open(os.path.join(repo, p)))
 def dump(p, d):
@@ -86,6 +84,8 @@ THEME_HEX = {"primary":"#00F0FF","accent":"#B967FF","info":"#00FFD1",
 
 # ─── opencode.json ────────────────────────────────────────────────────────────
 oc = load("opencode.json"); before = copy.deepcopy(oc)
+signature = load("signature.json")
+canonical_github = base64.b64decode(signature["github_b64"]).decode("ascii").rstrip("/")
 
 exp = oc.get("experimental", {})
 if "primary_tools" in exp:
@@ -104,13 +104,98 @@ for mid, m in prov.get("models", {}).items():
         changes.append(f"[{mid}] options.reasoning_effort -> reasoning.effort")
     for k in ("temperature", "top_p", "thinking"):
         if k in o: del o[k]; changes.append(f"[{mid}] stripped model-level options.{k}")
-    pv = o.get("provider", {})
+    pv = o.get("provider")
+    if not isinstance(pv, dict):
+        pv = {}
+        o["provider"] = pv
+        changes.append(f"[{mid}] provider options initialized")
+    for key in ("preferred_min_throughput", "preferred_max_latency"):
+        if key in pv:
+            del pv[key]
+            changes.append(f"[{mid}] removed provider.{key} (native provider routing owns selection)")
+    fam = m.get("family")
+    expected_require_parameters = fam in ("glm", "minimax")
+    pentest_throughput_policies = {
+        "deepseek/deepseek-v4-flash-0731-zdr-throughput": {"id": "deepseek/deepseek-v4-flash-0731", "max_price": {"prompt": 0.50, "completion": 1.50}, "require_parameters": True, "data_collection": "deny", "zdr": True},
+        "deepseek/deepseek-v4-pro-0813-zdr-throughput": {"id": "deepseek/deepseek-v4-pro-0813", "max_price": {"prompt": 1.50, "completion": 4.50}, "require_parameters": True, "data_collection": "deny", "zdr": True},
+    }
+    normal_price_policies = {
+        "z-ai/glm-5.3": {"max_price": {"prompt": 1.40, "completion": 4.40}, "require_parameters": True},
+        "google/gemini-3.1-pro-preview": {"max_price": {"prompt": 3.60, "completion": 21.60}, "require_parameters": False},
+        "google/gemini-3.7-flash": {"max_price": {"prompt": 1.35, "completion": 6.75}, "require_parameters": False},
+        "moonshotai/kimi-k2.7-code": {"max_price": {"prompt": 0.95, "completion": 4.00}, "require_parameters": False},
+        "minimax/minimax-m3": {"max_price": {"prompt": 0.30, "completion": 1.20}, "require_parameters": True},
+        "deepseek/deepseek-v4-pro-0813": {"max_price": {"prompt": 1.32, "completion": 3.96}, "require_parameters": False},
+        "deepseek/deepseek-v4-flash-0731": {"max_price": {"prompt": 0.10, "completion": 0.30}, "require_parameters": False},
+        "nousresearch/hermes-4-405b": {"max_price": {"prompt": 1.00, "completion": 3.00}, "require_parameters": False},
+    }
+    want_only = {
+        "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
+        "minimax": ["gmicloud", "novita", "deepinfra", "together"],
+    }.get(fam)
+    is_pentest_throughput = mid in pentest_throughput_policies
+    if mid in normal_price_policies:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed provider.only (normal uses every eligible capped provider)")
+        for key, value in (
+            ("require_parameters", normal_price_policies[mid]["require_parameters"]),
+            ("data_collection", "allow"),
+            ("allow_fallbacks", True),
+            ("sort", "price"),
+            ("max_price", normal_price_policies[mid]["max_price"]),
+        ):
+            if pv.get(key) != value:
+                pv[key] = value
+                changes.append(f"[{mid}] provider.{key} -> {value!r}")
+        if "zdr" in pv:
+            del pv["zdr"]
+            changes.append(f"[{mid}] removed provider.zdr (normal remains collection-allowed)")
+    elif is_pentest_throughput:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed provider.only (pentest throughput route uses all eligible providers)")
+        if m.get("id") != pentest_throughput_policies[mid]["id"]:
+            m["id"] = pentest_throughput_policies[mid]["id"]
+            changes.append(f"[{mid}] id -> {m['id']!r}")
+        for key, value in (
+            ("require_parameters", pentest_throughput_policies[mid]["require_parameters"]),
+            ("data_collection", pentest_throughput_policies[mid]["data_collection"]),
+            ("allow_fallbacks", True),
+            ("sort", "throughput"),
+            ("max_price", pentest_throughput_policies[mid]["max_price"]),
+        ):
+            if pv.get(key) != value:
+                pv[key] = value
+                changes.append(f"[{mid}] provider.{key} -> {value!r}")
+        if pentest_throughput_policies[mid]["zdr"]:
+            if pv.get("zdr") is not True:
+                pv["zdr"] = True
+                changes.append(f"[{mid}] provider.zdr -> true")
+        elif "zdr" in pv:
+            del pv["zdr"]
+            changes.append(f"[{mid}] removed provider.zdr (pentest throughput route remains collection-allowed)")
+    elif want_only is not None:
+        if pv.get("only") != want_only:
+            pv["only"] = want_only
+            changes.append(f"[{mid}] provider.only -> live {fam} roster")
+        want_require_parameters = False if fam == "deepseek" else expected_require_parameters
+        if pv.get("require_parameters") is not want_require_parameters:
+            pv["require_parameters"] = want_require_parameters
+            changes.append(f"[{mid}] provider.require_parameters -> {str(want_require_parameters).lower()}")
+    else:
+        if "only" in pv:
+            del pv["only"]
+            changes.append(f"[{mid}] removed stale provider.only")
+        if pv.get("require_parameters") is not expected_require_parameters:
+            pv["require_parameters"] = expected_require_parameters
+            changes.append(f"[{mid}] provider.require_parameters -> {str(expected_require_parameters).lower()}")
     # Only claude/deepseek NEED 'unknown' (their first-party endpoints report it).
     # GLM intentionally excludes it to drop fp4 providers — do not touch that.
     q = pv.get("quantizations")
-    if isinstance(q, list) and "unknown" not in q and m.get("family") in ("claude","deepseek"):
-        pv["quantizations"] = q + ["unknown"]; changes.append(f"[{mid}] quantizations += 'unknown' ({m.get('family')} first-party)")
-    if m.get("family") == "claude":
+    if isinstance(q, list) and "unknown" not in q and fam in ("claude","deepseek"):
+        pv["quantizations"] = q + ["unknown"]; changes.append(f"[{mid}] quantizations += 'unknown' ({fam} first-party)")
+    if fam == "claude":
         if pv.get("require_parameters") is True:
             pv["require_parameters"] = False; changes.append(f"[{mid}] Claude require_parameters -> false")
         if m.get("temperature") is True:
@@ -179,15 +264,18 @@ for pat, val in BASH_DENY.items():
         bash[pat] = val
         changes.append(f"permission.bash[{pat!r}] -> {val}")
 
-# Skills: global OpenConfig skills (any cwd — orca, Projects, …) + project-local ./skills.
-# Drop ~/.claude / ~/.agents imports; keep ~/.config/opencode/skills (the config symlink).
-ALLOWED_SKILL_PATHS = ["~/.config/opencode/skills", "./skills"]
+# Skills: canonical OpenConfig skills only. ~/.config/opencode is itself the
+# OpenConfig symlink, while ./skills resolves to the same directory when the
+# bridge runs from its private XDG overlay; keeping both makes OpenCode load
+# duplicate skills. Project-specific skills should be configured by the project,
+# not globally.
+ALLOWED_SKILL_PATHS = ["~/.config/opencode/skills"]
 sk = oc.setdefault("skills", {})
 paths = [str(p) for p in (sk.get("paths") or [])]
 bad = [p for p in paths if p not in ALLOWED_SKILL_PATHS and (".claude" in p or ".agents" in p or (p.startswith(("~", "/")) and "opencode/skills" not in p))]
 if bad or paths != ALLOWED_SKILL_PATHS:
     sk["paths"] = list(ALLOWED_SKILL_PATHS)
-    changes.append("skills.paths -> %s (global OpenConfig + project ./skills)" % ALLOWED_SKILL_PATHS)
+    changes.append("skills.paths -> %s (canonical OpenConfig skills only)" % ALLOWED_SKILL_PATHS)
 
 # Goal footgun doc must load every session
 instr = oc.get("instructions")
@@ -197,11 +285,12 @@ for must in ("AGENTS.md", "prompts/core.md", "prompts/goal.md"):
     if must not in instr:
         instr.append(must); changes.append(f"instructions += {must}")
 
-# normalize plugin pin name (accept oh-my-openagent or oh-my-opencode; keep version)
+# Normalize the plugin name and enforce the versions.json pin.
 plug = oc.get("plugin", [])
+want_omo_pin = (load("versions.json").get("oh_my_openagent") or {}).get("pin")
 for i, p in enumerate(plug):
     if "oh-my" in p and "@" in p:
-        ver = p.split("@")[-1]
+        ver = want_omo_pin or p.split("@")[-1]
         canon = f"oh-my-openagent@{ver}"
         if p != canon: plug[i] = canon; changes.append(f"plugin pin -> {canon}")
 
@@ -245,31 +334,11 @@ if oc.get("share") != "disabled":
     oc["share"] = "disabled"; changes.append("share -> disabled (no session sharing)")
 if oc.get("autoupdate") is not False:
     oc["autoupdate"] = False; changes.append("autoupdate -> false")
-if oc.get("subagent_depth") != 1:
-    oc["subagent_depth"] = 1; changes.append("subagent_depth -> 1 (OpenCode default; no nested Task storms)")
-comp = oc.setdefault("compaction", {})
-if isinstance(comp, dict):
-    if comp.get("auto") is not True:
-        comp["auto"] = True; changes.append("compaction.auto -> true")
-    if comp.get("prune") is not True:
-        comp["prune"] = True; changes.append("compaction.prune -> true")
-    if comp.get("reserved") != 24000:
-        comp["reserved"] = 24000; changes.append("compaction.reserved -> 24000")
-if oc.get("logLevel") != "ERROR":
-    oc["logLevel"] = "ERROR"; changes.append("logLevel -> ERROR (minimize sensitive runtime logs)")
 exp = oc.setdefault("experimental", {})
 if not isinstance(exp, dict):
     oc["experimental"] = {}; exp = oc["experimental"]
 if exp.get("openTelemetry") is not False:
     exp["openTelemetry"] = False; changes.append("experimental.openTelemetry -> false")
-if exp.get("mcp_timeout") != 30000:
-    exp["mcp_timeout"] = 30000; changes.append("experimental.mcp_timeout -> 30000")
-tool_output = oc.setdefault("tool_output", {})
-if isinstance(tool_output, dict):
-    if tool_output.get("max_lines") != 200:
-        tool_output["max_lines"] = 200; changes.append("tool_output.max_lines -> 200")
-    if tool_output.get("max_bytes") != 8000:
-        tool_output["max_bytes"] = 8000; changes.append("tool_output.max_bytes -> 8000")
 srv = oc.get("server")
 if isinstance(srv, dict):
     if srv.get("mdns") is not False:
@@ -282,14 +351,10 @@ if isinstance(srv, dict):
 # ─── OpenRouter app attribution (OpenConfig — not generic CLI / OpenCode) ─────
 or_opts = oc.setdefault("provider", {}).setdefault("openrouter", {}).setdefault("options", {})
 if isinstance(or_opts, dict):
-    for timeout_key, timeout_value in (("timeout", 300000), ("headerTimeout", 300000), ("chunkTimeout", 180000)):
-        if or_opts.get(timeout_key) != timeout_value:
-            or_opts[timeout_key] = timeout_value
-            changes.append(f"openrouter.options.{timeout_key} -> {timeout_value}")
     hdrs = or_opts.setdefault("headers", {})
     if isinstance(hdrs, dict):
         want_hdrs = {
-            "HTTP-Referer": github_repo_url(),
+            "HTTP-Referer": canonical_github,
             "X-Title": "OpenConfig",
             "X-OpenRouter-Title": "OpenConfig",
             "X-OpenRouter-Categories": "cli-agent",
@@ -298,477 +363,22 @@ if isinstance(or_opts, dict):
             if hdrs.get(hk) != hv:
                 hdrs[hk] = hv
                 changes.append(f"openrouter.headers.{hk} -> {hv} (OpenConfig attribution)")
-# Venice + native DeepSeek: same documented timeout trio
-# (https://opencode.ai/docs/config). chunkTimeout 180s — official default is 300s.
-for _pname in ("venice", "deepseek"):
-    _opts = oc.setdefault("provider", {}).setdefault(_pname, {}).setdefault("options", {})
-    if isinstance(_opts, dict):
-        for timeout_key, timeout_value in (("timeout", 300000), ("headerTimeout", 300000), ("chunkTimeout", 180000)):
-            if _opts.get(timeout_key) != timeout_value:
-                _opts[timeout_key] = timeout_value
-                changes.append(f"{_pname}.options.{timeout_key} -> {timeout_value}")
-or_models = oc.setdefault("provider", {}).setdefault("openrouter", {}).setdefault("models", {})
-if isinstance(or_models, dict):
-    for model_id, model_cfg in or_models.items():
-        if not isinstance(model_cfg, dict):
-            continue
-        provider_cfg = model_cfg.setdefault("options", {}).setdefault("provider", {})
-        if not isinstance(provider_cfg, dict):
-            continue
-        if provider_cfg.get("data_collection") != "allow":
-            provider_cfg["data_collection"] = "allow"
-            changes.append(f"{model_id}.provider.data_collection -> allow")
-        if "zdr" in provider_cfg:
-            del provider_cfg["zdr"]
-            changes.append(f"{model_id}.provider.zdr removed (preserve provider availability)")
-        require_parameters = model_cfg.get("family") in ("glm", "minimax")
-        family = model_cfg.get("family")
-        # Unmoderated-provider pinning, rebuilt from LIVE endpoints
-        # (openrouter.ai/api/v1/models/{id}/endpoints, rechecked 2026-09-08):
-        # skip first-party + moderated proxies that add runtime blocks, and skip
-        # every fp4 endpoint (fp4 quant degrades tool-calling). Plain provider
-        # slugs only — each listed host serves the family at fp8/full precision.
-        # glm has NO pin: glm-5.3 now has many hosts; Auto Exacto (on by default
-        # for tool requests) + require_parameters is the quality pin. A static
-        # provider.only roster would fight that and can 404 if hosts churn.
-        # MiniMax: parasail added 2026-09-08 (fp8 + tools; already on DeepSeek roster).
-        # V4.1 Flash (2026-09-10): day-one hosts are first-party DeepSeek + novita +
-        # deepinfra only. Do NOT stamp the V4 Pro/0731 8-host roster — those 404.
-        mid_l = str(model_id).lower()
-        if "v4.1-flash" in mid_l or "v4-1-flash" in mid_l:
-            want_only = ["deepseek", "novita", "deepinfra"]
-        else:
-            want_only = {
-                "minimax": ["gmicloud", "novita", "deepinfra", "together", "parasail"],
-                "deepseek": ["gmicloud", "novita", "siliconflow", "parasail", "deepinfra", "baidu", "fireworks", "digitalocean"],
-            }.get(family)
-        if want_only is not None:
-            if provider_cfg.get("only") != want_only:
-                provider_cfg["only"] = want_only
-                changes.append(f"{model_id}.provider.only -> {want_only} (live-verified unmoderated hosts; no fp4)")
-        elif "only" in provider_cfg:
-            del provider_cfg["only"]
-            changes.append(f"{model_id}.provider.only removed (stale pin — no live roster for this family)")
-        if provider_cfg.get("require_parameters") is not require_parameters:
-            provider_cfg["require_parameters"] = require_parameters
-            changes.append(f"{model_id}.provider.require_parameters -> {str(require_parameters).lower()}")
-        route_id = str(model_cfg.get("id") or model_id)
-        if "order" in provider_cfg:
-            del provider_cfg["order"]
-            changes.append(f"{model_id}.provider.order removed (restore adaptive provider routing)")
-        # :exacto/:nitro/:floor are virtual request suffixes, not catalog slugs.
-        # Do not persist them as whitelist ids. sort/ignore/preferred_* fight
-        # Auto Exacto / adaptive ranking.
-        if "sort" in provider_cfg:
-            del provider_cfg["sort"]
-            changes.append(f"{model_id}.provider.sort removed (OpenRouter auto-rank)")
-        if "ignore" in provider_cfg:
-            del provider_cfg["ignore"]
-            changes.append(f"{model_id}.provider.ignore removed (restore full fallback coverage)")
-        for routing_key in ("preferred_min_throughput", "preferred_max_latency", "quantizations"):
-            if routing_key in provider_cfg:
-                del provider_cfg[routing_key]
-                changes.append(f"{model_id}.provider.{routing_key} removed (OpenRouter auto-rank)")
-
-# Gateways: OpenRouter (default) + Venice (content-aware / optional Sisyphus) + native DeepSeek.
-want_enabled = ["openrouter", "venice", "deepseek"]
-if oc.get("enabled_providers") != want_enabled:
-    oc["enabled_providers"] = want_enabled
-    changes.append("enabled_providers -> ['openrouter', 'venice', 'deepseek']")
-prov_root = oc.setdefault("provider", {})
-# Do not duplicate OmO Venice/DeepSeek agents into opencode.json agent.
-# Native OpenCode agent + OmO merge conflicts (mode primary vs subagent) crash the TUI.
-# Venice lives in oh-my-openagent.json + agents/*.md; keep provider.venice.models metadata only.
-oc_agents = oc.get("agent") or {}
-if isinstance(oc_agents, dict):
-    for aname in (
-        "content-aware-research",
-        "content-aware-fast",
-        "sisyphus-venice-deepseek",
-        "sisyphus-venice-deepseek-flash-junior",
-        "sisyphus-deepseek",
-        "sisyphus-deepseek-junior",
-    ):
-        if aname in oc_agents:
-            del oc_agents[aname]
-            changes.append(f"agent.{aname} removed (OmO-owned; duplicate native agent crashes TUI)")
-venice_models = prov_root.setdefault("venice", {}).setdefault("models", {})
-if isinstance(venice_models, dict):
-    for vm, vcfg in venice_models.items():
-        if not isinstance(vcfg, dict):
-            continue
-        for field, default in (
-            ("id", vm),
-            ("family", "deepseek"),
-            ("temperature", True),
-            ("attachment", False),
-            ("status", "active"),
-        ):
-            if vcfg.get(field) != default:
-                vcfg[field] = default
-                changes.append(f"venice.models.{vm}.{field} -> {default!r}")
-        # Venice DeepSeek spends max_tokens in reasoning_content unless thinking
-        # is off. disable_thinking is a venice_parameters key — top-level is
-        # unrecognized and 400s (Flash and Pro). OpenRouter/native DeepSeek stay clean.
-        vopts = vcfg.setdefault("options", {})
-        if isinstance(vopts, dict):
-            if "disable_thinking" in vopts:
-                del vopts["disable_thinking"]
-                changes.append(f"venice.models.{vm}.options.disable_thinking removed (top-level 400s)")
-            vp = vopts.setdefault("venice_parameters", {})
-            if isinstance(vp, dict) and vp.get("disable_thinking") is not True:
-                vp["disable_thinking"] = True
-                changes.append(f"venice.models.{vm}.options.venice_parameters.disable_thinking -> true")
-        for vn, vv in list((vcfg.get("variants") or {}).items()):
-            if not isinstance(vv, dict):
-                continue
-            if "disable_thinking" in vv:
-                del vv["disable_thinking"]
-                changes.append(f"venice.models.{vm}.variants.{vn}.disable_thinking removed (top-level 400s)")
-            vvp = vv.setdefault("venice_parameters", {})
-            if isinstance(vvp, dict) and vvp.get("disable_thinking") is not True:
-                vvp["disable_thinking"] = True
-                changes.append(f"venice.models.{vm}.variants.{vn}.venice_parameters.disable_thinking -> true")
-if isinstance(prov_root, dict) and "openai" in prov_root:
-    del prov_root["openai"]
-    changes.append("removed provider.openai (OpenRouter-only)")
 
 # ─── oh-my-openagent.json ─────────────────────────────────────────────────────
 omo = load("oh-my-openagent.json"); ombefore = copy.deepcopy(omo)
 
-# Canonical reasoning field (OmO 4.19.4+) — migrate legacy reasoningEffort
-REASONING_EFFORT_MAP = {
-    "none": "off", "minimal": "minimal", "low": "low", "medium": "medium",
-    "high": "high", "xhigh": "xhigh", "max": "max",
-}
-for section in ("agents", "categories"):
-    for n, a in (omo.get(section) or {}).items():
-        if not isinstance(a, dict):
-            continue
-        reff = a.get("reasoningEffort")
-        if reff is None:
-            continue
-        canon = REASONING_EFFORT_MAP.get(str(reff), str(reff))
-        if a.get("reasoning") != canon:
-            a["reasoning"] = canon
-            changes.append(f"{section} {n}: reasoningEffort -> reasoning ({canon})")
-        del a["reasoningEffort"]
-        changes.append(f"{section} {n}: removed deprecated reasoningEffort")
-
-# Keep $schema URL aligned with pinned OmO version
-ver_path = os.path.join(repo, "versions.json")
-try:
-    omo_pin = json.load(open(ver_path)).get("oh_my_openagent", {}).get("pin")
-except Exception:
-    omo_pin = None
-if omo_pin:
-    # Canonical schema asset is omo.schema.json on the dev branch (the runtime's
-    # OMO_SCHEMA_URL). The legacy oh-my-opencode.schema.json basename 404s upstream.
-    want_schema = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
+if want_omo_pin:
+    want_schema = f"https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/v{want_omo_pin}/assets/oh-my-opencode.schema.json"
     if omo.get("$schema") != want_schema:
         omo["$schema"] = want_schema
-        changes.append("omo $schema -> dev/assets/omo.schema.json (canonical)")
+        changes.append(f"oh-my-openagent schema -> v{want_omo_pin}")
 
-# OmO 4.19.4 TUI/Zod rejects agents.*.models arrays (post-unification shape).
-# Convert to model + fallback_models so `oc fix` cannot re-break the sidebar.
-def _model_id(entry):
-    if isinstance(entry, str):
-        return entry
-    if isinstance(entry, dict):
-        return entry.get("model")
-    return None
-
+# OmO 4.19.4 uses one canonical reasoning vocabulary for agents/categories.
 for section in ("agents", "categories"):
-    for n, a in (omo.get(section) or {}).items():
-        if not isinstance(a, dict):
-            continue
-        models = a.get("models")
-        if not isinstance(models, list) or not models:
-            continue
-        first = models[0]
-        mid = _model_id(first)
-        if not mid:
-            continue
-        a["model"] = mid
-        if isinstance(first, dict) and first.get("reasoning"):
-            a["reasoning"] = first["reasoning"]
-        fbs = []
-        for entry in models[1:]:
-            fid = _model_id(entry)
-            if fid and fid != mid and fid not in fbs:
-                fbs.append(fid)
-        if fbs:
-            a["fallback_models"] = fbs
-        del a["models"]
-        changes.append(f"{section} {n}: models[] -> model/fallback_models (OmO 4.19.4)")
-
-for n, a in (omo.get("categories") or {}).items():
-    if isinstance(a, dict) and "color" in a:
-        del a["color"]
-        changes.append(f"categories {n}: removed color (unknown in OmO 4.19.4)")
-
-# OpenRouter-only model refs + strip slow kimi from routine fallbacks
-def _norm_or_model(m):
-    if not isinstance(m, str):
-        return m
-    if m.startswith("openai/") and not m.startswith("openrouter/"):
-        return "openrouter/" + m
-    return m
-SLOW_FB = ("kimi-k3",)
-for section in ("agents", "categories"):
-    for n, a in (omo.get(section) or {}).items():
-        if not isinstance(a, dict):
-            continue
-        if a.get("model"):
-            nm = _norm_or_model(a["model"])
-            if nm != a["model"]:
-                a["model"] = nm
-                changes.append(f"{section} {n}: model -> {nm}")
-        fbs = a.get("fallback_models")
-        if not isinstance(fbs, list):
-            continue
-        cleaned = []
-        for fb in fbs:
-            fb = _norm_or_model(fb)
-            if any(s in str(fb).lower() for s in SLOW_FB):
-                changes.append(f"{section} {n}: dropped slow fallback {fb}")
-                continue
-            cleaned.append(fb)
-        if cleaned != fbs:
-            a["fallback_models"] = cleaned[:3]
-
-# Recon routes: unmoderated primaries + fallbacks only (no Claude/GPT on explore/librarian/recon chains)
-MODERATED_FB = ("anthropic/claude", "openai/gpt", "meta-llama/", "cohere/")
-RECON_PRIMARY = {
-    "explore": "openrouter/deepseek/deepseek-v4-pro-0813",
-    "librarian": "openrouter/deepseek/deepseek-v4-pro-0813",
-    "metis": "openrouter/z-ai/glm-5.3",
-    "multimodal-looker": "openrouter/google/gemini-3.1-pro-preview",
-    "deep": "openrouter/deepseek/deepseek-v4-pro-0813",
-    "arch-review": "openrouter/z-ai/glm-5.3",
-    "content-aware-research": "venice/deepseek-v4-pro-0813",
-    "content-aware-deep": "venice/deepseek-v4-pro-0813",
-    "content-aware-fast": "venice/deepseek-v4-1-flash",
-}
-# content-aware-research is Venice-only (never OpenRouter / Hermes).
-# hermes-4-405b is NOT in RECON_FALLBACKS: it cannot tool-call.
-CONTENT_AWARE_FALLBACKS = [
-    "venice/deepseek-v4-pro",
-    "venice/deepseek-v4-1-flash",
-]
-VENICE_SISYPHUS = {
-    "sisyphus-venice-deepseek",
-    "sisyphus-venice-deepseek-flash-junior",
-}
-VENICE_SISYPHUS_FALLBACKS = [
-    "venice/deepseek-v4-pro-0813",
-    "venice/deepseek-v4-pro",
-    "venice/deepseek-v4-1-flash",
-]
-
-def _venice_lane(n, a=None):
-    if n.startswith("content-aware") or n in VENICE_SISYPHUS:
-        return True
-    model = str((a or {}).get("model") or "")
-    return model.startswith("venice/")
-RECON_FALLBACKS = [
-    "openrouter/deepseek/deepseek-v4-pro-0813",
-    "openrouter/z-ai/glm-5.3",
-    "openrouter/poolside/laguna-s-2.1",
-    "openrouter/meituan/longcat-2.0",
-]
-FAST_PRIMARY = "openrouter/z-ai/glm-5.3-flash"
-RECON_ROUTES = {
-    "explore", "librarian", "sisyphus-junior", "quick", "unspecified-low",
-    "content-aware-fast", "content-aware-deep", "content-aware-research",
-    "deep", "arch-review", "metis", "multimodal-looker",
-}
-for section in ("agents", "categories"):
-    for n, a in (omo.get(section) or {}).items():
-        if n not in RECON_ROUTES or not isinstance(a, dict):
-            continue
-        want_primary = RECON_PRIMARY.get(n, FAST_PRIMARY)
-        cur = str(a.get("model") or "")
-        # Content-aware is Venice-only. Always pin the Venice primary.
-        if n.startswith("content-aware"):
-            if cur != want_primary:
-                a["model"] = want_primary
-                changes.append(f"{section} {n}: model -> {want_primary} (Venice content-aware)")
-        elif cur != want_primary:
-            a["model"] = want_primary
-            changes.append(f"{section} {n}: model -> {want_primary} (recon primary)")
-        fbs = a.get("fallback_models")
-        if not isinstance(fbs, list):
-            continue
-        cleaned = []
-        for fb in fbs:
-            fb = _norm_or_model(fb)
-            if _venice_lane(n, a) and not str(fb).startswith("venice/"):
-                changes.append(f"{section} {n}: dropped non-Venice fallback {fb}")
-                continue
-            if any(m in str(fb).lower() for m in MODERATED_FB):
-                changes.append(f"{section} {n}: dropped moderated fallback {fb}")
-                continue
-            cleaned.append(fb)
-        if not cleaned:
-            if _venice_lane(n, a):
-                pool = CONTENT_AWARE_FALLBACKS if n.startswith("content-aware") else VENICE_SISYPHUS_FALLBACKS
-                cleaned = [x for x in pool if x != a.get("model")][:3]
-            else:
-                cleaned = [x for x in RECON_FALLBACKS if x != a.get("model")][:3]
-            changes.append(f"{section} {n}: rebuilt unmoderated fallbacks")
-        if cleaned != fbs:
-            a["fallback_models"] = cleaned[:3]
-        if n == "explore":
-            perm = a.setdefault("permission", {})
-            if isinstance(perm, dict):
-                # Official OmO tool boundary: search-only, no writes, no delegation
-                # https://omo.vibetip.help/docs/agents
-                for k, v in (("edit", "deny"), ("webfetch", "allow"), ("question", "allow"), ("task", "deny")):
-                    if perm.get(k) != v:
-                        perm[k] = v
-                        changes.append(f"explore permission.{k} -> {v}")
-
-# Official OmO read-only consult lanes (no writes, no nested task)
-# https://omo.vibetip.help/docs/agents — Oracle / Librarian / Multimodal-Looker
-OMO_READONLY = {
-    "oracle": ("edit", "webfetch", "question", "task"),
-    "librarian": ("edit", "webfetch", "question", "task"),
-    "multimodal-looker": ("edit", "webfetch", "question", "task"),
-}
-for n, keys in OMO_READONLY.items():
-    a = (omo.get("agents") or {}).get(n)
-    if not isinstance(a, dict):
-        continue
-    perm = a.setdefault("permission", {})
-    if not isinstance(perm, dict):
-        continue
-    want = {"edit": "deny", "webfetch": "allow", "question": "allow", "task": "deny"}
-    for k in keys:
-        if perm.get(k) != want[k]:
-            perm[k] = want[k]
-            changes.append(f"agents {n}: permission.{k} -> {want[k]} (OmO read-only boundary)")
-
-# Hermes consult lane — not Venice content-aware, not a recon/tool route.
-HERMES_PRIMARY = "openrouter/nousresearch/hermes-4-405b"
-HERMES_FALLBACKS = [
-    "openrouter/z-ai/glm-5.3",
-    "openrouter/poolside/laguna-s-2.1",
-    "openrouter/qwen/qwen3.8-max-0902",
-]
-hermes = (omo.get("agents") or {}).get("context-aware-hermes")
-if not isinstance(hermes, dict):
-    omo.setdefault("agents", {})["context-aware-hermes"] = {
-        "mode": "primary",
-        "name": "Context-aware Hermes",
-        "model": HERMES_PRIMARY,
-        "fallback_models": list(HERMES_FALLBACKS),
-        "permission": {"edit": "deny", "webfetch": "allow", "question": "allow", "task": "allow"},
-        "prompt_append": "file://~/.config/opencode/prompts/agents/context-aware-hermes.md",
-        "color": "#B388FF",
-        "maxTokens": 16384,
-        "reasoning": "high",
-    }
-    changes.append("agents context-aware-hermes: created Hermes 405B consult lane")
-    hermes = omo["agents"]["context-aware-hermes"]
-else:
-    if hermes.get("model") != HERMES_PRIMARY:
-        hermes["model"] = HERMES_PRIMARY
-        changes.append(f"agents context-aware-hermes: model -> {HERMES_PRIMARY}")
-    want_fb = [x for x in HERMES_FALLBACKS if x != HERMES_PRIMARY]
-    if hermes.get("fallback_models") != want_fb:
-        hermes["fallback_models"] = want_fb
-        changes.append("agents context-aware-hermes: fallbacks -> tool-capable GLM/Laguna/Qwen")
-    perm = hermes.setdefault("permission", {})
-    if isinstance(perm, dict) and perm.get("edit") != "deny":
-        perm["edit"] = "deny"
-        changes.append("agents context-aware-hermes: permission.edit -> deny")
-    if hermes.get("prompt_append") != "file://~/.config/opencode/prompts/agents/context-aware-hermes.md":
-        hermes["prompt_append"] = "file://~/.config/opencode/prompts/agents/context-aware-hermes.md"
-        changes.append("agents context-aware-hermes: prompt_append -> prompts/agents/context-aware-hermes.md")
-order = omo.setdefault("agent_order", [])
-if isinstance(order, list) and "context-aware-hermes" not in order:
-    order.append("context-aware-hermes")
-    changes.append("agent_order += context-aware-hermes")
-
-# OpenRouter-only gateway: strip GPT from all routes + whitelist (no openai/gpt-*)
-GPT_MARKERS = ("openai/gpt", "/gpt-5", "/gpt-4")
-DEEP_PRIMARY = "openrouter/z-ai/glm-5.3"
-DEEP_FALLBACKS = [
-    "openrouter/qwen/qwen3.8-max-0902",
-    "openrouter/poolside/laguna-s-2.1",
-    "openrouter/meituan/longcat-2.0",
-]
-MAX_PRIMARY = "openrouter/z-ai/glm-5.3"
-MAX_FALLBACKS = [
-    "openrouter/qwen/qwen3.8-max-0902",
-    "openrouter/poolside/laguna-s-2.1",
-    "openrouter/meituan/longcat-2.0",
-]
-MAX_ROUTES = {"momus", "ultrabrain", "unspecified-high"}
-
-def _is_gpt(ref):
-    s = str(ref or "").lower()
-    return any(m in s for m in GPT_MARKERS)
-
-for section in ("agents", "categories"):
-    for n, a in (omo.get(section) or {}).items():
-        if not isinstance(a, dict):
-            continue
-        want_p = MAX_PRIMARY if n in MAX_ROUTES else None
-        want_f = MAX_FALLBACKS if n in MAX_ROUTES else None
-        if _is_gpt(a.get("model")):
-            if n.startswith("content-aware"):
-                repl = RECON_PRIMARY.get(n, "venice/deepseek-v4-pro-0813")
-                note = "Venice content-aware, no GPT"
-            elif _venice_lane(n, a):
-                repl = "venice/deepseek-v4-pro-0813" if n != "sisyphus-venice-deepseek-flash-junior" else "venice/deepseek-v4-1-flash"
-                note = "Venice Sisyphus, no GPT"
-            else:
-                repl = want_p or DEEP_PRIMARY
-                note = "OpenRouter-only, no GPT"
-            a["model"] = repl
-            changes.append(f"{section} {n}: model -> {repl} ({note})")
-        fbs = a.get("fallback_models")
-        if not isinstance(fbs, list):
-            continue
-        cleaned = []
-        for fb in fbs:
-            fb = _norm_or_model(fb)
-            if _venice_lane(n, a) and not str(fb).startswith("venice/"):
-                changes.append(f"{section} {n}: dropped non-Venice fallback {fb}")
-                continue
-            if _is_gpt(fb):
-                changes.append(f"{section} {n}: dropped GPT fallback {fb}")
-                continue
-            cleaned.append(fb)
-        # Venice lanes never backfill OpenRouter fallbacks.
-        if _venice_lane(n, a):
-            if not cleaned:
-                pool = CONTENT_AWARE_FALLBACKS if n.startswith("content-aware") else VENICE_SISYPHUS_FALLBACKS
-                cleaned = [x for x in pool if x != a.get("model")][:3]
-                changes.append(f"{section} {n}: rebuilt Venice fallbacks")
-        else:
-            fill = want_f or DEEP_FALLBACKS
-            for x in fill:
-                if x != a.get("model") and x not in cleaned:
-                    cleaned.append(x)
-                if len(cleaned) >= 3:
-                    break
-        if cleaned != fbs:
-            a["fallback_models"] = cleaned[:3]
-
-or_prov = oc.setdefault("provider", {}).setdefault("openrouter", {})
-wl = or_prov.get("whitelist") or []
-new_wl = [w for w in wl if isinstance(w, str) and not _is_gpt(w)]
-if new_wl != wl:
-    or_prov["whitelist"] = new_wl
-    changes.append(f"removed GPT from openrouter whitelist ({len(wl) - len(new_wl)} models)")
-or_models = or_prov.get("models") or {}
-for mk in list(or_models.keys()):
-    if _is_gpt(mk):
-        del or_models[mk]
-        changes.append(f"removed openrouter.models[{mk}] (OpenRouter-only, no GPT)")
+    for name, cfg in (omo.get(section) or {}).items():
+        if isinstance(cfg, dict) and "reasoningEffort" in cfg:
+            cfg.setdefault("reasoning", cfg.pop("reasoningEffort"))
+            changes.append(f"{section}.{name}.reasoningEffort -> reasoning")
 
 # OmO / codegraph telemetry + co-author phone-home off
 if omo.get("telemetry") is not False:
@@ -794,15 +404,11 @@ if isinstance(tm, dict):
         tm["max_members"] = 5; changes.append("team_mode.max_members -> 5 (hyperplan floor)")
     elif tm.get("max_members") > 6:
         tm["max_members"] = 6; changes.append("team_mode.max_members capped -> 6")
-    for key, desired in (
-        ("max_messages_per_run", 600),
-        ("max_wall_clock_minutes", 45),
-        ("max_member_turns", 80),
-    ):
-        if tm.get(key) != desired:
-            tm[key] = desired; changes.append(f"team_mode.{key} -> {desired}")
     for key, default in (
-        ("message_payload_max_bytes", 16384),
+        ("max_messages_per_run", 10000),
+        ("max_wall_clock_minutes", 60),
+        ("max_member_turns", 500),
+        ("message_payload_max_bytes", 32768),
         ("recipient_unread_max_bytes", 262144),
         ("mailbox_poll_interval_ms", 1000),
     ):
@@ -831,108 +437,79 @@ if isinstance(tx, dict):
 # Background-task runaway guard — keep concurrency / tool budgets bounded
 bt = omo.setdefault("background_task", {})
 if isinstance(bt, dict):
-    if not isinstance(bt.get("defaultConcurrency"), int) or bt.get("defaultConcurrency") != 10:
-        bt["defaultConcurrency"] = 10; changes.append("background_task.defaultConcurrency -> 10 (high-throughput default)")
+    if bt.get("defaultConcurrency") != 6:
+        bt["defaultConcurrency"] = 6; changes.append("background_task.defaultConcurrency -> 6")
     pc = bt.setdefault("providerConcurrency", {})
     if isinstance(pc, dict):
-        want_pc = {"openrouter": 12, "venice": 6, "deepseek": 6}
-        for k in list(pc.keys()):
-            if k not in want_pc:
-                del pc[k]
-                changes.append(f"providerConcurrency removed {k} (not an OpenConfig gateway)")
-        for prov, cap in want_pc.items():
-            if pc.get(prov) != cap:
-                pc[prov] = cap
-                changes.append(f"providerConcurrency.{prov} -> {cap}")
+        if "subscription-gateway" in pc:
+            del pc["subscription-gateway"]; changes.append("removed retired providerConcurrency.subscription-gateway")
+        for provider, cap in (("openrouter", 8), ("codex-subscription", 4), ("venice", 6), ("deepseek", 6), ("anthropic", 2)):
+            if pc.get(provider) != cap:
+                pc[provider] = cap; changes.append(f"providerConcurrency.{provider} -> {cap}")
     mc = bt.setdefault("modelConcurrency", {})
     if isinstance(mc, dict):
-        for mk in list(mc.keys()):
-            if isinstance(mk, str) and mk.startswith("openai/") and not mk.startswith("openrouter/"):
-                del mc[mk]
-                changes.append(f"modelConcurrency removed direct alias {mk}")
-        def _mc_cap(model_key):
-            low = str(model_key).lower()
-            # Native DeepSeek platform key — keep well under 500/2500 account caps.
-            if low.startswith("deepseek/") or (not low.startswith(("openrouter/", "venice/")) and "deepseek-flash" in low):
-                if "flash" in low:
-                    return 6
-                return 4
-            # V4.1 Flash: day-one roster is 3 healthy hosts — keep the cap tight.
-            if "v4.1-flash" in low or "v4-1-flash" in low:
+        for old_model in [name for name in mc if name.startswith("subscription-gateway/")]:
+            new_model = old_model.replace("subscription-gateway/", "codex-subscription/", 1)
+            if new_model not in mc:
+                mc[new_model] = mc[old_model]
+            del mc[old_model]
+            changes.append(f"migrated modelConcurrency.{old_model} -> {new_model}")
+        pinned_model_concurrency = {
+            "openrouter/z-ai/glm-5.3": 8,
+            "openrouter/z-ai/glm-5.3-flash": 10,
+            "openrouter/poolside/laguna-s-2.1": 10,
+            "openrouter/meituan/longcat-2.0": 8,
+            "openrouter/minimax/minimax-m3": 8,
+            "openrouter/google/gemini-3.1-pro-preview": 5,
+            "openrouter/google/gemini-3.7-flash": 10,
+            "openrouter/google/gemini-3.8-flash": 10,
+            "openrouter/qwen/qwen3.8-max-0902": 5,
+            "openrouter/moonshotai/kimi-k2.7-code": 5,
+            "openrouter/deepseek/deepseek-v4-pro-0813": 8,
+            "openrouter/deepseek/deepseek-v4.1-flash": 5,
+            "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput": 5,
+            "openrouter/deepseek/deepseek-v4-flash-0731": 10,
+            "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput": 6,
+            "openrouter/nousresearch/hermes-4-405b": 2,
+            "venice/deepseek-v4-pro-0813": 5,
+            "venice/deepseek-v4-pro": 5,
+            "venice/deepseek-v4-1-flash": 5,
+            "deepseek/deepseek-v4-pro": 4,
+            "deepseek/deepseek-flash": 6,
+        }
+        def _model_concurrency(model):
+            if model in pinned_model_concurrency:
+                return pinned_model_concurrency[model]
+            low = str(model).lower()
+            if any(name in low for name in ("opus", "fable")):
+                return 1
+            if "kimi" in low:
+                return 2
+            if any(name in low for name in ("flash", "floor", "luna")):
+                return 6
+            if any(name in low for name in ("exacto", "minimax", "glm")):
                 return 5
-            if any(x in low for x in ("flash", "luna", "qwen3.7", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3-flash", "gemini-3.5-flash-lite", "laguna")):
-                return 10
-            # OpenRouter DeepSeek Pro 0813 is shared by explore+librarian+deep — keep 8.
-            # Venice DeepSeek is hardcoded to 5 below (not this helper).
-            if "deepseek-v4-pro" in low:
-                return 8
-            if any(x in low for x in ("minimax", "glm", "mimo", "longcat")):
-                return 8
-            if any(x in low for x in ("sonnet", "sol", "terra", "gemini-3.1-pro", "qwen3.8-max", "kimi-k2.7")):
-                return 5
-            return 2
-        wl = (oc.get("provider") or {}).get("openrouter", {}).get("whitelist") or []
-        # Cap against the full OpenRouter id. Passing the whitelist slug
-        # (deepseek/deepseek-v4-pro-0813) falsely matched the native
-        # deepseek/ prefix and stamped 4 instead of the shared-route 8.
-        want_mc = {f"openrouter/{w}": _mc_cap(f"openrouter/{w}") for w in wl if isinstance(w, str)}
-        venice_models = ((oc.get("provider") or {}).get("venice") or {}).get("models") or {}
-        if isinstance(venice_models, dict):
-            for vm in venice_models:
-                want_mc[f"venice/{vm}"] = 5
-        deepseek_models = ((oc.get("provider") or {}).get("deepseek") or {}).get("models") or {}
-        if isinstance(deepseek_models, dict):
-            for dm in deepseek_models:
-                want_mc[f"deepseek/{dm}"] = 6 if "flash" in str(dm).lower() else 4
-        for mk, mv in list(mc.items()):
-            if isinstance(mk, str) and mk.startswith(("venice/", "deepseek/")) and mk not in want_mc:
-                want_mc[mk] = mv
-        if want_mc != mc:
-            bt["modelConcurrency"] = want_mc
-            changes.append(f"modelConcurrency synced to {len(want_mc)} whitelist+venice models")
-    if not isinstance(bt.get("maxToolCalls"), int) or bt.get("maxToolCalls") > 80:
-        bt["maxToolCalls"] = 80; changes.append("background_task.maxToolCalls capped -> 80")
+            if any(name in low for name in ("sonnet", "sol", "terra", "gpt-5.5", "gemini-3.1-pro")):
+                return 3
+            return 1
+        for model, cap in pinned_model_concurrency.items():
+            if mc.get(model) != cap:
+                mc[model] = cap; changes.append(f"modelConcurrency.{model} -> {cap}")
+        for model in list(mc):
+            if model in pinned_model_concurrency:
+                continue
+            cap = _model_concurrency(model)
+            if mc.get(model) != cap:
+                mc[model] = cap; changes.append(f"modelConcurrency.{model} -> {cap}")
+    if not isinstance(bt.get("maxToolCalls"), int) or bt.get("maxToolCalls") > 400:
+        bt["maxToolCalls"] = 400; changes.append("background_task.maxToolCalls capped -> 400")
     if not isinstance(bt.get("syncPollTimeoutMs"), int) or bt.get("syncPollTimeoutMs") < 60000:
         bt["syncPollTimeoutMs"] = 60000; changes.append("background_task.syncPollTimeoutMs -> 60000 (OmO floor)")
     cb = bt.setdefault("circuitBreaker", {})
     if isinstance(cb, dict):
         cb["enabled"] = True
-        if not isinstance(cb.get("maxToolCalls"), int) or cb.get("maxToolCalls") > 80:
-            cb["maxToolCalls"] = 80; changes.append("circuitBreaker.maxToolCalls capped -> 80")
-        if not isinstance(cb.get("consecutiveThreshold"), int) or cb.get("consecutiveThreshold") < 1:
-            cb["consecutiveThreshold"] = 8; changes.append("circuitBreaker.consecutiveThreshold -> 8")
-        # OmO 4.19.4 Zod only allows enabled/maxToolCalls/consecutiveThreshold.
-        # Extra keys make the TUI show "config invalid - run doctor".
-        for _k in ("cooldownMs", "halfOpenRetries", "fallbackOnTrip", "notifyOnTrip"):
-            if _k in cb:
-                del cb[_k]; changes.append(f"circuitBreaker: removed {_k} (unknown in OmO 4.19.4)")
-rf = omo.setdefault("runtime_fallback", {})
-if isinstance(rf, dict):
-    desired_retry_codes = [408, 429, 500, 502, 503, 504]
-    if rf.get("retry_on_errors") != desired_retry_codes:
-        rf["retry_on_errors"] = desired_retry_codes; changes.append("runtime_fallback.retry_on_errors -> transient errors only")
-    if rf.get("max_fallback_attempts") != 3:
-        rf["max_fallback_attempts"] = 3; changes.append("runtime_fallback.max_fallback_attempts -> 3")
-    if rf.get("timeout_seconds") != 120:
-        rf["timeout_seconds"] = 120; changes.append("runtime_fallback.timeout_seconds -> 120")
-    # Cost-aware keys are OpenConfig-only; OmO 4.19.4 rejects them as unknown.
-    for _k in (
-        "cost_aware_routing",
-        "max_cost_per_request",
-        "degrade_on_budget_pressure",
-        "budget_warning_threshold",
-        "budget_critical_threshold",
-    ):
-        if _k in rf:
-            del rf[_k]; changes.append(f"runtime_fallback: removed {_k} (unknown in OmO 4.19.4)")
-omoexp = omo.setdefault("experimental", {})
-if isinstance(omoexp, dict):
-    if omoexp.get("aggressive_truncation") is not False:
-        omoexp["aggressive_truncation"] = False; changes.append("experimental.aggressive_truncation -> false")
-    if omoexp.get("truncate_all_tool_outputs") is not False:
-        omoexp["truncate_all_tool_outputs"] = False; changes.append("experimental.truncate_all_tool_outputs -> false")
-    if not isinstance(omoexp.get("max_tools"), int) or omoexp.get("max_tools") > 32:
-        omoexp["max_tools"] = 32; changes.append("experimental.max_tools capped -> 32")
+        if not isinstance(cb.get("maxToolCalls"), int) or cb.get("maxToolCalls") > 400:
+            cb["maxToolCalls"] = 400; changes.append("circuitBreaker.maxToolCalls capped -> 400")
 # OmO 4.19: Goals replace Ralph — drop legacy ralph_loop (ignored when goal is explicit)
 if "ralph_loop" in omo:
     del omo["ralph_loop"]; changes.append("removed deprecated ralph_loop (OmO 4.19 Goals replace Ralph)")
@@ -950,16 +527,22 @@ dm = omo.setdefault("default_mode", {})
 if isinstance(dm, dict) and dm.get("goal") is not False:
     dm["goal"] = False; changes.append("default_mode.goal -> false")
 
-# Imported Claude MCP configs get no sensitive environment variables.
-if omo.get("mcp_env_allowlist") != []:
-    omo["mcp_env_allowlist"] = []
-    changes.append("mcp_env_allowlist -> [] (no API keys exposed to imported MCPs)")
+# MCP env allowlist — Exa / Context7 / provider keys
+allow = omo.setdefault("mcp_env_allowlist", [])
+if not isinstance(allow, list):
+    allow = []; omo["mcp_env_allowlist"] = allow
+for retired in ("LLM_GATEWAY_API_KEY", "LLM_GATEWAY_OPENAI_BASE_URL"):
+    if retired in allow:
+        allow.remove(retired); changes.append(f"mcp_env_allowlist -= {retired}")
+for must in ("CONTEXT7_API_KEY", "EXA_API_KEY", "OPENROUTER_API_KEY"):
+    if must not in allow:
+        allow.append(must); changes.append(f"mcp_env_allowlist += {must}")
 
 sw = omo.setdefault("start_work", {})
 if isinstance(sw, dict) and sw.get("auto_commit") is not False:
     sw["auto_commit"] = False; changes.append("start_work.auto_commit -> false")
 
-# CodeGraph: keep indexing opt-in, but let OmO manage its pinned daemon runtime.
+# codegraph: provision the runtime binary, but do not auto-index projects.
 cg2 = omo.setdefault("codegraph", {})
 if isinstance(cg2, dict):
     if cg2.get("auto_init") is not False:
@@ -994,8 +577,8 @@ for must in ("posthog:posthog", "sentry:sentry", "axiom:axiom"):
     if must not in dmcps:
         dmcps.append(must); changes.append(f"disabled_mcps += {must}")
 
-# Wild but clean neon palette for TUI tabs (valid #RRGGBB only — OmO drops non-hex).
-# High-chroma, role-distinct, dark-UI readable. oc fix enforces these.
+# Wild but clean neon palette for agent TUI tabs. OmO 4.19.4 accepts colors on
+# agents, not categories; category color keys are stripped at runtime.
 AGENT_COLORS = {
     "sisyphus": "#00F0FF",
     "hephaestus": "#FF5C00",
@@ -1012,10 +595,6 @@ AGENT_COLORS = {
     "content-aware-fast": "#FF9100",
     "context-aware-hermes": "#B388FF",
 }
-# NOTE: categories do NOT get colors. The OmO 4.19.4 schema allows `color` on
-# agents only (properties.agents.*.color); categories have no color property,
-# and the unknown-key strip above removes any that sneak in.
-
 for n, a in omo.get("agents", {}).items():
     c = a.get("color")
     want = AGENT_COLORS.get(n)
@@ -1034,8 +613,13 @@ for n, a in omo.get("agents", {}).items():
             del a[bad]
             changes.append(f"agent {n}: stripped '{bad}'")
 
-# OmO skills sources — mirror opencode.json (global config + project ./skills)
-ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills", "./skills"]
+for n, category in omo.get("categories", {}).items():
+    if isinstance(category, dict) and "color" in category:
+        del category["color"]
+        changes.append(f"category {n}: removed unsupported color")
+
+# OmO skills sources — keep a single canonical global skill source.
+ALLOWED_SKILL_SOURCES = ["~/.config/opencode/skills"]
 osk = omo.setdefault("skills", {})
 srcs = []
 for s in (osk.get("sources") or []):
@@ -1087,43 +671,34 @@ if "hyperplan" in (kd.get("enabled_expansions") or []):
         del oc["agent"]["plan"]
         changes.append("removed agent.plan.disable (OmO demotes plan for hyperplan)")
 
-# ─── sync canonical ~/.omo/omo.jsonc from oh-my-openagent.json ────────────────
-# OmO 4.19.4 loads ~/.omo/omo.jsonc (detectUserOmoJsonPath), NOT the repo's
-# oh-my-openagent.json. The repo file is OpenConfig's source-of-truth; we mirror it
-# into the runtime path wrapped under "[opencode]" with the canonical omo.schema.json.
-# This keeps the runtime config in lockstep with the repo and prevents a stale
-# partial `config migrate` from leaving a broken agents.*.models array behind.
-omo_jsonc_path = os.path.expanduser("~/.omo/omo.jsonc")
-repo_omo_path = os.path.join(repo, "oh-my-openagent.json")
-if os.path.isfile(repo_omo_path):
-    # _migrations is a TOP-LEVEL marker (not under "[opencode]"). OmO 4.19.4 reads
-    # it from the parsed omo.jsonc document to decide whether to re-run migrations.
-    # Without it, every `oc fix`/`omo` invocation re-runs opencode-config-unification
-    # and reasoning-unification, which can leave a stale agents.*.models array behind.
-    omo_runtime = {"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-                   "_migrations": ["2026-07-opencode-config-unification", "2026-08-reasoning-unification"],
-                   "[opencode]": omo}
-    omo_jsonc_new = (
-        "// GENERATED by oc fix — edit oh-my-openagent.json in the OpenConfig repo.\n"
-        "// Do not edit this file. ~/.omo is a symlink to sibling opencode-runtime.\n"
-        "// OMO configuration\n" + json.dumps(omo_runtime, indent=2) + "\n"
-    )
-    omo_jsonc_old = ""
-    if os.path.isfile(omo_jsonc_path):
+# A historical partial OmO migration put 4.19's `models` routes at the *root*
+# of a regular native file. Only that provably invalid flat shape is
+# quarantined. A governed alias is always hands-off: following it would mutate
+# the generated compatibility target and can never be a repair action.
+omo_jsonc_path = os.environ.get("OC_NATIVE_OMO_PATH") or os.path.expanduser("~/.omo/omo.jsonc")
+if os.path.islink(omo_jsonc_path):
+    # Intentionally no validation or target traversal here. Alias governance
+    # belongs to runtime-profile/doctor; fix.sh must never unlink or alter it.
+    pass
+elif os.path.isfile(omo_jsonc_path):
+    try:
         with open(omo_jsonc_path, encoding="utf-8") as f:
-            omo_jsonc_old = f.read()
-    if omo_jsonc_old != omo_jsonc_new:
+            native_document = runtime_profile.parse_jsonc(f.read())
+    except (OSError, ValueError, json.JSONDecodeError, SystemExit):
+        native_document = None
+    if runtime_profile.is_broken_legacy_native_migration(native_document):
         if not dry:
-            os.makedirs(os.path.dirname(omo_jsonc_path), exist_ok=True)
-            with open(omo_jsonc_path, "w", encoding="utf-8") as f:
-                f.write(omo_jsonc_new)
-        changes.append("synced ~/.omo/omo.jsonc (canonical [opencode] wrapper + omo.schema.json)")
+            bdir = os.path.join(backup_root, f"fix-{stamp or 'manual'}")
+            os.makedirs(bdir, exist_ok=True)
+            shutil.copy2(omo_jsonc_path, os.path.join(bdir, "omo.jsonc"))
+            os.remove(omo_jsonc_path)
+        changes.append("quarantined regular ~/.omo/omo.jsonc (broken flat legacy models migration)")
 
 # ─── config-only: scrub install/runtime strays OpenCode may drop here ─────────
 STRAYS = (
     "node_modules", "package.json", "package-lock.json", "npm-shrinkwrap.json",
-    "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", ".omo", ".runtime", ".sisyphus",
-    ".codegraph", "command",
+    "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", ".omo", ".sisyphus",
+    "command",
 )
 for name in STRAYS:
     path = os.path.join(repo, name)
@@ -1150,8 +725,6 @@ else:
             src = os.path.join(repo, name)
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(bdir, name))
-        if os.path.isfile(omo_jsonc_path):
-            shutil.copy2(omo_jsonc_path, os.path.join(bdir, "omo.jsonc"))
         if oc != before: dump("opencode.json", oc)
         if omo != ombefore: dump("oh-my-openagent.json", omo)
         print(f"\n  \033[32mapplied {len(changes)} fix(es)\033[0m")
@@ -1161,11 +734,6 @@ PY
 
 echo ""
 if [[ $DRY -eq 0 ]]; then
-  _oai_scrub="$(oc_scrub_openai_env_key "$REPO/opencode.json" "$REPO/.env" 2>/dev/null || true)"
-  if [[ "$_oai_scrub" == CLEARED* ]]; then
-    printf "  ${c_g}✓${c_0} %s\n" "${_oai_scrub#CLEARED|}"
-  fi
-  unset _oai_scrub
   printf "${c_b}==>${c_0} Re-validating\n"
   validate_out="$($REPO/validate.sh 2>&1)"
   validate_rc=$?

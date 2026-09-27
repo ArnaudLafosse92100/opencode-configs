@@ -1,12 +1,13 @@
-# Profile: low (GLM 5.3 orchestrator / cheap subagents)
+# Profile: low (economy orchestration / cheap subagents)
 
-Cost-first scaffold. Sisyphus stays on GLM 5.3 for tool quality; prefer Flash for parallel work.
+Cost-first scaffold. The active runtime capability bindings own every physical model choice, including architecture, implementation, and private-mode overrides.
 
 ## Prefer
 
-- Routes: `quick` category; explore, librarian, and sisyphus-junior agents
+- Routes: `quick` category; non-security map via explore; docs via librarian; small execution via sisyphus-junior
+- Security/pentest work still uses `content-aware-fast` / `content-aware-deep`; don't downgrade it to generic explore just because this is the low-cost profile.
 - Short answers. Batch tools. Skip deep orchestration.
-- Context7 via librarian for docs — don't burn Pro / GLM on trivial lookups.
+- Context7 via librarian for docs — don't spend a depth route on trivial lookups.
 
 ## Avoid
 

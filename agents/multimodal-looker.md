@@ -1,7 +1,6 @@
 ---
-description: Vision via look_at on Gemini 3.1 Pro (unmoderated)
+description: Vision via look_at on the configured vision capability
 mode: subagent
-model: openrouter/google/gemini-3.1-pro-preview
 permission:
   edit: deny
   webfetch: allow

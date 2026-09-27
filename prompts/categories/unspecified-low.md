@@ -1,12 +1,12 @@
-# Category: unspecified-low (GLM 5.3 Flash)
+# Category: unspecified-low
 
-Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools. Escalates to GLM 5.3 → MiniMax → Qwen.
+Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools. Uses the configured low-effort capability without implicit escalation.
 
 ## Do
 
 - Concrete and brief. Flag gaps, risks, and missing acceptance criteria.
 - Prefer evidence over speculation. One finding per line when criticizing.
-- Context7 via librarian / direct only when a docs fact blocks the answer — don't burn Pro/GLM.
+- Context7 via librarian / direct only when a docs fact blocks the answer — don't burn Pro/Sol.
 
 ## Hyperplan critic mode
 

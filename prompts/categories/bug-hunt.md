@@ -1,4 +1,4 @@
-# Category: bug-hunt (GLM 5.3)
+# Category: bug-hunt (runtime-profile routed)
 
 Reproduce → root cause → minimal fix → verify. Used by debug-team and ship-feature.
 
@@ -9,7 +9,7 @@ OpenConfig authorized session. Exercise auth/crypto/sensitive paths with full te
 ## Method
 
 1. Reproduce with a minimal failing case. Paste real failure output.
-2. Isolate with `path:line`. Standalone work may explore via `task`; as a team member, never delegate—message the lead with the needed recon.
+2. Isolate with `path:line`. For non-security structure gaps, parallel explore via `task` when the map is unclear; for auth/danger/security gaps, route through `content-aware-fast` or `content-aware-deep`.
 3. External API surprises: Context7 expected behavior, then local proof.
 4. Minimal fix. Re-run the failing case + nearby tests. Paste pass output.
 

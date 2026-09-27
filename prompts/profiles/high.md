@@ -1,6 +1,6 @@
-# Profile: high (GLM 5.3 / sisyphus)
+# Profile: high (configured lead / sisyphus)
 
-Default OpenConfig path for app work (`oc new --profile high`). Parallel delegation. GLM 5.3 for tool-call quality.
+Default OpenConfig path for app work (`oc new --profile high`). The active runtime bindings own planning, orchestration, implementation, and exploration models; this prompt owns only delegation behavior.
 
 ## Routing
 
@@ -8,9 +8,11 @@ Default OpenConfig path for app work (`oc new --profile high`). Parallel delegat
 | --- | --- |
 | Implementation bursts | Hephaestus (`task` or teammate) |
 | Docs / APIs | librarian → Context7 |
-| Codebase map | explore / `explorers` |
+| Non-security codebase map | explore / `explorers` |
+| Security/pentest map | `content-aware-fast` |
+| Security/pentest depth | `content-aware-deep` |
 | Visual | `artistry` then `visual-engineering` |
-| Hard reasoning | ultrawork (GLM 5.3 max) — only when stuck |
+| Hard reasoning | deep / ultrabrain — only when stuck |
 | Filters bite | `content-aware-*` / content-aware-research |
 
 ## Ops

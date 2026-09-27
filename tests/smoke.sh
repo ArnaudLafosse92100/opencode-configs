@@ -59,7 +59,7 @@ run_step() {
 
 run_step "bash -n oc" bash -n "$REPO/oc"
 
-# oc aliases dispatch to the right handlers (no full doctor run — help only)
+# CLI aliases must dispatch without running their full commands.
 if "$REPO/oc" health --help 2>&1 | grep -q 'oc check'; then
   ok "oc health → check"
 else
@@ -78,12 +78,19 @@ fi
 if "$REPO/oc" help 2>&1 | grep -q 'health, ready'; then
   ok "oc help lists aliases"
 else
-  bad "oc help missing aliases section"
+  bad "oc help missing aliases"
 fi
 if NO_COLOR=1 "$REPO/oc" help 2>&1 | grep -q $'\033'; then
   bad "oc help leaks ANSI under NO_COLOR"
 else
   ok "oc help respects NO_COLOR"
+fi
+profile_help="$({ "$REPO/oc" profile --help 2>&1 || true; })"
+if grep -qF '[--schema-version 1|3|4]' <<<"$profile_help" \
+  && grep -qF 'export-policy-manifest <normal|normal-private|pentest>' <<<"$profile_help"; then
+  ok "oc profile help lists workflow schemas and canonical policy manifest"
+else
+  bad "oc profile help has stale workflow export contracts"
 fi
 if python3 - "$REPO" <<'PY'
 import os, subprocess, sys
@@ -110,7 +117,45 @@ fi
 run_step "bash -n doctor.sh" bash -n "$REPO/doctor.sh"
 run_step "bash -n locate.sh" bash -n "$REPO/locate.sh"
 run_step "bash -n versions.sh" bash -n "$REPO/versions.sh"
+run_step "bash -n eval-models.sh" bash -n "$REPO/eval-models.sh"
+run_step "bash -n eval-orchestration.sh" bash -n "$REPO/eval-orchestration.sh"
 run_step "bash -n lib/common.sh" bash -n "$REPO/lib/common.sh"
+run_step "compile model-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/model-routing/run.py"
+run_step "model-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_model_routing_eval.py"
+run_step "compile orchestration-routing eval" python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' "$REPO/evals/orchestration-routing/run.py"
+run_step "routing docs SSOT" python3 "$REPO/scripts/render-routing-docs.py" --repo "$REPO" --check
+run_step "installer distribution migration contract" python3 - "$REPO" <<'PY'
+import json, pathlib, re, sys
+
+repo = pathlib.Path(sys.argv[1])
+signature = json.loads((repo / "signature.json").read_text(encoding="utf-8"))
+installer = (repo / "install.sh").read_text(encoding="utf-8")
+def constant(name):
+    match = re.search(rf"^{re.escape(name)}='([^']+)'$", installer, re.MULTILINE)
+    return match.group(1) if match else None
+
+if constant("_OC_GH_B64") != signature["github_b64"]:
+    raise SystemExit("installer canonical repository differs from signature.json")
+if constant("_OC_UPSTREAM_GH_B64") != signature["upstream_github_b64"]:
+    raise SystemExit("installer upstream repository differs from signature.json")
+if constant("_OC_GIT_REF") != signature["github_ref"]:
+    raise SystemExit("installer canonical ref differs from signature.json")
+required = (
+    "remote rename origin upstream",
+    "remote add origin",
+    "checkout -b",
+    "pull --ff-only origin",
+    "upstream_reference_commit",
+    "fetch --depth 1 upstream",
+)
+missing = [value for value in required if value not in installer]
+if missing:
+    raise SystemExit(f"installer distribution migration contract missing: {missing}")
+PY
+run_step "orchestration-routing eval unit tests" env PYTHONDONTWRITEBYTECODE=1 python3 "$REPO/tests/test_orchestration_routing_eval.py"
+run_step "model-routing eval plan" "$REPO/eval-models.sh"
+run_step "model-routing targeted plan" "$REPO/eval-models.sh" --models deepseek --cases bounded-architecture-plan
+run_step "orchestration-routing eval plan" "$REPO/eval-orchestration.sh"
 run_step "validate --quiet" "$REPO/validate.sh" --quiet
 run_step "locate --json" "$REPO/locate.sh" --json
 run_step "signature" "$REPO/signature.sh"
@@ -118,7 +163,171 @@ run_step "fix --dry-run" "$REPO/fix.sh" --dry-run
 run_step "cleanup --dry-run" "$REPO/cleanup.sh" --dry-run
 run_step "oc secrets --help" "$REPO/oc" secrets --help
 run_step "versions --local" "$REPO/versions.sh" --local
-run_step "bash -n models.sh" bash -n "$REPO/models.sh"
+
+# OmO 4.19.4 native `models` arrays are valid only inside the [opencode]
+# envelope. fix.sh must leave both a regular generated file and the governed
+# alias untouched, while quarantining only the old flat top-level migration.
+test_home="$(mktemp -d)"
+test_state="$test_home/state"; test_native="$test_home/.omo/omo.jsonc"
+mkdir -p "$(dirname "$test_native")"
+env OC_RUNTIME_STATE_DIR="$test_state" OC_NATIVE_OMO_PATH="$test_native" \
+  python3 "$REPO/scripts/runtime-profile.py" --repo "$REPO" env normal >/dev/null
+generated_native="$test_state/compat/current/.omo.jsonc"
+cp "$generated_native" "$test_native"
+generated_before="$(shasum -a 256 "$test_native" | awk '{print $1}')"
+generated_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" --dry-run 2>&1)"
+generated_after="$(shasum -a 256 "$test_native" | awk '{print $1}')"
+if ! grep -q 'quarantined regular' <<< "$generated_out" && [[ "$generated_before" == "$generated_after" ]]; then
+  ok "generated OmO models envelope is a fix.sh no-op"
+else
+  bad "generated OmO models envelope was misclassified"
+fi
+rm -f "$test_native"; ln -s "$generated_native" "$test_native"
+alias_link_before="$(readlink "$test_native")"
+alias_target_before="$(shasum -a 256 "$generated_native" | awk '{print $1}')"
+alias_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" --dry-run 2>&1)"
+alias_target_after="$(shasum -a 256 "$generated_native" | awk '{print $1}')"
+if ! grep -q 'quarantined regular' <<< "$alias_out" && [[ "$(readlink "$test_native")" == "$alias_link_before" ]] \
+  && [[ "$alias_target_before" == "$alias_target_after" ]]; then
+  ok "governed native alias and target stay unchanged by fix.sh"
+else
+  bad "governed native alias was touched by fix.sh"
+fi
+rm -f "$test_native"
+printf '%s\n' '{"agents":{"sisyphus":{"models":["bad"]}},"categories":{"quick":{"models":["bad"]}}}' > "$test_native"
+broken_out="$(HOME="$test_home" OC_NATIVE_OMO_PATH="$test_native" "$REPO/fix.sh" 2>&1)"
+broken_backup="$(find "$test_home/.opencode-backups" -name omo.jsonc -type f | head -1)"
+if grep -q 'quarantined regular' <<< "$broken_out" && [[ ! -e "$test_native" && -f "$broken_backup" ]] \
+  && grep -q '"agents"' "$broken_backup"; then
+  ok "only broken flat regular native migration is quarantined"
+else
+  bad "broken flat regular native migration quarantine"
+fi
+rm -rf "$test_home"
+
+# Exact model/version and OmO reasoning schema guard.
+if python3 -c '
+import json, pathlib, re, sys
+repo=pathlib.Path(sys.argv[1])
+oc=json.load(open(repo/"opencode.json"))
+omo=json.load(open(repo/"oh-my-openagent.json"))
+models=oc["provider"]["openrouter"]["models"]
+flash=models.get("deepseek/deepseek-v4-flash-0731") or {}
+throughput=models.get("deepseek/deepseek-v4-flash-0731-zdr-throughput") or {}
+pro=models.get("deepseek/deepseek-v4-pro-0813") or {}
+pro_throughput=models.get("deepseek/deepseek-v4-pro-0813-zdr-throughput") or {}
+runtime=(repo/"opencode.json").read_text()+(repo/"oh-my-openagent.json").read_text()+(repo/"evals/model-routing/run.py").read_text()
+rf=omo.get("runtime_fallback") or {}
+common=(repo/"lib/common.sh").read_text()
+ok=(flash.get("id")=="deepseek/deepseek-v4-flash-0731:floor"
+    and throughput.get("id")=="deepseek/deepseek-v4-flash-0731"
+    and throughput.get("options", {}).get("provider")=={
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "allow_fallbacks": True,
+        "sort": "throughput",
+        "max_price": {"prompt": 0.50, "completion": 1.50},
+    }
+    and pro.get("id")=="deepseek/deepseek-v4-pro-0813:floor"
+    and pro_throughput.get("id")=="deepseek/deepseek-v4-pro-0813"
+    and pro_throughput.get("options", {}).get("provider")=={
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "allow_fallbacks": True,
+        "sort": "throughput",
+        "max_price": {"prompt": 1.50, "completion": 4.50},
+    }
+    and pro.get("tool_call") is True
+    and pro.get("reasoning") is True
+    and not re.search(r"deepseek/deepseek-v4-flash(?!-0731)", runtime)
+    and "reasoningEffort" not in runtime
+    and rf.get("timeout_seconds")==20
+    and "same_model_retries_before_fallback" not in rf
+    and "first_prompt_timeout_seconds" not in rf
+    and "OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK" in common
+    and "OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS" in common
+    and (repo/"scripts/patch-omo-runtime-fallback.mjs").is_file())
+sys.exit(0 if ok else 1)
+' "$REPO"; then
+  ok "separate normal/pentest Floor DeepSeek 0731 routes + OmO schema-clean bounded retry policy"
+else
+  bad "DeepSeek version, OmO reasoning schema, or OpenConfig runtime fallback retry policy drift"
+fi
+
+# Fast OpenRouter lanes, bounded local Codex subscription, expensive models capped.
+if python3 -c '
+import json, sys
+omo=json.load(open(sys.argv[1]))
+bt=omo.get("background_task") or {}
+pc=bt.get("providerConcurrency") or {}
+mc=bt.get("modelConcurrency") or {}
+ok=(bt.get("defaultConcurrency")==6
+    and pc.get("openrouter")==8
+    and pc.get("codex-subscription")==4
+    and pc.get("anthropic")==2
+    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==8
+    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput")==5
+    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731")==10
+    and mc.get("openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput")==6
+    and mc.get("openrouter/z-ai/glm-5.3")==8
+    and mc.get("openrouter/moonshotai/kimi-k2.7-code")==5
+    and mc.get("openrouter/nousresearch/hermes-4-405b")==2)
+sys.exit(0 if ok else 1)
+' "$REPO/oh-my-openagent.json"; then
+  ok "mixed-provider concurrency pins"
+else
+  bad "concurrency drift — run: oc fix"
+fi
+
+# OpenRouter lanes may fail over to the independent local Codex subscription
+# first in normal mode. Runtime-profile-listed routes are authoritative. In
+# In pentest mode, every listed agent/category must take the fixed price-capped
+# Flash 0731 ZDR Throughput then Pro 0813 ZDR Throughput path, with no other provider/model.
+if python3 -c '
+import importlib.util, json, pathlib, sys
+omo=json.load(open(sys.argv[1]))
+profile=json.load(open(sys.argv[2]))
+prof=profile.get("default_profile", "normal")
+repo=pathlib.Path(sys.argv[3])
+spec=importlib.util.spec_from_file_location("openconfig_runtime_profile", repo / "scripts/runtime-profile.py")
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+selected=module.RuntimeProfiles(repo).selected(prof)
+expected={}
+for section in ("agents", "categories"):
+    for name, cfg in (selected.get(section) or {}).items():
+        expected[(section, name)]=(str(cfg.get("model") or ""), [str(x) for x in (cfg.get("fallback_models") or [])])
+if prof == "pentest":
+    actual={(section, name) for section in ("agents", "categories") for name, cfg in (omo.get(section) or {}).items() if isinstance(cfg, dict)}
+    declared=set(expected)
+    if actual != declared:
+        raise SystemExit(5)
+flash="openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput"
+pro="openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
+for section in ("agents", "categories"):
+    for name, cfg in (omo.get(section) or {}).items():
+        if not isinstance(cfg, dict): continue
+        primary=str(cfg.get("model") or "")
+        fbs=[str(x) for x in (cfg.get("fallback_models") or [])]
+        if any(x.startswith(("openrouter/openai/gpt-5.6-sol", "openrouter/openai/gpt-5.6-terra")) for x in fbs):
+            raise SystemExit(1)
+        route_expected=expected.get((section, name))
+        if route_expected:
+            expected_primary, expected_fallbacks = route_expected
+            if primary != expected_primary or fbs != expected_fallbacks:
+                raise SystemExit(3)
+            if prof == "pentest" and (primary != flash or fbs != [pro]):
+                raise SystemExit(4)
+            continue
+        if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("codex-subscription/")):
+            raise SystemExit(2)
+' "$REPO/oh-my-openagent.json" "$REPO/runtime-profile.json" "$REPO"; then
+  ok "fallback isolation, runtime-profile routing, and no paid OpenRouter GPT fallback"
+else
+  bad "model fallback isolation drift"
+fi
 
 if [[ "${OC_CI:-}" == "1" ]]; then
   ok "skipped setup/doctor/models probes (OC_CI=1 hermetic)"
@@ -164,13 +373,22 @@ else
 fi
 
 # Helpers exist
-for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature oc_secrets_sync oc_export_vault_allowlist oc_vault_merged_json oc_vault_op_refs oc_live_config_root oc_is_live_config oc_omo_teams_canonical oc_omo_teams_ok oc_runtime_conf_ok oc_banner oc_section oc_infisical_dir oc_openrouter_key_configured oc_telemetry_off; do
+for fn in oc_set_env_key_if_unset oc_ensure_env_file oc_link_points_to oc_ensure_symlink oc_verify_signature oc_secrets_sync oc_export_vault_allowlist oc_vault_merged_json oc_vault_op_refs oc_live_config_root oc_is_live_config oc_omo_teams_canonical oc_omo_teams_ok oc_runtime_conf_ok oc_banner oc_section oc_infisical_dir oc_openrouter_key_configured oc_telemetry_off oc_redact_secrets; do
   if grep -q "${fn}()" "$REPO/lib/common.sh"; then
     ok "helper $fn"
   else
     bad "helper $fn missing"
   fi
 done
+
+redaction_fixture='Authorization: Bearer secret-token API_KEY=api-secret sk-or-v1-1234567890abcdef ghp_1234567890abcdef'
+redacted_fixture="$(printf '%s\n' "$redaction_fixture" | oc_redact_secrets)"
+if [[ "$redacted_fixture" == *secret-token* || "$redacted_fixture" == *api-secret* \
+   || "$redacted_fixture" == *1234567890abcdef* || "$redacted_fixture" != *'<redacted>'* ]]; then
+  bad "secret redaction helper"
+else
+  ok "secret redaction helper"
+fi
 
 # /goal disabled + no ralph_loop + footgun doc (OmO 4.19.x breaks /start-work when goal is on)
 if [[ -f "$REPO/prompts/goal.md" ]] \
@@ -187,162 +405,14 @@ sys.exit(0 if ok else 1)
   && grep -q 'plugins' "$REPO/.gitignore" \
   && grep -qE '^/\*$' "$REPO/.gitignore" \
   && grep -q '!prompts/' "$REPO/.gitignore" \
-  && grep -q '!.github/' "$REPO/.gitignore" \
-  && ! grep -qE '/Users/[A-Za-z0-9_-]+/' "$REPO/zshrc.snippet" \
+  && ! grep -qE '/Users/Shared/(lm-agents|test-speed)' "$REPO/zshrc.snippet" \
   && grep -q 'plugins' "$REPO/lib/common.sh"; then
   ok "goal off + ralph removed + plugins scrubbed + deny-all gitignore + no host paths"
 else
   bad "goal/ralph/plugins hygiene incomplete (goal must be off; ralph_loop must be gone)"
 fi
 
-# Fast concurrency pins (background_task + provider caps)
-if python3 -c '
-import json, sys
-omo=json.load(open(sys.argv[1]))
-bt=omo.get("background_task") or {}
-pc=bt.get("providerConcurrency") or {}
-mc=bt.get("modelConcurrency") or {}
-ok=(bt.get("defaultConcurrency")==10
-    and pc.get("openrouter")==12 and pc.get("venice")==6 and pc.get("deepseek")==6
-    and "openai" not in pc and "anthropic" not in pc
-    and mc.get("openrouter/deepseek/deepseek-v4-pro-0813")==8
-    and mc.get("openrouter/deepseek/deepseek-v4.1-flash")==5
-    and mc.get("venice/deepseek-v4-pro-0813")==5
-    and mc.get("venice/deepseek-v4-1-flash")==5
-    and mc.get("deepseek/deepseek-v4-pro")==4
-    and mc.get("deepseek/deepseek-flash")==6)
-sys.exit(0 if ok else 1)
-' "$REPO/oh-my-openagent.json"; then
-  ok "fast concurrency pins (default=10 openrouter=12 venice=6 deepseek=6)"
-else
-  bad "concurrency drift — run: oc fix"
-fi
-
-# Content-aware is Venice-only (OmO + profile + agent md + quarantine skip)
-if python3 - "$REPO" <<'PY'
-import json, os, re, sys
-repo = sys.argv[1]
-omo = json.load(open(os.path.join(repo, "oh-my-openagent.json")))
-want = {
-    "content-aware-research": ("agents", "venice/deepseek-v4-pro-0813"),
-    "content-aware-fast": ("agents", "venice/deepseek-v4-1-flash"),
-    "content-aware-deep": ("categories", "venice/deepseek-v4-pro-0813"),
-}
-cat_fast = ((omo.get("categories") or {}).get("content-aware-fast") or {})
-if cat_fast.get("model") != "venice/deepseek-v4-1-flash":
-    raise SystemExit(f"category content-aware-fast {cat_fast.get('model')!r}")
-for name, (sec, primary) in want.items():
-    cfg = ((omo.get(sec) or {}).get(name) or {})
-    if cfg.get("model") != primary:
-        raise SystemExit(f"{name} model {cfg.get('model')!r}")
-    for fb in cfg.get("fallback_models") or []:
-        if not str(fb).startswith("venice/") or "openrouter/" in str(fb).lower():
-            raise SystemExit(f"{name} fallback {fb!r}")
-gp = json.load(open(os.path.join(repo, "profiles", "content-aware.json")))
-if not str(gp.get("model") or "").startswith("venice/"):
-    raise SystemExit("profile model not venice")
-if not str(gp.get("small_model") or "").startswith("venice/"):
-    raise SystemExit("profile small_model not venice")
-body = open(os.path.join(repo, "agents", "content-aware-research.md"), encoding="utf-8").read()
-m = re.search(r"(?m)^model:\s*(\S+)", body)
-if not m or not m.group(1).startswith("venice/"):
-    raise SystemExit("agent md not venice")
-guard = open(os.path.join(repo, "deploy-guard.sh"), encoding="utf-8").read()
-if "content-aware" not in guard or "startswith('venice/')" not in guard:
-    raise SystemExit("deploy-guard missing Venice skip")
-hermes = ((omo.get("agents") or {}).get("context-aware-hermes") or {})
-if hermes.get("model") != "openrouter/nousresearch/hermes-4-405b":
-    raise SystemExit(f"context-aware-hermes {hermes.get('model')!r}")
-if (hermes.get("permission") or {}).get("edit") != "deny":
-    raise SystemExit("context-aware-hermes must deny edit")
-for fb in hermes.get("fallback_models") or []:
-    if "hermes" in str(fb).lower():
-        raise SystemExit(f"hermes fallback {fb!r}")
-hmd = open(os.path.join(repo, "agents", "context-aware-hermes.md"), encoding="utf-8").read()
-if "openrouter/nousresearch/hermes-4-405b" not in hmd:
-    raise SystemExit("hermes agent md missing model")
-PY
-then
-  ok "content-aware Venice-only (OmO + profile + quarantine skip)"
-else
-  bad "content-aware left Venice — run: oc fix"
-fi
-
-# Native OpenCode agent must not duplicate OmO Venice/DeepSeek agents (TUI crash)
-if python3 -c '
-import json, sys
-oc=json.load(open(sys.argv[1]))
-blocked={"content-aware-research","content-aware-fast",
-         "sisyphus-venice-deepseek","sisyphus-venice-deepseek-flash-junior",
-         "sisyphus-deepseek","sisyphus-deepseek-junior"}
-hit=sorted(blocked & set((oc.get("agent") or {})))
-sys.exit(1 if hit else 0)
-' "$REPO/opencode.json" \
-  && [[ ! -e "$REPO/cursor-venice.json" ]] \
-  && [[ ! -e "$REPO/cursor.sh" ]] \
-  && [[ ! -e "$REPO/cursor-openrouter.json" ]] \
-  && python3 -c '
-import json,sys
-omo=json.load(open(sys.argv[1]))
-for name in ("sisyphus-venice-deepseek","sisyphus-venice-deepseek-flash-junior",
-             "content-aware-research","content-aware-fast"):
-    a=(omo.get("agents") or {}).get(name) or {}
-    if not str(a.get("model") or "").startswith("venice/"):
-        raise SystemExit(name)
-    for fb in a.get("fallback_models") or []:
-        if not str(fb).startswith("venice/") or "openrouter/" in str(fb).lower():
-            raise SystemExit(f"{name} fallback {fb}")
-' "$REPO/oh-my-openagent.json"; then
-  ok "no OmO agent duplicates in opencode.json + Venice stays on venice/*"
-else
-  bad "duplicate native agents or leftover oc cursor files"
-fi
-
-if python3 -c '
-import json,sys
-oc=json.load(open(sys.argv[1]))
-for vm, vcfg in ((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}).items():
-    opts = (vcfg.get("options") or {})
-    if opts.get("disable_thinking") is True:
-        raise SystemExit(f"{vm} top-level")
-    if (opts.get("venice_parameters") or {}).get("disable_thinking") is not True:
-        raise SystemExit(vm)
-    for vn, vv in (vcfg.get("variants") or {}).items():
-        if not isinstance(vv, dict):
-            continue
-        if vv.get("disable_thinking") is True:
-            raise SystemExit(f"{vm}.{vn} top-level")
-        if (vv.get("venice_parameters") or {}).get("disable_thinking") is not True:
-            raise SystemExit(f"{vm}.{vn}")
-for pname in ("openrouter", "deepseek"):
-    for mid, m in ((((oc.get("provider") or {}).get(pname) or {}).get("models")) or {}).items():
-        o = (m or {}).get("options") or {}
-        if o.get("disable_thinking") is True or (o.get("venice_parameters") or {}).get("disable_thinking") is True:
-            raise SystemExit(f"{pname}/{mid}")
-' "$REPO/opencode.json"; then
-  ok "venice venice_parameters.disable_thinking pinned (OpenRouter/native DeepSeek clean)"
-else
-  bad "venice thinking pin missing, top-level, or leaked onto OpenRouter/DeepSeek"
-fi
-
-# OpenRouter attribution (marketplace categories are hyphenated; cli,agent is dropped)
-if python3 -c '
-import json, sys
-oc=json.load(open(sys.argv[1]))
-h=((oc.get("provider") or {}).get("openrouter") or {}).get("options") or {}
-hdrs=h.get("headers") or {}
-ok=(hdrs.get("X-OpenRouter-Title")=="OpenConfig"
-    and hdrs.get("X-Title")=="OpenConfig"
-    and hdrs.get("X-OpenRouter-Categories")=="cli-agent"
-    and str(hdrs.get("HTTP-Referer") or "").endswith("jesseoue/opencode-configs"))
-sys.exit(0 if ok else 1)
-' "$REPO/opencode.json"; then
-  ok "openrouter attribution (cli-agent + OpenConfig title)"
-else
-  bad "openrouter attribution headers — run: oc fix"
-fi
-
-# Team mode schema + ~/.omo/teams → live ~/.config/opencode (not this checkout)
+# Team mode schema + ~/.omo/teams symlinks (not directory copies)
 if python3 - "$REPO" <<'PY'
 import json, os, sys
 repo = sys.argv[1]

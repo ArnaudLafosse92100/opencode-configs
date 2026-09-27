@@ -18,6 +18,13 @@ Fast authorized surface mapping. Prefer this over re-enabling OmO `security-*` s
 - `content-aware-fast` category / `content-aware-audit` team recon member
 - Before deep vuln work (`content-aware-audit` skill / `content-aware-deep`)
 
+## Lead routing contract
+
+- Sisyphus loading this skill does not change models and is not delegation.
+- For non-trivial recon, Sisyphus uses synchronous category `content-aware-fast` and should pass this skill through `load_skills` when possible.
+- The category prompt embeds the same mandatory baseline, so a category-routed child remains specialized if a provider omits the redundant skill argument.
+- The category executor or `content-aware-research` runs the method below. The parent verifies and synthesizes the returned evidence.
+
 ## Method
 
 1. Parallel local probes: `glob` / `grep` / codegraph / config reads.

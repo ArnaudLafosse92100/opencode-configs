@@ -258,7 +258,7 @@ open(os.environ["HEALTHYOUT"],"w").write("\n".join(m for m,r in route.items() if
 # ── AI diagnosis ──
 if ai_on and key:
     sec("AI diagnosis")
-    model=(aimodel or conf.get("model","deepseek/deepseek-v4-pro-0813")).replace("openrouter/","")
+    model=(aimodel or conf.get("model","deepseek/deepseek-v4-flash-0731")).replace("openrouter/","")
     red=json.loads(json.dumps(conf))
     try: red["provider"]["openrouter"]["options"]["apiKey"]="<redacted>"
     except: pass
@@ -324,8 +324,8 @@ if [[ $AGENTFIX -eq 1 ]]; then
     # Pick a model that VERIFIABLY routes (the broken model may be the default the
     # agent would otherwise use). Prefer a cheap healthy one; fall back to flash.
     healthy="$(head -1 "$HEALTHYFILE" 2>/dev/null)"
-    fixmodel="openrouter/${healthy:-deepseek/deepseek-v4.1-flash}"
-    prompt="You are working in the OpenCode config repo at ${REPO} (this IS ~/.config/opencode). These issues were detected by ./diagnose.sh:
+    fixmodel="openrouter/${healthy:-deepseek/deepseek-v4-flash-0731}"
+    prompt="You are working in the immutable OpenConfig source checkout at ${REPO}; ~/.config/opencode is a generated compatibility view. These issues were detected by ./diagnose.sh:
 ${issues}
 
 Fix them by editing opencode.json / oh-my-openagent.json. Rules: keep it cheap+agentic; the plugin pin must be oh-my-openagent@4.19.4; every model's max_price cap must admit at least one non-ignored provider (raise the cap if routing fails). After editing, run ./fix.sh then ./validate.sh then ./doctor.sh, and report exactly what you changed plus the final doctor summary."

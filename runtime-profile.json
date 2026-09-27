@@ -1,0 +1,1175 @@
+{
+  "schema_version": 4,
+  "default_profile": "normal",
+  "promotion_gates": {},
+  "retry_policies": {
+    "private-text": {
+      "primary_attempts": 4,
+      "fallback_attempts": [
+        1
+      ],
+      "terminal_on_exhaustion": true
+    }
+  },
+  "qualified_models": {
+    "deepseek-flash-openrouter": {
+      "runtime_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "provider": "pi",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode",
+        "factory-archon"
+      ],
+      "tool_use": true
+    },
+    "deepseek-pro-openrouter": {
+      "runtime_model": "openrouter/deepseek/deepseek-v4-pro-0813",
+      "provider": "pi",
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "sol-subscription": {
+      "runtime_model": "codex-subscription/gpt-5.6-sol",
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "billing": "subscription",
+      "transport": "codex-subscription",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments"
+      ],
+      "execution_surfaces": [
+        "opencode",
+        "factory-archon"
+      ],
+      "tool_use": true
+    },
+    "astra-subscription": {
+      "runtime_model": "codex-subscription/gpt-6-astra",
+      "provider": "codex",
+      "model": "gpt-6-astra",
+      "billing": "subscription",
+      "transport": "codex-subscription",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode",
+        "factory-archon"
+      ],
+      "tool_use": true
+    },
+    "opus-subscription": {
+      "runtime_model": null,
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "billing": "subscription",
+      "transport": "claude-subscription",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "factory-archon"
+      ],
+      "tool_use": true
+    },
+    "gemini-pro-openrouter": {
+      "runtime_model": "openrouter/google/gemini-3.1-pro-preview",
+      "provider": "pi",
+      "model": "openrouter/google/gemini-3.1-pro-preview",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "gemini-flash-openrouter": {
+      "runtime_model": "openrouter/google/gemini-3.7-flash",
+      "provider": "pi",
+      "model": "openrouter/google/gemini-3.7-flash",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "gemini-writing-openrouter": {
+      "runtime_model": "openrouter/google/gemini-3.8-flash",
+      "provider": "pi",
+      "model": "openrouter/google/gemini-3.8-flash",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "minimax-openrouter": {
+      "runtime_model": "openrouter/minimax/minimax-m3",
+      "provider": "pi",
+      "model": "openrouter/minimax/minimax-m3",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "kimi-openrouter": {
+      "runtime_model": "openrouter/moonshotai/kimi-k2.7-code",
+      "provider": "pi",
+      "model": "openrouter/moonshotai/kimi-k2.7-code",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "glm-openrouter": {
+      "runtime_model": "openrouter/z-ai/glm-5.3",
+      "provider": "pi",
+      "model": "openrouter/z-ai/glm-5.3",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "hermes-openrouter": {
+      "runtime_model": "openrouter/nousresearch/hermes-4-405b",
+      "provider": "pi",
+      "model": "openrouter/nousresearch/hermes-4-405b",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": false
+    },
+    "venice-pro": {
+      "runtime_model": "venice/deepseek-v4-pro-0813",
+      "provider": "venice",
+      "model": "deepseek-v4-pro-0813",
+      "billing": "metered",
+      "transport": "venice-api",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard",
+        "zdr"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "venice-pro-alias": {
+      "runtime_model": "venice/deepseek-v4-pro",
+      "provider": "venice",
+      "model": "deepseek-v4-pro",
+      "billing": "metered",
+      "transport": "venice-api",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard",
+        "zdr"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "venice-flash": {
+      "runtime_model": "venice/deepseek-v4-1-flash",
+      "provider": "venice",
+      "model": "deepseek-v4-1-flash",
+      "billing": "metered",
+      "transport": "venice-api",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard",
+        "zdr"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "deepseek-pro-direct": {
+      "runtime_model": "deepseek/deepseek-v4-pro",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "billing": "metered",
+      "transport": "deepseek-api",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "deepseek-flash-direct": {
+      "runtime_model": "deepseek/deepseek-flash",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "billing": "metered",
+      "transport": "deepseek-api",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "qwen-openrouter": {
+      "runtime_model": "openrouter/qwen/qwen3.8-max-0902",
+      "provider": "pi",
+      "model": "openrouter/qwen/qwen3.8-max-0902",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "laguna-openrouter": {
+      "runtime_model": "openrouter/poolside/laguna-s-2.1",
+      "provider": "pi",
+      "model": "openrouter/poolside/laguna-s-2.1",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "deepseek-flash-zdr": {
+      "runtime_model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+      "provider": "pi",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "privacy_classes": [
+        "zdr"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
+    "deepseek-pro-zdr": {
+      "runtime_model": "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput",
+      "provider": "pi",
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput",
+      "billing": "metered",
+      "transport": "openrouter-pi",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "privacy_classes": [
+        "zdr"
+      ],
+      "modalities": [
+        "text"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    }
+  },
+  "capabilities": {
+    "exploration": {
+      "primary": "deepseek-flash-openrouter",
+      "fallbacks": [],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered",
+        "subscription"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": [
+        "low"
+      ]
+    },
+    "implementation": {
+      "primary": "sol-subscription",
+      "fallbacks": [],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "subscription",
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": [
+        "medium"
+      ]
+    },
+    "architecture": {
+      "primary": "astra-subscription",
+      "fallbacks": [],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "subscription",
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": [
+        "high"
+      ]
+    },
+    "review": {
+      "primary": "opus-subscription",
+      "fallbacks": [],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "subscription",
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": [
+        "high"
+      ]
+    },
+    "adjudication": {
+      "primary": "opus-subscription",
+      "fallbacks": [],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "subscription",
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": [
+        "high"
+      ]
+    },
+    "vision": {
+      "primary": "gemini-pro-openrouter",
+      "fallbacks": [
+        "gemini-flash-openrouter",
+        "minimax-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text",
+        "multimodal"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "writing": {
+      "primary": "gemini-writing-openrouter",
+      "fallbacks": [
+        "deepseek-flash-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "agentic-code": {
+      "primary": "kimi-openrouter",
+      "fallbacks": [
+        "deepseek-pro-openrouter",
+        "glm-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "content-research": {
+      "primary": "venice-pro",
+      "fallbacks": [
+        "venice-pro-alias",
+        "venice-flash"
+      ],
+      "required_privacy": "zdr",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "content-fast": {
+      "primary": "venice-flash",
+      "fallbacks": [
+        "venice-pro",
+        "venice-pro-alias"
+      ],
+      "required_privacy": "zdr",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "deepseek-specialist": {
+      "primary": "deepseek-pro-direct",
+      "fallbacks": [
+        "deepseek-flash-direct",
+        "qwen-openrouter",
+        "laguna-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "deepseek-junior": {
+      "primary": "deepseek-flash-direct",
+      "fallbacks": [
+        "deepseek-pro-direct",
+        "qwen-openrouter",
+        "laguna-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
+    "pasted-context": {
+      "primary": "hermes-openrouter",
+      "fallbacks": [
+        "sol-subscription",
+        "deepseek-pro-openrouter"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered",
+        "subscription"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": false,
+      "workflow_efforts": []
+    },
+    "private-text": {
+      "primary": "deepseek-flash-zdr",
+      "fallbacks": [
+        "deepseek-pro-zdr"
+      ],
+      "required_privacy": "zdr",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "metered"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    }
+  },
+  "export_routes": {
+    "normal": {
+      "security-strix-scan": {
+        "primary": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "source_fallbacks": [
+          "openrouter/deepseek/deepseek-v4-pro-0813"
+        ],
+        "reasoning": "low",
+        "variant": "low",
+        "data_classification": "synthetic",
+        "admission": "primary-only"
+      }
+    },
+    "normal-private": {},
+    "pentest": {}
+  },
+  "surface_bindings": {
+    "factory-archon": {
+      "aliases": {
+        "@explorer": {
+          "capability": "exploration",
+          "default_effort": "low"
+        },
+        "@implementer": {
+          "capability": "implementation",
+          "default_effort": "medium"
+        },
+        "@architect": {
+          "capability": "architecture",
+          "default_effort": "high"
+        },
+        "@reviewer": {
+          "capability": "review",
+          "default_effort": "high"
+        },
+        "@adjudicator": {
+          "capability": "adjudication",
+          "default_effort": "high"
+        }
+      }
+    }
+  },
+  "profiles": {
+    "normal": {
+      "entry_agent": "codex-router",
+      "small_model": "exploration",
+      "helper_model": "exploration",
+      "runtime_fallbacks": {
+        "capabilities": [
+          "exploration",
+          "implementation",
+          "architecture"
+        ],
+        "by_billing": {
+          "subscription": [
+            "astra-subscription",
+            "sol-subscription"
+          ],
+          "metered": [
+            "deepseek-flash-openrouter",
+            "glm-openrouter",
+            "minimax-openrouter"
+          ]
+        }
+      },
+      "privacy": {
+        "classification": "standard",
+        "enforcement": "policy"
+      },
+      "admission": {
+        "unqualified_models": "deny",
+        "capability_mismatch": "deny",
+        "metered_fallback": "explicit"
+      },
+      "bindings": {
+        "agents": {
+          "codex-router": {
+            "capability": "architecture",
+            "effort": "low"
+          },
+          "sisyphus": {
+            "capability": "architecture",
+            "effort": "low"
+          },
+          "hephaestus": {
+            "capability": "implementation",
+            "effort": "high"
+          },
+          "prometheus": {
+            "capability": "architecture",
+            "effort": "low"
+          },
+          "plan": {
+            "capability": "architecture",
+            "effort": "low"
+          },
+          "atlas": {
+            "capability": "implementation",
+            "effort": "low"
+          },
+          "oracle": {
+            "capability": "architecture",
+            "effort": "high"
+          },
+          "librarian": {
+            "capability": "exploration",
+            "effort": "low"
+          },
+          "explore": {
+            "capability": "exploration",
+            "effort": "low"
+          },
+          "multimodal-looker": {
+            "capability": "vision",
+            "effort": "low"
+          },
+          "metis": {
+            "capability": "architecture",
+            "effort": "medium"
+          },
+          "momus": {
+            "capability": "architecture",
+            "effort": "xhigh"
+          },
+          "sisyphus-junior": {
+            "capability": "exploration",
+            "effort": "low"
+          },
+          "content-aware-research": {
+            "capability": "content-research",
+            "effort": "high"
+          },
+          "sisyphus-deepseek": {
+            "capability": "deepseek-specialist",
+            "effort": "low"
+          },
+          "sisyphus-deepseek-junior": {
+            "capability": "deepseek-junior",
+            "effort": "low"
+          },
+          "sisyphus-venice-deepseek": {
+            "capability": "content-research",
+            "effort": "low"
+          },
+          "sisyphus-venice-deepseek-flash-junior": {
+            "capability": "content-fast",
+            "effort": "low"
+          },
+          "content-aware-fast": {
+            "capability": "content-fast",
+            "effort": "low"
+          },
+          "context-aware-hermes": {
+            "capability": "pasted-context",
+            "effort": "high"
+          }
+        },
+        "categories": {
+          "visual-engineering": {
+            "capability": "vision",
+            "effort": "high"
+          },
+          "ultrabrain": {
+            "capability": "architecture",
+            "effort": "xhigh"
+          },
+          "deep": {
+            "capability": "implementation",
+            "effort": "high"
+          },
+          "agentic-deep-kimi": {
+            "capability": "agentic-code",
+            "effort": "high"
+          },
+          "artistry": {
+            "capability": "vision",
+            "effort": "high"
+          },
+          "quick": {
+            "capability": "exploration",
+            "effort": "low"
+          },
+          "unspecified-low": {
+            "capability": "exploration",
+            "effort": "low"
+          },
+          "unspecified-high": {
+            "capability": "architecture",
+            "effort": "high"
+          },
+          "writing": {
+            "capability": "writing",
+            "effort": "medium"
+          },
+          "bug-hunt": {
+            "capability": "implementation",
+            "effort": "low"
+          },
+          "refactor-safe": {
+            "capability": "implementation",
+            "effort": "low"
+          },
+          "arch-review": {
+            "capability": "architecture",
+            "effort": "high"
+          },
+          "content-aware-fast": {
+            "capability": "content-fast",
+            "effort": "low"
+          },
+          "content-aware-deep": {
+            "capability": "content-research",
+            "effort": "high"
+          }
+        }
+      }
+    },
+    "pentest": {
+      "entry_agent": "codex-router",
+      "small_model": "private-text",
+      "helper_model": "private-text",
+      "privacy": {
+        "classification": "security",
+        "enforcement": "zdr_required"
+      },
+      "admission": {
+        "unqualified_models": "deny",
+        "capability_mismatch": "deny",
+        "metered_fallback": "forbidden"
+      },
+      "bindings": {
+        "agents": {
+          "codex-router": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "sisyphus": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "hephaestus": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "prometheus": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "plan": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "atlas": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "oracle": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "librarian": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "explore": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "multimodal-looker": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "metis": {
+            "capability": "private-text",
+            "effort": "medium"
+          },
+          "momus": {
+            "capability": "private-text",
+            "effort": "xhigh"
+          },
+          "sisyphus-junior": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "content-aware-research": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "content-aware-fast": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "context-aware-hermes": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "sisyphus-deepseek": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "sisyphus-deepseek-junior": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "sisyphus-venice-deepseek": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "sisyphus-venice-deepseek-flash-junior": {
+            "capability": "private-text",
+            "effort": "low"
+          }
+        },
+        "categories": {
+          "visual-engineering": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "ultrabrain": {
+            "capability": "private-text",
+            "effort": "xhigh"
+          },
+          "deep": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "agentic-deep-kimi": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "artistry": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "quick": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "unspecified-low": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "unspecified-high": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "writing": {
+            "capability": "private-text",
+            "effort": "medium"
+          },
+          "bug-hunt": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "refactor-safe": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "arch-review": {
+            "capability": "private-text",
+            "effort": "high"
+          },
+          "content-aware-fast": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "content-aware-deep": {
+            "capability": "private-text",
+            "effort": "high"
+          }
+        }
+      }
+    },
+    "normal-private": {
+      "compose": "normal",
+      "replacement_capability": "private-text",
+      "entry_agent": "codex-router",
+      "privacy": {
+        "classification": "private",
+        "enforcement": "zdr_required"
+      },
+      "admission": {
+        "unqualified_models": "deny",
+        "capability_mismatch": "deny",
+        "metered_fallback": "forbidden"
+      },
+      "exclude_providers": [
+        "codex-subscription"
+      ]
+    }
+  }
+}

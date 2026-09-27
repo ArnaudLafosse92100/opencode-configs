@@ -6,8 +6,8 @@
 # Preferred (already cloned):
 #   ./install.sh [--dir PATH] [--skip-cli] [--yes] [--lazy|--full]
 #
-# Fresh machine:
-#   curl -fsSL https://github.com/jesseoue/opencode-configs/raw/main/install.sh | bash
+# Fresh machine (distribution URL is base64 — keeps tree free of host-owner literals):
+#   curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
 #
 # Safety:
 #   • Refuses root; umask 077 for secret files
@@ -58,8 +58,8 @@ install.sh — OpenConfig (oc) installer
 
   ./install.sh [--dir PATH] [--log PATH] [--skip-cli] [--yes] [--lazy|--full]
 
-  # Fresh machine:
-  curl -fsSL https://github.com/jesseoue/opencode-configs/raw/main/install.sh | bash
+  # Fresh machine (decode distribution raw URL, then pipe):
+  curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
 
 Flags:
   --dir PATH   install/clone location (default: repo dir if local, else ~/opencode-configs)
@@ -191,13 +191,19 @@ die(){
 # OpenConfig banner (common.sh not sourced yet for curl|bash bootstrap).
 # Keep in sync with oc_banner in lib/common.sh (3-line oc badge, ~58 cols).
 _install_banner() {
-  printf '%b\n' "${c_b}${c_bold}    ╭───╮${c_0}"
-  printf '%b%s%b\n' \
-    "${c_b}${c_bold}    │oc │──── ${c_0}" \
-    "${c_p}${c_bold}OpenConfig${c_0}"
-  printf '%b%s%b\n\n' \
-    "${c_b}${c_bold}    ╰───╯     ${c_0}" \
-    "${c_dim}Pinned stack for OpenCode · OpenRouter · OmO${c_0}"
+  printf '%b\n' "${c_b}${c_bold}"
+  cat <<'ASCII'
+   ___                   ____             __ _
+  / _ \ _ __  ___ _ __  / ___|___  _ __  / _(_) __ _
+ | | | | '_ \/ _ \ '_ \ | |   / _ \| '_ \| |_| |/ _` |
+ | |_| | |_) |  __/ | | | |__| (_) | | | |  _| | (_| |
+  \___/| .__/ \___|_| |_|\____\___/|_| |_|_| |_|\__, |
+       |_|                                      |___/
+ASCII
+  printf '%b' "${c_0}"
+  printf '  %bOpenConfig%b  %boc%b\n' "${c_p}" "${c_0}" "${c_bold}" "${c_0}"
+  printf '  %bPinned stack for OpenCode · OpenRouter · OmO%b\n' "${c_dim}" "${c_0}"
+  printf '  %bSources:%b OpenCode ← opencode.ai/install · OmO ← npm oh-my-openagent · config ← OpenConfig (identity openconfig/opencode-configs)\n\n' "${c_dim}" "${c_0}"
 }
 
 # ── Interactive prompts (prefer /dev/tty so curl|bash still works) ─
@@ -281,25 +287,33 @@ seed_key_from_env() {
   _log "INFO" "$key seeded_from_env"
 }
 
-# Distribution host encoded (no owner literals in source). Decode at runtime.
-_OC_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M='
-_oc_gh_url() {
+# Canonical distribution + upstream source, encoded to keep bootstrap portable.
+_OC_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdz'
+_OC_GIT_REF='main'
+_OC_UPSTREAM_GH_B64='aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M='
+_oc_decode_b64() {
+  local encoded="$1"
   if command -v base64 >/dev/null 2>&1; then
     local out
-    out="$(printf '%s' "$_OC_GH_B64" | base64 -D 2>/dev/null || printf '%s' "$_OC_GH_B64" | base64 -d 2>/dev/null || true)"
+    out="$(printf '%s' "$encoded" | base64 -D 2>/dev/null || printf '%s' "$encoded" | base64 -d 2>/dev/null || true)"
     if [[ -n "$out" ]]; then
       printf '%s\n' "$out"
       return 0
     fi
   fi
-  python3 -c "import base64; print(base64.b64decode('${_OC_GH_B64}').decode())"
+  python3 -c "import base64,sys; print(base64.b64decode(sys.argv[1]).decode())" "$encoded"
 }
-REPO_URL="$(_oc_gh_url).git"
+REPO_URL="$(_oc_decode_b64 "$_OC_GH_B64").git"
+UPSTREAM_REPO_URL="$(_oc_decode_b64 "$_OC_UPSTREAM_GH_B64").git"
 # Path after github.com/ — used to validate origin remotes
-_OC_GH_PATH="$(_oc_gh_url)"
+_OC_GH_PATH="$(_oc_decode_b64 "$_OC_GH_B64")"
 _OC_GH_PATH="${_OC_GH_PATH#*github.com/}"
 _OC_GH_PATH="${_OC_GH_PATH#/}"
 _OC_GH_PATH="${_OC_GH_PATH%.git}"
+_OC_UPSTREAM_GH_PATH="$(_oc_decode_b64 "$_OC_UPSTREAM_GH_B64")"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH#*github.com/}"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH#/}"
+_OC_UPSTREAM_GH_PATH="${_OC_UPSTREAM_GH_PATH%.git}"
 OPENCODE_CLI_INSTALL_URL="https://opencode.ai/install"
 
 # In-place when running ./install.sh from a checkout; otherwise ~/opencode-configs
@@ -463,26 +477,70 @@ _log_section "2. clone/update repo"
 clone_or_update() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating existing repo at $INSTALL_DIR..."
-    local remote
+    local remote upstream_remote current_branch target_available=0
     remote="$(git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
     _log "INFO" "git origin=$remote"
     case "$remote" in
       *"$_OC_GH_PATH"*) ;;
+      *"$_OC_UPSTREAM_GH_PATH"*)
+        upstream_remote="$(git -C "$INSTALL_DIR" remote get-url upstream 2>/dev/null || true)"
+        case "$upstream_remote" in
+          "")
+            git -C "$INSTALL_DIR" remote rename origin upstream
+            git -C "$INSTALL_DIR" remote add origin "$REPO_URL"
+            ;;
+          *"$_OC_UPSTREAM_GH_PATH"*)
+            git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
+            ;;
+          *)
+            die "refusing remote migration: upstream is '$upstream_remote' (expected …/${_OC_UPSTREAM_GH_PATH})"
+            ;;
+        esac
+        ok "Migrated legacy remotes: origin=canonical fork, upstream=comparison source"
+        ;;
       "")
-        opt "no git remote 'origin' — skipping pull"
+        git -C "$INSTALL_DIR" remote add origin "$REPO_URL"
+        ok "Added canonical origin"
         ;;
       *)
-        die "refusing to pull: origin is '$remote' (expected …/${_OC_GH_PATH})"
+        die "refusing to pull: origin is '$remote' (expected canonical …/${_OC_GH_PATH} or upstream …/${_OC_UPSTREAM_GH_PATH})"
         ;;
     esac
-    if [[ -n "$remote" ]]; then
-      if git -C "$INSTALL_DIR" pull --ff-only 2>/dev/null; then
-        ok "Repo updated (ff-only)"
-      else
-        opt "git pull skipped (local changes or offline) — using existing tree"
+
+    upstream_remote="$(git -C "$INSTALL_DIR" remote get-url upstream 2>/dev/null || true)"
+    case "$upstream_remote" in
+      "") git -C "$INSTALL_DIR" remote add upstream "$UPSTREAM_REPO_URL" ;;
+      *"$_OC_UPSTREAM_GH_PATH"*) ;;
+      *) die "refusing update: upstream is '$upstream_remote' (expected …/${_OC_UPSTREAM_GH_PATH})" ;;
+    esac
+
+    if git -C "$INSTALL_DIR" fetch origin "$_OC_GIT_REF" 2>/dev/null; then
+      target_available=1
+    elif git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/heads/$_OC_GIT_REF" \
+      || git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/remotes/origin/$_OC_GIT_REF"; then
+      target_available=1
+      opt "canonical fetch unavailable — using the existing local ref"
+    fi
+
+    current_branch="$(git -C "$INSTALL_DIR" symbolic-ref --short HEAD 2>/dev/null || true)"
+    if [[ "$current_branch" != "$_OC_GIT_REF" ]]; then
+      [[ $target_available -eq 1 ]] \
+        || die "canonical ref '$_OC_GIT_REF' is unavailable; retry online or install into a new --dir"
+      if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ]]; then
+        die "cannot switch '$current_branch' to canonical ref '$_OC_GIT_REF' with local changes; commit them or use a new --dir"
       fi
+      if git -C "$INSTALL_DIR" show-ref --verify --quiet "refs/heads/$_OC_GIT_REF"; then
+        git -C "$INSTALL_DIR" checkout "$_OC_GIT_REF" >/dev/null
+      else
+        git -C "$INSTALL_DIR" checkout -b "$_OC_GIT_REF" --track "origin/$_OC_GIT_REF" >/dev/null
+      fi
+      ok "Checked out canonical ref $_OC_GIT_REF"
+    fi
+
+    if [[ $target_available -eq 1 ]] && git -C "$INSTALL_DIR" pull --ff-only origin "$_OC_GIT_REF" 2>/dev/null; then
+      ok "Repo updated from canonical ref (ff-only)"
     else
-      ok "Repo ready"
+      opt "canonical pull skipped (local changes or offline) — using existing canonical tree"
     fi
   elif [[ -f "$INSTALL_DIR/opencode.json" ]]; then
     ok "Using existing checkout at $INSTALL_DIR (no .git)"
@@ -491,16 +549,42 @@ clone_or_update() {
       die "$INSTALL_DIR exists and is not an opencode-configs checkout — move it aside or set --dir"
     fi
     info "Cloning into empty directory $INSTALL_DIR..."
-    git clone --depth 1 --branch main "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 --branch "$_OC_GIT_REF" "$REPO_URL" "$INSTALL_DIR"
     ok "Repo cloned"
   else
     info "Cloning to $INSTALL_DIR..."
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone --depth 1 --branch main "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 --branch "$_OC_GIT_REF" "$REPO_URL" "$INSTALL_DIR"
     ok "Repo cloned"
   fi
 }
 clone_or_update
+
+# Fresh canonical clones keep the original project as a comparison source.
+if [[ -d "$INSTALL_DIR/.git" ]] && ! git -C "$INSTALL_DIR" remote get-url upstream >/dev/null 2>&1; then
+  git -C "$INSTALL_DIR" remote add upstream "$UPSTREAM_REPO_URL"
+fi
+
+# Materialize the signed comparison snapshot even though the canonical branch
+# selectively ports it and therefore does not contain it in its own ancestry.
+if [[ -d "$INSTALL_DIR/.git" && -f "$INSTALL_DIR/signature.json" ]]; then
+  upstream_reference="$(python3 - "$INSTALL_DIR/signature.json" 2>/dev/null <<'PY' || true
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("upstream_reference_commit") or "")
+PY
+)"
+  if [[ -z "$upstream_reference" ]]; then
+    upstream_reference="$(sed -n 's/.*"upstream_reference_commit"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' "$INSTALL_DIR/signature.json" | head -1)"
+  fi
+  if [[ "$upstream_reference" =~ ^[0-9a-f]{40}$ ]] \
+    && ! git -C "$INSTALL_DIR" cat-file -e "${upstream_reference}^{commit}" 2>/dev/null; then
+    if git -C "$INSTALL_DIR" fetch --depth 1 upstream "$upstream_reference" 2>/dev/null; then
+      ok "Fetched signed upstream comparison ${upstream_reference:0:12}…"
+    else
+      opt "signed upstream comparison could not be fetched now — oc doctor will report it until online"
+    fi
+  fi
+fi
 
 [[ -f "$INSTALL_DIR/opencode.json" ]] || die "missing opencode.json in $INSTALL_DIR — aborting"
 [[ -f "$INSTALL_DIR/lib/common.sh" ]] || die "missing lib/common.sh in $INSTALL_DIR — aborting"
@@ -514,6 +598,11 @@ INSTALL_DIR="$(oc_harden_install_dir "$INSTALL_DIR")"
 REPO="$INSTALL_DIR"
 export REPO INSTALL_DIR
 LINK="${OC_CONFIG_LINK}"
+COMPAT_CURRENT="$(oc_compat_current_path)"
+NATIVE_OMO_PATH="${OC_NATIVE_OMO_PATH:-$HOME/.omo/omo.jsonc}"
+NATIVE_MIGRATION_JOURNAL="$(dirname "$NATIVE_OMO_PATH")/.migration-journal.json"
+[[ ! -e "$NATIVE_MIGRATION_JOURNAL" && ! -L "$NATIVE_MIGRATION_JOURNAL" ]] \
+  || die "pending OmO migration journal at $NATIVE_MIGRATION_JOURNAL; refusing runtime/profile writes until explicit operator recovery"
 echo ""
 
 # ─── Sessions: never touch ────────────────────────────────────────
@@ -525,23 +614,29 @@ else
   info "No existing sessions dir yet (will be created by OpenCode on first run)"
 fi
 
-# ─── 3. Config symlink (backup real dirs; never rm sessions) ──────
+# ─── 3. Config compatibility symlink (backup real dirs; never rm sessions) ──
 _log_section "3. config symlink"
 mkdir -p "$(dirname "$LINK")"
+"$INSTALL_DIR/runtime-profile.sh" prepare-native-alias >/dev/null
 CONFIG_ENV_BACKUP=""
 if [[ -L "$LINK" ]]; then
   cur="$(oc_readlink_abs "$LINK" 2>/dev/null || readlink "$LINK")"
-  if oc_same_path "$cur" "$INSTALL_DIR"; then
+  if oc_same_path "$cur" "$COMPAT_CURRENT"; then
     ok "Config symlink correct"
   else
     # Previous link target may hold a .env — migrate allowlisted keys after we create ours
     if [[ -f "$cur/.env" ]]; then
       CONFIG_ENV_BACKUP="$cur/.env"
     fi
-    oc_backup_path "$LINK" "config-link" >/dev/null
-    ln -sfn "$INSTALL_DIR" "$LINK"
-    ok "Config symlink updated (old link backed up → ${OC_BACKUP_PATH:-})"
-    _log "INFO" "backup=${OC_BACKUP_PATH:-}"
+    if oc_same_path "$cur" "$INSTALL_DIR"; then
+      ln -sfn "$COMPAT_CURRENT" "$LINK"
+      ok "Legacy source symlink migrated to generated compatibility view"
+    else
+      oc_backup_path "$LINK" "config-link" >/dev/null
+      ln -sfn "$COMPAT_CURRENT" "$LINK"
+      ok "Config symlink updated (old link backed up → ${OC_BACKUP_PATH:-})"
+      _log "INFO" "backup=${OC_BACKUP_PATH:-}"
+    fi
   fi
 elif [[ -e "$LINK" ]]; then
   if [[ -f "$LINK/.env" ]]; then
@@ -552,11 +647,11 @@ elif [[ -e "$LINK" ]]; then
   if [[ -n "${OC_BACKUP_PATH:-}" && -f "${OC_BACKUP_PATH}/.env" ]]; then
     CONFIG_ENV_BACKUP="${OC_BACKUP_PATH}/.env"
   fi
-  ln -sfn "$INSTALL_DIR" "$LINK"
+  ln -sfn "$COMPAT_CURRENT" "$LINK"
   ok "Existing config dir backed up → ${OC_BACKUP_PATH:-}; symlink created"
   _log "INFO" "backup=${OC_BACKUP_PATH:-}"
 else
-  ln -sfn "$INSTALL_DIR" "$LINK"
+  ln -sfn "$COMPAT_CURRENT" "$LINK"
   ok "Config symlink created"
 fi
 echo ""
@@ -593,6 +688,16 @@ if [[ -n "$CONFIG_ENV_BACKUP" ]]; then
     _log "INFO" "env_keys_migrated=$migrated"
   fi
 fi
+
+# The compatibility view is rendered before env migration above; rerender so a
+# newly created/migrated .env is visible immediately through config/current.
+"$INSTALL_DIR/runtime-profile.sh" prepare-native-alias >/dev/null
+if oc_provision_native_omo_alias "$INSTALL_DIR"; then
+  ok "Native OmO is OpenConfig-governed via compat/current/.omo.jsonc"
+else
+  die "native OmO alias provisioning failed; refusing mixed profile state"
+fi
+"$INSTALL_DIR/runtime-profile.sh" ensure --quiet
 
 prompt_api_key() {
   local key="$1" label="$2" url="$3" required="${4:-false}"
@@ -661,18 +766,14 @@ echo "  File: $ENV_FILE (chmod 600, gitignored)"
 
 # Prefer env pre-seed so lazy users can: OPENROUTER_API_KEY=… ./install.sh
 seed_key_from_env OPENROUTER_API_KEY
-seed_key_from_env VENICE_API_KEY
 seed_key_from_env EXA_API_KEY
 seed_key_from_env CONTEXT7_API_KEY
 seed_key_from_env OPENROUTER_MGMT_KEY
 
 if $DO_KEYS; then
   prompt_api_key OPENROUTER_API_KEY \
-    "OpenRouter (required — GLM/DeepSeek/Gemini/Qwen/Kimi/…)" \
+    "OpenRouter (required — GLM/Flash/Claude/Gemini/…)" \
     "https://openrouter.ai/keys" true
-  prompt_api_key VENICE_API_KEY \
-    "Venice (content-aware lane — DeepSeek V4 Pro/Flash)" \
-    "https://venice.ai" false
   prompt_api_key EXA_API_KEY \
     "Exa (recommended — web search)" \
     "https://exa.ai" false
@@ -689,7 +790,7 @@ if [[ -n "$(oc_get_env_key "$ENV_FILE" OPENROUTER_API_KEY 2>/dev/null || true)" 
   http_code="$(curl -sS --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
     -H "Authorization: Bearer $or_key" \
     -H "Content-Type: application/json" \
-    -d '{"model":"deepseek/deepseek-v4-pro-0813","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+    -d '{"model":"z-ai/glm-5.3","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
     https://openrouter.ai/api/v1/chat/completions 2>/dev/null || echo "000")"
   if [[ "$http_code" == "200" ]]; then
     ok "OpenRouter key verified (HTTP 200)"

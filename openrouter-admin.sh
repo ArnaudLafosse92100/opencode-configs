@@ -149,25 +149,70 @@ else:
     print(f'  ✓ \${remaining:.2f} credits remaining')
 "
     echo ""
-    echo -e "${c_b}── Model Routing Probes (parallel) ──${c_0}"
-    if ! "$REPO/models.sh" --probe; then
-      bad "one or more model probes failed — run: oc models --probe --json"
-    fi
+    echo -e "${c_b}── Model Routing Probes ──${c_0}"
+    python3 -c "
+import json
+oc = json.load(open('$REPO/opencode.json'))
+models = oc.get('provider', {}).get('openrouter', {}).get('models', {})
+for mid in sorted(models.keys()):
+    m = models[mid]
+    real_id = m.get('id', mid)
+    print(f'{mid}|{real_id}')
+" | while IFS='|' read -r mid real_id; do
+      echo -n "  "
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\":\"$real_id\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":16}" \
+        "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null)
+      if [ "$http_code" = "200" ]; then
+        printf "${c_g}✓${c_0} %-35s routes (HTTP 200)\n" "$mid"
+      elif [ "$http_code" = "429" ]; then
+        printf "${c_y}⚠${c_0} %-35s RATE LIMITED (HTTP 429)\n" "$mid"
+      elif [ "$http_code" = "402" ]; then
+        printf "${c_r}✗${c_0} %-35s INSUFFICIENT CREDITS (HTTP 402)\n" "$mid"
+      else
+        printf "${c_r}✗${c_0} %-35s FAILED (HTTP %s)\n" "$mid" "$http_code"
+      fi
+    done
     echo ""
     echo -e "${c_b}── Rate Limit Headers ──${c_0}"
     curl -sI -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"model":"deepseek/deepseek-v4-pro-0813","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+      -d '{"model":"z-ai/glm-5.3","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
       "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null \
       | grep -i "x-ratelimit\|retry-after" \
       | while read -r line; do
           echo "  $line" | tr -d '\r'
         done || true
 
-    # OpenRouter-only — GPT models probed via OpenRouter above.
+    # Local Codex subscription lane. /models is non-billable and verifies the
+    # exact OpenAI-compatible transport used by the configured agent aliases.
     echo ""
-    echo -e "${c_b}── Direct OpenAI Probes ──${c_0}"
-    ok "skipped — OpenRouter-only (no GPT models in stack)"
+    echo -e "${c_b}── Local Codex Subscription ──${c_0}"
+    CODEX_URL="http://127.0.0.1:10100/v1"
+    codex_models="$(curl -sS --connect-timeout 2 --max-time 5 \
+      "${CODEX_URL}/models" 2>/dev/null || true)"
+    if ! printf '%s' "$codex_models" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      bad "Local OpenCodex /models probe failed"
+    else
+      printf '%s' "$codex_models" | python3 -c "
+import json
+cfg = json.load(open('$REPO/opencode.json'))
+available = {m.get('id') for m in json.load(open('/dev/stdin')).get('data', []) if isinstance(m, dict)}
+expected = (cfg.get('provider') or {}).get('codex-subscription', {}).get('models') or {}
+for name, spec in sorted(expected.items()):
+    remote_id = str(spec.get('id') or name).removeprefix('openai/')
+    state = 'available' if remote_id in available else 'MISSING'
+    print(f'{name}|{remote_id}|{state}')
+" | while IFS='|' read -r name remote_id state; do
+          if [[ "$state" == "available" ]]; then
+            printf "${c_g}✓${c_0} %-35s advertised as %s\n" "codex-subscription/$name" "$remote_id"
+          else
+            printf "${c_r}✗${c_0} %-35s (%s) MISSING from /v1/models\n" "codex-subscription/$name" "$remote_id"
+          fi
+        done
+    fi
     ;;
 
   ratelimit)
@@ -175,7 +220,7 @@ else:
     echo ""
     headers=$(curl -sI -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"model":"deepseek/deepseek-v4-pro-0813","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+      -d '{"model":"z-ai/glm-5.3","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
       "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null)
     if echo "$headers" | grep -qi "429"; then
       bad "RATE LIMITED (HTTP 429)"

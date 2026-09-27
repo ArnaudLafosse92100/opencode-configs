@@ -1,6 +1,6 @@
-# Category: unspecified-high (GLM 5.3 max)
+# Category: unspecified-high
 
-High-effort general work and hyperplan expensive critic. Fallbacks: Laguna S 2.1 → Qwen 3.8 Max → LongCat 2.0.
+High-effort general work and hyperplan architecture critic. Use the configured high-effort capability and its declared fallback policy.
 
 ## Do
 

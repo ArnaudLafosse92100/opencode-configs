@@ -1,7 +1,6 @@
 ---
 description: Critique / adjudication (consult only)
 mode: subagent
-model: openrouter/z-ai/glm-5.3
 temperature: 0.2
 permission:
   edit: deny

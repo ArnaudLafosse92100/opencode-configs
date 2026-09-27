@@ -93,7 +93,7 @@ check_ratelimit() {
   local headers code
   headers=$(curl -sI -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"model":"deepseek/deepseek-v4-pro-0813","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+    -d '{"model":"deepseek/deepseek-v4-flash-0731:nitro","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
     "https://openrouter.ai/api/v1/chat/completions" 2>/dev/null)
   code=$(echo "$headers" | head -1 | awk '{print $2}')
   if echo "$headers" | grep -qi "429"; then
@@ -200,17 +200,10 @@ for section in ('agents', 'categories'):
     for name, cfg in (omo.get(section, {}) or {}).items():
         if not isinstance(cfg, dict): continue
         model = cfg.get('model', '')
-        # Content-aware is Venice-only. Never rewrite venice/* onto OpenRouter.
-        if str(name).startswith('content-aware') or str(model).startswith('venice/'):
-            continue
-        if 'deepseek-v4-pro' in str(model) and '0813' not in str(model):
-            cfg['model'] = 'openrouter/deepseek/deepseek-v4-pro-0813'
-            changes += 1
-            print(f'  quarantine: {section}.{name} → deepseek-v4-pro-0813 (cheaper GA)')
         if 'claude-opus-5' in str(model) and 'fast' not in str(model):
-            cfg['model'] = 'openrouter/deepseek/deepseek-v4-pro-0813'
+            cfg['model'] = 'openrouter/deepseek/deepseek-v4-flash-0731'
             changes += 1
-            print(f'  quarantine: {section}.{name} → deepseek-v4-pro-0813 (opus swap)')
+            print(f'  quarantine: {section}.{name} → deepseek-v4-flash-0731 (opus swap)')
 if changes:
     json.dump(omo, open('$REPO/oh-my-openagent.json', 'w'), indent=2)
     print(f'  Quarantine: {changes} model(s) downgraded to cost-saving')
