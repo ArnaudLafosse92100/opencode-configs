@@ -31,7 +31,14 @@ source ~/.zshrc && oc doctor && oc launch
 
 Canonical distribution: `ArnaudLafosse92100/opencode-configs@main`.
 
-Upstream comparison reference: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). This is a source snapshot, not an ancestry claim: the fork selectively ports the upstream model/provider invariants and adds the documented normal/pentest, codex-subscription and retry-policy extensions.
+Upstream baseline: [jesseoue/opencode-configs](https://github.com/jesseoue/opencode-configs) at `58cc27ac75ace2030d296956dc68997402ab8bfb` (OpenConfig 1.5.80). The fork contains that complete upstream tree and keeps it as Git ancestry; local commits add the documented runtime profiles, subscription transports, Codex bridge entry, governed retry policy, and optional integration exports.
+
+### Local extension boundary
+
+- **OpenConfig core:** Jesse's config, agents, tools, health checks, deployment guards, and provider catalog remain the baseline.
+- **Local interactive overlay:** `runtime-profile.json`, `codex-router`, and the local Codex subscription transport select models and run the named Sisyphus workflow.
+- **Codex transport:** [OpenCode-Codex-Bridge](https://github.com/ArnaudLafosse92100/OpenCode-Codex-Bridge) owns Responses streaming and visible runtime progress; OpenConfig owns routing policy.
+- **Optional durable lifecycle:** [Sisyphus Factory Bridge](https://github.com/ArnaudLafosse92100/sisyphus-factory-bridge) consumes a versioned capability snapshot for Factory/Archon. It is never entered automatically by interactive OpenCode work.
 
 > Plugin name must stay **`oh-my-openagent@…`** (not legacy `oh-my-opencode`).  
 > Schema URL basename stays `omo.schema.json` (legacy `oh-my-opencode.schema.json` / `oh-my-openagent.schema.json` 404 — `oc validate` rejects both).
@@ -73,6 +80,8 @@ oc new myapp           # scaffold under ~/Projects
 oc run "…"             # headless to completion
 oc admin health        # live OpenRouter + codex-subscription probes
 oc models --providers  # OpenRouter provider health for routed models
+oc models --probe      # bounded live model probes
+oc models --moderation # provider moderation/data-policy catalog
 oc versions            # pins vs npm + GitHub (+ other opencode.json)
 oc versions --fix       # align ~/.opencode @opencode-ai/plugin to CLI
 oc plugin doctor       # OmO pin-cache doctor (also: oc plugin --fix)
@@ -81,6 +90,9 @@ oc signature           # identity fingerprint
 oc test                # smoke + idempotency
 oc doctor              # full readiness
 oc doctor --quick --json   # machine summary (heal/check tooling)
+oc deploy check        # credits, model health, rate limits, git, signature
+oc deploy status       # current lock, credits, and alert state
+oc deploy quarantine   # explicit cost-saving mode; `quarantine exit` restores
 ```
 
 Prefer `oc <cmd>` over raw `./foo.sh`. Full help: `oc help`.
@@ -103,7 +115,7 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 | Package | Source of truth | Current |
 | --- | --- | --- |
 | OpenConfig | `versions.json` → `opencode_configs` | `1.5.80` |
-| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.17+` |
+| OpenCode CLI | install + `versions.json` → `opencode.min` | `1.18.30+` |
 | OmO | `opencode.json` plugin + `versions.json` → `oh_my_openagent.pin` | `4.19.4` |
 | `@opencode-ai/plugin` | `~/.opencode/package.json` (peer; not in this repo) | match CLI |
 
@@ -522,7 +534,7 @@ Idempotency: re-running install / setup / heal / fix on a healthy box must not c
 
 ## Upstream
 
-This fork is the canonical install source. `jesseoue/opencode-configs` remains the comparison upstream, pinned in `signature.json` by full reference commit; upstream prose is informative, while executable JSON plus local validation remain authoritative.
+This fork is the canonical install source. `jesseoue/opencode-configs` remains the replaceable upstream baseline, pinned in `signature.json` by full reference commit and preserved as Git ancestry. Upstream prose is informative, while executable JSON plus local validation remain authoritative.
 
 | Layer | Docs | Source |
 | --- | --- | --- |

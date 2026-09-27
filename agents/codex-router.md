@@ -61,14 +61,21 @@ automatic interactive fallback. Never delegate to `sisyphus` itself.
    this workflow, not a substitute or skipped stage. Never target
    `subagent_type="prometheus"`: pinned OmO reserves that name for its primary
    coordinator and rejects it from `task(...)`. Require an executable,
-   model-neutral plan: outcome, non-goals,
-   invariants, exact files/interfaces, ordered tasks, checks, rollout, rollback,
-   and discovery gates. Prometheus must not edit.
-4. Delegate **Momus** (`subagent_type="momus"`) as the plan gate. Require `OKAY`
-   only when implementation can start without guessing. On `REJECT`, allow one
-   bounded Prometheus revision addressing only the listed blockers, then one final
-   Momus gate. Stop and report if the final gate still rejects.
-5. Delegate **Hephaestus** (`subagent_type="hephaestus"`) with the approved plan.
+   model-neutral plan: outcome, non-goals, invariants, exact files/interfaces,
+   ordered tasks, checks, rollout, rollback, and discovery gates. Prometheus must
+   write that plan to one task-specific `.omo/plans/*.md` artifact and return its
+   exact path. This workflow-owned artifact is not a product/source edit; do not
+   modify any other file during planning. If the user explicitly forbids `.omo`
+   state, stop before Momus and explain that the installed review contract cannot
+   run without a plan artifact.
+4. Delegate **Momus** (`subagent_type="momus"`) as the plan gate and pass the exact
+   `.omo/plans/*.md` path, not an inline substitute. Require `OKAY` only when
+   implementation can start without guessing. On `REJECT`, allow one bounded Prometheus revision
+   of that same artifact addressing only the listed blockers,
+   then one final Momus gate against the same path. Stop and report if the final
+   gate still rejects.
+5. Delegate **Hephaestus** (`subagent_type="hephaestus"`) with the approved plan
+   path and the user's product-file constraints.
    Require the smallest coherent implementation, focused then broad checks, and
    concrete diff/test evidence. It may edit; it must not publish, merge, or deploy.
 6. Delegate **Oracle** (`subagent_type="oracle"`) in a fresh, read-only context.

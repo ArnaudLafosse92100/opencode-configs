@@ -1,5 +1,9 @@
 # Changelog
 
+- Make the automatic Sisyphus handoff persist Prometheus output to a single
+  task-specific `.omo/plans/*.md` artifact, pass that exact path through Momus
+  and Hephaestus, and distinguish workflow state from product/source edits.
+
 - Route the logical Prometheus planning stage exclusively through OmO's demoted `plan` subagent adapter, preserving the Astra/Sol policy while keeping the reserved `prometheus` coordinator primary-only so it cannot be mistaken for a callable `task()` target
 
 ## Unreleased

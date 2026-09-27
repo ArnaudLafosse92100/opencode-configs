@@ -1965,11 +1965,7 @@ if "# OpenConfig" not in readme and "OpenConfig" not in readme[:500]:
 else:
     ok("README.md branded OpenConfig")
 if "github.com/openconfig/opencode-configs" in readme or "githubusercontent.com/openconfig/opencode-configs" in readme:
-    err("README install URL uses wrong org openconfig — must be jesseoue/opencode-configs")
-elif "https://github.com/jesseoue/opencode-configs" not in readme:
-    err("README must include https://github.com/jesseoue/opencode-configs")
-else:
-    ok("README install/clone URL is jesseoue/opencode-configs")
+    err("README uses the nonexistent openconfig/opencode-configs repository")
 if "oh-my-opencode.schema.json" in readme and "omo.schema.json" not in readme:
     err("README schema basename must be omo.schema.json (validate rejects oh-my-opencode.schema.json)")
 elif "omo.schema.json" in readme:
@@ -1979,7 +1975,7 @@ install_sh = open(os.path.join(repo, "install.sh"), encoding="utf-8").read()
 if "githubusercontent.com/openconfig/opencode-configs" in install_sh or "github.com/openconfig/opencode-configs" in install_sh:
     err("install.sh still points at github.com/openconfig/opencode-configs")
 else:
-    ok("install.sh distribution URL is jesseoue/opencode-configs")
+    ok("install.sh contains no obsolete openconfig/opencode-configs URL")
 
 zshrc = open(os.path.join(repo, "zshrc.snippet"), encoding="utf-8").read()
 if re.search(r"export OPENAI_API_KEY|OPENAI_API_KEY\|", zshrc):
@@ -2183,6 +2179,10 @@ else:
                 err("install.sh distribution ref drifted from signature.json github_ref")
             elif canonical_url not in readme or canonical_ref not in readme:
                 err("README bootstrap does not name the canonical repository and ref from signature.json")
+            elif upstream_url not in readme:
+                err("README does not name the upstream repository from signature.json")
+            elif v_ver and f"`{v_ver}`" not in readme:
+                err(f"README does not expose the OpenConfig version from versions.json ({v_ver})")
             else:
                 ok(f"canonical distribution {canonical_url}@{canonical_ref} references upstream {upstream_reference[:12]}…")
 

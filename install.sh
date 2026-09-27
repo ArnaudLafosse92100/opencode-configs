@@ -7,7 +7,7 @@
 #   ./install.sh [--dir PATH] [--skip-cli] [--yes] [--lazy|--full]
 #
 # Fresh machine (distribution URL is base64 — keeps tree free of host-owner literals):
-#   curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
+#   curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL21haW4vaW5zdGFsbC5zaA==' | base64 -d)" | bash
 #
 # Safety:
 #   • Refuses root; umask 077 for secret files
@@ -59,7 +59,7 @@ install.sh — OpenConfig (oc) installer
   ./install.sh [--dir PATH] [--log PATH] [--skip-cli] [--yes] [--lazy|--full]
 
   # Fresh machine (decode distribution raw URL, then pipe):
-  curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL2NvZGV4L2J1enotb3BlbmNvbmZpZy1yb3V0aW5nL2luc3RhbGwuc2g=' | base64 -d)" | bash
+  curl -fsSL "$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL21haW4vaW5zdGFsbC5zaA==' | base64 -d)" | bash
 
 Flags:
   --dir PATH   install/clone location (default: repo dir if local, else ~/opencode-configs)

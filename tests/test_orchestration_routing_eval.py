@@ -232,6 +232,13 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn('canonical callable identity of Prometheus', prompt)
         self.assertIn('Never target\n   `subagent_type="prometheus"`', definition)
         self.assertIn('Never target\n   `subagent_type="prometheus"`', prompt)
+        for rendered in (definition, prompt):
+            normalized = " ".join(rendered.split())
+            self.assertIn("one task-specific `.omo/plans/*.md` artifact", normalized)
+            self.assertIn("pass the exact `.omo/plans/*.md` path, not an inline substitute", normalized)
+            self.assertIn("revision of that same artifact", normalized)
+            self.assertIn("with the approved plan path", normalized)
+            self.assertIn("explicitly forbids `.omo`", normalized)
         self.assertIn("bounded Prometheus revision", definition)
         self.assertIn("Factory and Archon", definition)
         self.assertIn("never claim that Opus ran", definition)
