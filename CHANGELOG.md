@@ -1,5 +1,10 @@
 # Changelog
 
+- Standardize every OpenCode runtime binding and Factory/Archon workflow alias
+  on medium effort, preserving model selection, privacy boundaries, and fallback
+  chains while using the same balanced default across normal, private, and
+  pentest execution.
+
 - Make the automatic Sisyphus handoff persist Prometheus output to a single
   task-specific `.omo/plans/*.md` artifact, pass that exact path through Momus
   and Hephaestus, and distinguish workflow state from product/source edits.

@@ -135,7 +135,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         profiles = runtime_profile.RuntimeProfiles(REPO)
         self.assertEqual(
             profiles.policy_snapshot_id("pentest"),
-            "2ff0535cb518ae0140f54d54da1b4341682b970d9ec98b3d50cd8bf1ce3370b9",
+            "4df616a0795cb73855594c7dc0a061b16f08030f50337e18f7ea6e4d9dcb2af5",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
@@ -508,8 +508,8 @@ class ExportRouteTests(unittest.TestCase):
         expected = {
             "primary": "openrouter/deepseek/deepseek-v4-flash-0731",
             "source_fallbacks": ["openrouter/deepseek/deepseek-v4-pro-0813"],
-            "reasoning": "low",
-            "variant": "low",
+            "reasoning": "medium",
+            "variant": "medium",
             "data_classification": "synthetic",
             "admission": "primary-only",
         }
@@ -694,7 +694,7 @@ class WorkflowRouteTests(unittest.TestCase):
         )
         self.assertEqual(
             opencode["bindings"]["agents"]["momus"],
-            {"capability": "architecture", "effort": "xhigh"},
+            {"capability": "architecture", "effort": "medium"},
         )
         aliases = payload["surfaces"]["factory-archon"]["aliases"]
         for binding in aliases.values():
@@ -884,10 +884,10 @@ class WorkflowRouteTests(unittest.TestCase):
         tools["capabilities"]["pasted-context"]["requires_tools"] = True
         mutations.append((tools, "tool capability incompatibility"))
         workflow_effort = json.loads(json.dumps(self.profile_data))
-        workflow_effort["capabilities"]["adjudication"]["primary"] = "deepseek-flash-openrouter"
+        workflow_effort["qualified_models"]["opus-subscription"]["supported_efforts"] = ["low"]
         mutations.append((workflow_effort, "workflow effort incompatibility"))
         review_effort = json.loads(json.dumps(self.profile_data))
-        review_effort["capabilities"]["review"]["primary"] = "deepseek-flash-openrouter"
+        review_effort["qualified_models"]["opus-subscription"]["supported_efforts"] = ["high"]
         mutations.append((review_effort, "workflow effort incompatibility"))
         duplicate_runtime = json.loads(json.dumps(self.profile_data))
         duplicate_runtime["qualified_models"]["deepseek-flash-openrouter-alias"] = json.loads(
@@ -987,9 +987,9 @@ class WorkflowRouteTests(unittest.TestCase):
         ):
             profiles = runtime_profile.RuntimeProfiles(REPO)
             rendered = json.loads((profiles.render("normal", force=True) / "oh-my-openagent.json").read_text())
-        self.assertEqual(rendered["agents"]["momus"]["reasoning"], "xhigh")
-        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["reasoning"], "high")
-        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["variant"], "high")
+        self.assertEqual(rendered["agents"]["momus"]["reasoning"], "medium")
+        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["reasoning"], "medium")
+        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["variant"], "medium")
 
     def test_resolve_reports_binding_effort_not_baseline_omo_reasoning(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1000,8 +1000,8 @@ class WorkflowRouteTests(unittest.TestCase):
             (repo / "runtime-profile.json").write_text(json.dumps(data))
             (repo / "oh-my-openagent.json").write_text(json.dumps(omo))
             resolved = runtime_profile.RuntimeProfiles(repo).resolve("normal", "agents", "momus")
-        self.assertEqual(resolved["reasoning"], "xhigh")
-        self.assertEqual(resolved["variant"], "max")
+        self.assertEqual(resolved["reasoning"], "medium")
+        self.assertEqual(resolved["variant"], "medium")
 
     def test_runtime_policy_contract_is_model_neutral_and_private_snapshot_ignores_unexported_workflow(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)

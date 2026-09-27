@@ -554,7 +554,7 @@
       "allow_metered_fallback": false,
       "requires_tools": true,
       "workflow_efforts": [
-        "low"
+        "medium"
       ]
     },
     "implementation": {
@@ -588,7 +588,7 @@
       "allow_metered_fallback": false,
       "requires_tools": true,
       "workflow_efforts": [
-        "high"
+        "medium"
       ]
     },
     "review": {
@@ -605,7 +605,7 @@
       "allow_metered_fallback": false,
       "requires_tools": true,
       "workflow_efforts": [
-        "high"
+        "medium"
       ]
     },
     "adjudication": {
@@ -622,7 +622,7 @@
       "allow_metered_fallback": false,
       "requires_tools": true,
       "workflow_efforts": [
-        "high"
+        "medium"
       ]
     },
     "vision": {
@@ -788,8 +788,8 @@
         "source_fallbacks": [
           "openrouter/deepseek/deepseek-v4-pro-0813"
         ],
-        "reasoning": "low",
-        "variant": "low",
+        "reasoning": "medium",
+        "variant": "medium",
         "data_classification": "synthetic",
         "admission": "primary-only"
       }
@@ -802,7 +802,7 @@
       "aliases": {
         "@explorer": {
           "capability": "exploration",
-          "default_effort": "low"
+          "default_effort": "medium"
         },
         "@implementer": {
           "capability": "implementation",
@@ -810,15 +810,15 @@
         },
         "@architect": {
           "capability": "architecture",
-          "default_effort": "high"
+          "default_effort": "medium"
         },
         "@reviewer": {
           "capability": "review",
-          "default_effort": "high"
+          "default_effort": "medium"
         },
         "@adjudicator": {
           "capability": "adjudication",
-          "default_effort": "high"
+          "default_effort": "medium"
         }
       }
     }
@@ -859,43 +859,43 @@
         "agents": {
           "codex-router": {
             "capability": "architecture",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus": {
             "capability": "architecture",
-            "effort": "low"
+            "effort": "medium"
           },
           "hephaestus": {
             "capability": "implementation",
-            "effort": "high"
+            "effort": "medium"
           },
           "prometheus": {
             "capability": "architecture",
-            "effort": "low"
+            "effort": "medium"
           },
           "plan": {
             "capability": "architecture",
-            "effort": "low"
+            "effort": "medium"
           },
           "atlas": {
             "capability": "implementation",
-            "effort": "low"
+            "effort": "medium"
           },
           "oracle": {
             "capability": "architecture",
-            "effort": "high"
+            "effort": "medium"
           },
           "librarian": {
             "capability": "exploration",
-            "effort": "low"
+            "effort": "medium"
           },
           "explore": {
             "capability": "exploration",
-            "effort": "low"
+            "effort": "medium"
           },
           "multimodal-looker": {
             "capability": "vision",
-            "effort": "low"
+            "effort": "medium"
           },
           "metis": {
             "capability": "architecture",
@@ -903,73 +903,73 @@
           },
           "momus": {
             "capability": "architecture",
-            "effort": "xhigh"
+            "effort": "medium"
           },
           "sisyphus-junior": {
             "capability": "exploration",
-            "effort": "low"
+            "effort": "medium"
           },
           "content-aware-research": {
             "capability": "content-research",
-            "effort": "high"
+            "effort": "medium"
           },
           "sisyphus-deepseek": {
             "capability": "deepseek-specialist",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-deepseek-junior": {
             "capability": "deepseek-junior",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-venice-deepseek": {
             "capability": "content-research",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-venice-deepseek-flash-junior": {
             "capability": "content-fast",
-            "effort": "low"
+            "effort": "medium"
           },
           "content-aware-fast": {
             "capability": "content-fast",
-            "effort": "low"
+            "effort": "medium"
           },
           "context-aware-hermes": {
             "capability": "pasted-context",
-            "effort": "high"
+            "effort": "medium"
           }
         },
         "categories": {
           "visual-engineering": {
             "capability": "vision",
-            "effort": "high"
+            "effort": "medium"
           },
           "ultrabrain": {
             "capability": "architecture",
-            "effort": "xhigh"
+            "effort": "medium"
           },
           "deep": {
             "capability": "implementation",
-            "effort": "high"
+            "effort": "medium"
           },
           "agentic-deep-kimi": {
             "capability": "agentic-code",
-            "effort": "high"
+            "effort": "medium"
           },
           "artistry": {
             "capability": "vision",
-            "effort": "high"
+            "effort": "medium"
           },
           "quick": {
             "capability": "exploration",
-            "effort": "low"
+            "effort": "medium"
           },
           "unspecified-low": {
             "capability": "exploration",
-            "effort": "low"
+            "effort": "medium"
           },
           "unspecified-high": {
             "capability": "architecture",
-            "effort": "high"
+            "effort": "medium"
           },
           "writing": {
             "capability": "writing",
@@ -977,23 +977,23 @@
           },
           "bug-hunt": {
             "capability": "implementation",
-            "effort": "low"
+            "effort": "medium"
           },
           "refactor-safe": {
             "capability": "implementation",
-            "effort": "low"
+            "effort": "medium"
           },
           "arch-review": {
             "capability": "architecture",
-            "effort": "high"
+            "effort": "medium"
           },
           "content-aware-fast": {
             "capability": "content-fast",
-            "effort": "low"
+            "effort": "medium"
           },
           "content-aware-deep": {
             "capability": "content-research",
-            "effort": "high"
+            "effort": "medium"
           }
         }
       }
@@ -1015,43 +1015,43 @@
         "agents": {
           "codex-router": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "hephaestus": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "prometheus": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "plan": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "atlas": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "oracle": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "librarian": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "explore": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "multimodal-looker": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "metis": {
             "capability": "private-text",
@@ -1059,73 +1059,73 @@
           },
           "momus": {
             "capability": "private-text",
-            "effort": "xhigh"
+            "effort": "medium"
           },
           "sisyphus-junior": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "content-aware-research": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "content-aware-fast": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "context-aware-hermes": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "sisyphus-deepseek": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-deepseek-junior": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-venice-deepseek": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "sisyphus-venice-deepseek-flash-junior": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           }
         },
         "categories": {
           "visual-engineering": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "ultrabrain": {
             "capability": "private-text",
-            "effort": "xhigh"
+            "effort": "medium"
           },
           "deep": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "agentic-deep-kimi": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "artistry": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "quick": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "unspecified-low": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "unspecified-high": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "writing": {
             "capability": "private-text",
@@ -1133,23 +1133,23 @@
           },
           "bug-hunt": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "refactor-safe": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "arch-review": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           },
           "content-aware-fast": {
             "capability": "private-text",
-            "effort": "low"
+            "effort": "medium"
           },
           "content-aware-deep": {
             "capability": "private-text",
-            "effort": "high"
+            "effort": "medium"
           }
         }
       }
