@@ -33,11 +33,11 @@ EXPORT_ROUTE_FIELDS = {
 WORKFLOW_ROUTE_NAMES = {"exploration", "implementation", "architecture", "review", "adjudication"}
 WORKFLOW_ROUTE_ORDER = ("exploration", "implementation", "architecture", "review", "adjudication")
 WORKFLOW_ROUTE_EFFORTS = {
-    "exploration": ["low"],
+    "exploration": ["medium"],
     "implementation": ["medium"],
-    "architecture": ["high"],
-    "review": ["high"],
-    "adjudication": ["high"],
+    "architecture": ["medium"],
+    "review": ["medium"],
+    "adjudication": ["medium"],
 }
 FACTORY_ARCHON_ALIAS_NAMES = {
     "@explorer", "@implementer", "@architect", "@reviewer", "@adjudicator",

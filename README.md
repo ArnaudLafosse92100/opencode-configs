@@ -203,7 +203,7 @@ OpenCode TUI sessions continue to use `sisyphus`.
 | `visual-engineering` | Runtime-profile routed | Ship UI |
 | `artistry` | Runtime-profile routed | Design direction |
 | `quick` | `runtime-profile.json` | Cheap fast tasks |
-| `deep` / `ultrabrain` | `runtime-profile.json` | Heavy / max reasoning |
+| `deep` / `ultrabrain` | `runtime-profile.json` | Complex implementation / architecture, medium effort |
 | `unspecified-low` / `unspecified-high` | Runtime-profile routed | Hyperplan critics |
 
 ---
@@ -328,11 +328,11 @@ references for each core capability.
 
 | Capability | Model reference | Provider / transport | Billing | Qualified | Workflow effort |
 | --- | --- | --- | --- | --- | --- |
-| `exploration` | `deepseek-flash-openrouter` | `pi` / `openrouter-pi` | `metered` | yes | `low` |
+| `exploration` | `deepseek-flash-openrouter` | `pi` / `openrouter-pi` | `metered` | yes | `medium` |
 | `implementation` | `sol-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `medium` |
-| `architecture` | `astra-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `high` |
-| `review` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
-| `adjudication` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
+| `architecture` | `astra-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `medium` |
+| `review` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `medium` |
+| `adjudication` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `medium` |
 
 All 5 workflow routes have empty fallback lists, and producer validation
 checks Factory/Archon surface support, transport identity, privacy, tools,
@@ -350,11 +350,11 @@ aliases under a separate `manifest_snapshot_id`:
 
 | Factory/Archon alias | Capability | Default effort |
 | --- | --- | --- |
-| `@explorer` | `exploration` | `low` |
+| `@explorer` | `exploration` | `medium` |
 | `@implementer` | `implementation` | `medium` |
-| `@architect` | `architecture` | `high` |
-| `@reviewer` | `review` | `high` |
-| `@adjudicator` | `adjudication` | `high` |
+| `@architect` | `architecture` | `medium` |
+| `@reviewer` | `review` | `medium` |
+| `@adjudicator` | `adjudication` | `medium` |
 
 Workflow node-to-alias assignments remain owned by the Archon workflow;
 the manifest does not reclassify OpenCode agents such as Metis or Momus.
