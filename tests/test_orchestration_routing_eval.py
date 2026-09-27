@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import pathlib
 import tempfile
@@ -220,6 +221,24 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("content-aware-deep", prompt)
         self.assertIn("service-role keys", prompt)
         self.assertIn("Do not route these briefs to generic `deep`", prompt)
+        for role in ("explore", "librarian", "metis", "prometheus", "momus", "hephaestus", "oracle"):
+            self.assertIn(f'subagent_type="{role}"', definition)
+            self.assertIn(f'subagent_type="{role}"', prompt)
+        self.assertIn("bounded Prometheus revision", definition)
+        self.assertIn("Factory and Archon", definition)
+        self.assertIn("never claim that Opus ran", definition)
+        self.assertNotIn("`codex-plan`", definition)
+        self.assertNotIn("`codex-implement`", definition)
+        self.assertNotIn("`codex-review`", definition)
+        config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
+        self.assertEqual(config["agents"]["prometheus"]["mode"], "all")
+        self.assertEqual(config["agents"]["hephaestus"]["mode"], "all")
+        self.assertEqual(config["agents"]["sisyphus"]["mode"], "primary")
+        global_policy = (REPO / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle", global_policy)
+        self.assertIn("Factory/Archon is never entered automatically", global_policy)
+        for removed in ("codex-plan", "codex-implement", "codex-review"):
+            self.assertNotIn(removed, global_policy)
 
     def test_live_canary_targets_codex_router(self) -> None:
         self.assertEqual(runner.DEFAULT_AGENT, "codex-router")

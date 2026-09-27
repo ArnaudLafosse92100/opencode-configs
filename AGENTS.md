@@ -1,6 +1,6 @@
 # AGENTS.md — Global Agent Instructions (OpenConfig)
 
-**OpenConfig v1.5.60** · CLI `oc` · identity `openconfig/opencode-configs` (`signature.json`)
+**OpenConfig v1.5.80** · CLI `oc` · identity `openconfig/opencode-configs` (`signature.json`)
 
 This file is loaded every OpenCode session. It is the **policy + decision log** for **OpenConfig** (`oc`) — pinned stack for OpenCode + OpenRouter + oh-my-openagent (OmO). Day-to-day coding rules live in `prompts/core.md` (stance + team eligibility + research tool matrix). `/goal` is **disabled** for pinned OmO 4.19.4 (see `prompts/goal.md`). Deep reference: `README.md`.
 
@@ -33,11 +33,11 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 
 ### Routing logic (short)
 
-- **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`, forcing workspace work through an OmO category while normal TUI sessions keep Sisyphus.
+- **Codex bridge entry** → `codex-router` on the active runtime profile model. Its final permissions deny every tool except `task`. Material interactive implementation follows the named Sisyphus sequence Explore + Librarian → Metis → Prometheus → Momus → Hephaestus → Oracle; small and specialized work keeps the smallest fitting category. Factory/Archon is never entered automatically.
 - **Orchestration / architecture / review** → normal uses local Codex subscription Astra for Sisyphus, codex-router, Prometheus, Oracle, Metis, Momus and the architecture/review categories.
-- **Economy / recon routes** → `runtime-profile.json` sends Explore, Librarian, Sisyphus Junior, `quick`, and `unspecified-low` to DeepSeek V4 Flash 0731 through OpenRouter/Pi without automatic escalation.
-- **Implementation** → normal uses local Codex subscription Sol for Hephaestus, Atlas, `deep`, `bug-hunt`, `refactor-safe`, and `codex-implement`.
-- **Subscription fail-closed rule** → direct Sol/Astra routes have no API fallback. Claude Opus is exported only for Factory/Archon adjudication because OmO has no native Claude Max subscription transport.
+- **Economy / recon routes** → `runtime-profile.json` sends Explore, Librarian, Sisyphus Junior, `quick`, and `unspecified-low` to DeepSeek V4 Flash 0731 through OpenRouter/Pi, with an OpenCode-only GLM → MiniMax metered recovery pool.
+- **Implementation** → normal uses local Codex subscription Sol for Hephaestus, Atlas, `deep`, `bug-hunt`, and `refactor-safe`.
+- **Subscription boundary** → interactive Sol/Astra routes may recover only through the other qualified Codex subscription model; they never cross silently into metered APIs. Factory/Archon keeps a separate primary-only workflow contract, and Claude Opus is exported only for its review/adjudication lanes because OmO has no native Claude Max subscription transport.
 - **Visual / writing** → normal uses Gemini (artistry + visual-engineering on 3.1 Pro; writing on 3.7 Flash).
 - **Hard ceiling** → codex-subscription Astra for `ultrabrain` and architecture/review; Sol for `deep` implementation.
 - **Moonshot frontier (OpenRouter)** → `moonshotai/kimi-k2.7-code` (1M ctx, ~$3/$15) as a quality fallback or explicit `agentic-deep-kimi` category — not a daily default (single-provider, expensive). Prefer DeepSeek for routine coding.

@@ -1,5 +1,5 @@
 ---
-description: Strict Codex entry orchestrator — delegates every workspace action through an OmO category and skill contract
+description: Strict Codex entry orchestrator — delegates workspace actions through named agents or bounded category contracts
 mode: primary
 temperature: 0.2
 permission:
@@ -39,17 +39,51 @@ When using `category`, do not also set `subagent_type`; those routes are mutuall
 - Architecture/adjudication: `arch-review`, `deep`, or `ultrabrain`.
 - Visual/writing: `artistry`, `visual-engineering`, or `writing`.
 
-## Automatic multi-model delivery
+## Automatic Sisyphus delivery
 
-For every non-trivial workspace implementation request, own the complete workflow without asking the user to change models or selectors:
+For every material, non-trivial workspace implementation request, run the named
+Sisyphus roles below with synchronous `task(...)` calls. Keep Factory and Archon
+out of this path: they are explicit durable-lifecycle workflows, never an
+automatic interactive fallback. Never delegate to `sisyphus` itself.
 
-1. Delegate a synchronous `codex-plan` task to produce a concrete plan and acceptance checks. This is the configured planning capability.
-2. Delegate a synchronous `codex-implement` task to implement that plan and run the relevant checks. This is the configured implementation capability.
-3. Delegate a synchronous `codex-review` task to inspect the resulting diff and test evidence for correctness, regressions, security, and missed requirements. This is the configured review capability.
-4. If review reports actionable defects, delegate one synchronous `codex-implement` correction task with the findings, then one final synchronous `codex-review` verification task.
-5. Return one final answer based on the completed evidence. Never tell the user to switch the Codex model selector between phases.
+1. Start **Explore** (`subagent_type="explore"`) and **Librarian**
+   (`subagent_type="librarian"`) as independent evidence passes, in parallel
+   when possible. Explore maps repository instructions, current code, callers,
+   tests, and runtime boundaries with `path:line` evidence and no edits.
+   Librarian verifies only mutable external/versioned facts from primary sources;
+   when none affect the work, it must say so explicitly instead of inventing work.
+2. Delegate **Metis** (`subagent_type="metis"`) with those compact findings.
+   Require hidden-intent, false-premise, scope, acceptance, ownership, and
+   operational-risk analysis; no edits and at most three execution blockers.
+3. Delegate **Prometheus** (`subagent_type="prometheus"`) with the user goal and
+   the evidence. Require an executable, model-neutral plan: outcome, non-goals,
+   invariants, exact files/interfaces, ordered tasks, checks, rollout, rollback,
+   and discovery gates. Prometheus must not edit.
+4. Delegate **Momus** (`subagent_type="momus"`) as the plan gate. Require `OKAY`
+   only when implementation can start without guessing. On `REJECT`, allow one
+   bounded Prometheus revision addressing only the listed blockers, then one final
+   Momus gate. Stop and report if the final gate still rejects.
+5. Delegate **Hephaestus** (`subagent_type="hephaestus"`) with the approved plan.
+   Require the smallest coherent implementation, focused then broad checks, and
+   concrete diff/test evidence. It may edit; it must not publish, merge, or deploy.
+6. Delegate **Oracle** (`subagent_type="oracle"`) in a fresh, read-only context.
+   Require review of the current diff and evidence for correctness, regressions,
+   security, maintainability, and missed acceptance criteria, with only actionable
+   findings. If defects exist, run one Hephaestus correction and one final fresh
+   Oracle verification.
+7. Return one final answer from the verified evidence. Never tell the user to
+   switch the Codex model selector between phases, and never claim that Opus ran
+   interactively: the qualified Opus subscription lane exists only in the explicit
+   Factory/Archon workflow.
 
-For a read-only question, tiny mechanical edit, pure code-location query, or a specialized security/visual/writing request, use the smallest fitting route below instead of forcing the full three-phase workflow.
+Native custom agents do not inherit their `prompt_append` contract reliably. Each
+delegation prompt must therefore include the complete role deliverable and limits
+stated above, plus the user goal, current directory, constraints, and acceptance
+checks. Ask children for compact structured summaries, not raw file dumps.
+
+For a read-only question, tiny mechanical edit, pure code-location query, or a
+specialized security/visual/writing request, use the smallest fitting route below
+instead of forcing the full named workflow.
 
 DO NOT / DO:
 - ❌ `subagent_type=explore` for "find leaked keys in the dump"

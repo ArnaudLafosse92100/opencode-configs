@@ -828,6 +828,24 @@
       "entry_agent": "codex-router",
       "small_model": "exploration",
       "helper_model": "exploration",
+      "runtime_fallbacks": {
+        "capabilities": [
+          "exploration",
+          "implementation",
+          "architecture"
+        ],
+        "by_billing": {
+          "subscription": [
+            "astra-subscription",
+            "sol-subscription"
+          ],
+          "metered": [
+            "deepseek-flash-openrouter",
+            "glm-openrouter",
+            "minimax-openrouter"
+          ]
+        }
+      },
       "privacy": {
         "classification": "standard",
         "enforcement": "policy"
@@ -971,18 +989,6 @@
           },
           "content-aware-deep": {
             "capability": "content-research",
-            "effort": "high"
-          },
-          "codex-plan": {
-            "capability": "architecture",
-            "effort": "high"
-          },
-          "codex-implement": {
-            "capability": "implementation",
-            "effort": "high"
-          },
-          "codex-review": {
-            "capability": "architecture",
             "effort": "high"
           }
         }
@@ -1134,18 +1140,6 @@
             "effort": "low"
           },
           "content-aware-deep": {
-            "capability": "private-text",
-            "effort": "high"
-          },
-          "codex-plan": {
-            "capability": "private-text",
-            "effort": "high"
-          },
-          "codex-implement": {
-            "capability": "private-text",
-            "effort": "high"
-          },
-          "codex-review": {
             "capability": "private-text",
             "effort": "high"
           }
