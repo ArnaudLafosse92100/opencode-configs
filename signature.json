@@ -96,7 +96,7 @@
     "t3-opencode.json",
     "vault.json"
   ],
-  "fingerprint": "2157cdca1dae0b0c0eac0db1c08ac6ac3a589545afa32a1f089dfbf7aa008d01",
+  "fingerprint": "210c07ebebcdb12600fe752dbd46088a9e45f9bd398c8224aa4ba0ad5d6aeae7",
   "github_b64": "aHR0cHM6Ly9naXRodWIuY29tL0FybmF1ZExhZm9zc2U5MjEwMC9vcGVuY29kZS1jb25maWdz",
   "github_ref": "main",
   "upstream_github_b64": "aHR0cHM6Ly9naXRodWIuY29tL2plc3Nlb3VlL29wZW5jb2RlLWNvbmZpZ3M=",

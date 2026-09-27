@@ -85,10 +85,12 @@ if NO_COLOR=1 "$REPO/oc" help 2>&1 | grep -q $'\033'; then
 else
   ok "oc help respects NO_COLOR"
 fi
-if { "$REPO/oc" profile --help 2>&1 || true; } | grep -qF '[--schema-version 1|3|4]'; then
-  ok "oc profile help lists workflow export schemas 1|3|4"
+profile_help="$({ "$REPO/oc" profile --help 2>&1 || true; })"
+if grep -qF '[--schema-version 1|3|4]' <<<"$profile_help" \
+  && grep -qF 'export-policy-manifest <normal|normal-private|pentest>' <<<"$profile_help"; then
+  ok "oc profile help lists workflow schemas and canonical policy manifest"
 else
-  bad "oc profile help has stale workflow export schemas"
+  bad "oc profile help has stale workflow export contracts"
 fi
 if python3 - "$REPO" <<'PY'
 import os, subprocess, sys

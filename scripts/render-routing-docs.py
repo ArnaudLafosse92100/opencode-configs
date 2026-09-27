@@ -91,6 +91,7 @@ def workflow_routing(repo: Path) -> str:
     data = load_object(repo / "runtime-profile.json")
     models = data["qualified_models"]
     capabilities = data["capabilities"]
+    aliases = data["surface_bindings"]["factory-archon"]["aliases"]
     workflow_names = [
         name for name, capability in capabilities.items()
         if capability.get("workflow_efforts")
@@ -130,6 +131,21 @@ def workflow_routing(repo: Path) -> str:
         "workflow routes. `--schema-version 3` emits the derived previous contract;",
         "`--schema-version 1` projects implementation and architecture to the legacy",
         "`standard`/`frontier` pair.",
+        "",
+        "`oc profile export-policy-manifest normal` adds the complete canonical",
+        "cross-surface contract without changing the schema-v4 route export. It seals",
+        "the declarative OpenCode agent/category bindings and these Factory/Archon",
+        "aliases under a separate `manifest_snapshot_id`:",
+        "",
+        "| Factory/Archon alias | Capability | Effort |",
+        "| --- | --- | --- |",
+        *(
+            f"| `{alias}` | `{binding['capability']}` | `{binding['effort']}` |"
+            for alias, binding in aliases.items()
+        ),
+        "",
+        "Workflow node-to-alias assignments remain owned by the Archon workflow;",
+        "the manifest does not reclassify OpenCode agents such as Metis or Momus.",
         WORKFLOW_END,
     ])
     return "\n".join(lines)

@@ -658,6 +658,120 @@ class WorkflowRouteTests(unittest.TestCase):
         self.assertEqual(payload["schema_version"], 4)
         self.assertEqual(result.stdout.strip(), json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
+    def test_policy_manifest_exports_canonical_surface_bindings_without_reclassifying_agents(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        with mock.patch.object(runtime_profile, "repository_identity", return_value=("0" * 40, False)):
+            payload = profiles.export_policy_manifest("normal")
+        self.assertEqual(
+            set(payload),
+            {
+                "schema_version", "repository_revision", "repository_dirty", "profile",
+                "policy_snapshot_id", "manifest_snapshot_id", "routes", "surfaces",
+            },
+        )
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(set(payload["routes"]), set(runtime_profile.WORKFLOW_ROUTE_NAMES))
+        self.assertEqual(set(payload["surfaces"]), {"opencode", "factory-archon"})
+        opencode = payload["surfaces"]["opencode"]
+        self.assertEqual(
+            set(opencode), {"entry_agent", "small_model", "helper_model", "bindings"}
+        )
+        self.assertEqual(
+            opencode["bindings"]["agents"]["metis"],
+            {"capability": "architecture", "effort": "medium"},
+        )
+        self.assertEqual(
+            opencode["bindings"]["agents"]["momus"],
+            {"capability": "architecture", "effort": "xhigh"},
+        )
+        aliases = payload["surfaces"]["factory-archon"]["aliases"]
+        self.assertEqual(
+            {alias: binding["capability"] for alias, binding in aliases.items()},
+            {
+                "@explorer": "exploration",
+                "@implementer": "implementation",
+                "@architect": "architecture",
+                "@reviewer": "review",
+                "@adjudicator": "adjudication",
+            },
+        )
+        semantic = {
+            key: payload[key]
+            for key in ("schema_version", "profile", "policy_snapshot_id", "routes", "surfaces")
+        }
+        expected_digest = hashlib.sha256(
+            json.dumps(
+                semantic, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(payload["manifest_snapshot_id"], expected_digest)
+
+    def test_policy_manifest_cli_is_observational_and_canonical(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "state"
+            result = subprocess.run(
+                [str(REPO / "oc"), "profile", "export-policy-manifest", "normal"],
+                check=True, capture_output=True, text=True,
+                env={**os.environ, "OC_RUNTIME_STATE_DIR": str(state)},
+            )
+            self.assertFalse(state.exists())
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(result.stdout.strip(), json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    def test_manifest_snapshot_covers_alias_declarations_but_v4_export_stays_unchanged(self) -> None:
+        baseline = runtime_profile.RuntimeProfiles(REPO)
+        before_manifest = baseline.manifest_snapshot_id("normal")
+        before_v4 = baseline.export_workflow_routes("normal")
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            data["surface_bindings"]["factory-archon"]["aliases"]["@reviewer"]["effort"] = "xhigh"
+            with self.assertRaisesRegex(SystemExit, "alias effort mismatch"):
+                runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            aliases = data["surface_bindings"]["factory-archon"]["aliases"]
+            aliases["@reviewer"]["capability"], aliases["@adjudicator"]["capability"] = (
+                aliases["@adjudicator"]["capability"], aliases["@reviewer"]["capability"],
+            )
+            changed_aliases = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+            self.assertNotEqual(changed_aliases.manifest_snapshot_id("normal"), before_manifest)
+            with mock.patch.object(runtime_profile, "repository_identity", return_value=("0" * 40, False)):
+                alias_v4 = changed_aliases.export_workflow_routes("normal")
+            self.assertEqual(alias_v4["routes"], before_v4["routes"])
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            data["profiles"]["normal"]["bindings"]["agents"]["metis"]["effort"] = "high"
+            changed = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+            self.assertNotEqual(changed.manifest_snapshot_id("normal"), before_manifest)
+            with mock.patch.object(runtime_profile, "repository_identity", return_value=("0" * 40, False)):
+                changed_v4 = changed.export_workflow_routes("normal")
+        self.assertEqual(changed_v4["routes"], before_v4["routes"])
+
+    def test_policy_manifest_alias_contract_rejects_missing_extra_and_mismatched_bindings(self) -> None:
+        mutations = []
+        missing = json.loads(json.dumps(self.profile_data))
+        missing["surface_bindings"]["factory-archon"]["aliases"].pop("@reviewer")
+        mutations.append((missing, "canonical workflow aliases"))
+        extra = json.loads(json.dumps(self.profile_data))
+        extra["surface_bindings"]["factory-archon"]["aliases"]["@planner"] = {
+            "capability": "architecture", "effort": "high",
+        }
+        mutations.append((extra, "canonical workflow aliases"))
+        mismatch = json.loads(json.dumps(self.profile_data))
+        mismatch["surface_bindings"]["factory-archon"]["aliases"]["@reviewer"]["capability"] = "architecture"
+        mutations.append((mismatch, "invalid factory-archon alias capability"))
+        for data, message in mutations:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(SystemExit, message):
+                    runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+
+    def test_private_and_pentest_policy_manifests_fail_closed(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        for profile in ("normal-private", "pentest"):
+            with self.subTest(profile=profile), self.assertRaisesRegex(SystemExit, "policy manifest unavailable"):
+                profiles.export_policy_manifest(profile)
+
     def test_legacy_v1_and_v3_exports_are_derived_rollback_views(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)
         v1 = profiles.export_workflow_routes("normal", 1)

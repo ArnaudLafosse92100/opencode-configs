@@ -39,6 +39,9 @@ WORKFLOW_ROUTE_EFFORTS = {
     "review": ["high"],
     "adjudication": ["high"],
 }
+FACTORY_ARCHON_ALIAS_NAMES = {
+    "@explorer", "@implementer", "@architect", "@reviewer", "@adjudicator",
+}
 MODEL_FIELDS = {
     "runtime_model", "provider", "model", "billing", "transport", "active",
     "qualified", "supported_efforts", "privacy_classes", "modalities",
@@ -507,6 +510,7 @@ class RuntimeProfiles:
         self.capabilities = self.data.get("capabilities")
         self.promotion_gates = self.data.get("promotion_gates")
         self.retry_policies = self.data.get("retry_policies")
+        self.surface_bindings = self.data.get("surface_bindings")
         profiles = self.data.get("profiles")
         if not isinstance(self.models, dict) or not self.models:
             raise SystemExit("qualified_models must be a non-empty object")
@@ -516,6 +520,8 @@ class RuntimeProfiles:
             raise SystemExit("promotion_gates must be an object")
         if not isinstance(self.retry_policies, dict):
             raise SystemExit("retry_policies must be an object")
+        if not isinstance(self.surface_bindings, dict) or set(self.surface_bindings) != {"factory-archon"}:
+            raise SystemExit("surface_bindings must declare exactly factory-archon")
         if not isinstance(profiles, dict) or set(profiles) != set(VALID_PROFILES):
             raise SystemExit(f"profiles must declare exactly {', '.join(VALID_PROFILES)}")
         for reference, model in self.models.items():
@@ -636,6 +642,26 @@ class RuntimeProfiles:
                 or retry.get("terminal_on_exhaustion") is not True
             ):
                 raise SystemExit(f"invalid retry policy: {capability_name}")
+        factory_archon = self.surface_bindings["factory-archon"]
+        if not isinstance(factory_archon, dict) or set(factory_archon) != {"aliases"}:
+            raise SystemExit("invalid factory-archon surface binding")
+        aliases = factory_archon.get("aliases")
+        if not isinstance(aliases, dict) or set(aliases) != FACTORY_ARCHON_ALIAS_NAMES:
+            raise SystemExit("factory-archon aliases must declare the canonical workflow aliases")
+        alias_capabilities = set()
+        for alias, binding in aliases.items():
+            if not isinstance(binding, dict) or set(binding) != {"capability", "effort"}:
+                raise SystemExit(f"invalid factory-archon alias binding: {alias}")
+            capability_name = binding.get("capability")
+            if capability_name not in WORKFLOW_ROUTE_NAMES or capability_name in alias_capabilities:
+                raise SystemExit(f"invalid factory-archon alias capability: {alias}")
+            alias_capabilities.add(capability_name)
+            if binding["effort"] not in EFFORTS:
+                raise SystemExit(f"invalid factory-archon alias effort: {alias}")
+            if [binding["effort"]] != WORKFLOW_ROUTE_EFFORTS[capability_name]:
+                raise SystemExit(f"factory-archon alias effort mismatch: {alias}")
+        if alias_capabilities != WORKFLOW_ROUTE_NAMES:
+            raise SystemExit("factory-archon aliases must cover every workflow capability")
         for profile in VALID_PROFILES:
             selected = profiles[profile]
             if not isinstance(selected, dict):
@@ -1157,9 +1183,7 @@ class RuntimeProfiles:
             **copy.deepcopy(route),
         }
 
-    def export_workflow_routes(self, profile: str, schema_version: int = 4) -> dict:
-        if profile != "normal":
-            raise SystemExit(f"workflow routes unavailable for profile: {profile}")
+    def _workflow_routes_v4(self) -> dict:
         routes = {}
         for name in WORKFLOW_ROUTE_ORDER:
             capability = self.capabilities[name]
@@ -1175,6 +1199,12 @@ class RuntimeProfiles:
                 "qualified": model["qualified"],
                 "fallbacks": list(capability["fallbacks"]),
             }
+        return routes
+
+    def export_workflow_routes(self, profile: str, schema_version: int = 4) -> dict:
+        if profile != "normal":
+            raise SystemExit(f"workflow routes unavailable for profile: {profile}")
+        routes = self._workflow_routes_v4()
         if schema_version == 1:
             routes = {
                 "standard": routes["implementation"],
@@ -1200,6 +1230,44 @@ class RuntimeProfiles:
             "profile": profile,
             **({"policy_snapshot_id": self.policy_snapshot_id(profile)} if schema_version == 4 else {}),
             "routes": copy.deepcopy(routes),
+        }
+
+    def _policy_manifest_semantic(self, profile: str) -> dict:
+        if profile != "normal":
+            raise SystemExit(f"policy manifest unavailable for profile: {profile}")
+        policy = self.data["profiles"][profile]
+        opencode = {
+            "entry_agent": policy["entry_agent"],
+            "small_model": policy["small_model"],
+            "helper_model": policy["helper_model"],
+            "bindings": copy.deepcopy(policy["bindings"]),
+        }
+        return {
+            "schema_version": 1,
+            "profile": profile,
+            "policy_snapshot_id": self.policy_snapshot_id(profile),
+            "routes": self._workflow_routes_v4(),
+            "surfaces": {
+                "opencode": opencode,
+                "factory-archon": copy.deepcopy(self.surface_bindings["factory-archon"]),
+            },
+        }
+
+    def manifest_snapshot_id(self, profile: str) -> str:
+        canonical = json.dumps(
+            self._policy_manifest_semantic(profile),
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")
+        return hashlib.sha256(canonical).hexdigest()
+
+    def export_policy_manifest(self, profile: str) -> dict:
+        semantic = self._policy_manifest_semantic(profile)
+        revision, dirty = repository_identity(self.repo)
+        return {
+            **semantic,
+            "repository_revision": revision,
+            "repository_dirty": dirty,
+            "manifest_snapshot_id": self.manifest_snapshot_id(profile),
         }
 
     def source_fingerprint(self) -> str:
@@ -1807,6 +1875,8 @@ def parser() -> argparse.ArgumentParser:
     export_workflow_routes = sub.add_parser("export-workflow-routes")
     export_workflow_routes.add_argument("profile", choices=VALID_PROFILES)
     export_workflow_routes.add_argument("--schema-version", type=int, choices=(1, 3, 4), default=4)
+    export_policy_manifest = sub.add_parser("export-policy-manifest")
+    export_policy_manifest.add_argument("profile", choices=VALID_PROFILES)
     return result
 
 
@@ -1818,6 +1888,9 @@ def main() -> int:
         return 0
     if args.command == "export-workflow-routes":
         print(json.dumps(profiles.export_workflow_routes(args.profile, args.schema_version), ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "export-policy-manifest":
+        print(json.dumps(profiles.export_policy_manifest(args.profile), ensure_ascii=False, sort_keys=True))
         return 0
     with profiles.locked():
         profiles.assert_native_migration_safe()

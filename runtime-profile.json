@@ -797,6 +797,32 @@
     "normal-private": {},
     "pentest": {}
   },
+  "surface_bindings": {
+    "factory-archon": {
+      "aliases": {
+        "@explorer": {
+          "capability": "exploration",
+          "effort": "low"
+        },
+        "@implementer": {
+          "capability": "implementation",
+          "effort": "medium"
+        },
+        "@architect": {
+          "capability": "architecture",
+          "effort": "high"
+        },
+        "@reviewer": {
+          "capability": "review",
+          "effort": "high"
+        },
+        "@adjudicator": {
+          "capability": "adjudication",
+          "effort": "high"
+        }
+      }
+    }
+  },
   "profiles": {
     "normal": {
       "entry_agent": "codex-router",

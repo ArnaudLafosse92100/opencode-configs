@@ -332,6 +332,22 @@ or used by the OpenConfig runtime. `normal-private` and `pentest` export no
 workflow routes. `--schema-version 3` emits the derived previous contract;
 `--schema-version 1` projects implementation and architecture to the legacy
 `standard`/`frontier` pair.
+
+`oc profile export-policy-manifest normal` adds the complete canonical
+cross-surface contract without changing the schema-v4 route export. It seals
+the declarative OpenCode agent/category bindings and these Factory/Archon
+aliases under a separate `manifest_snapshot_id`:
+
+| Factory/Archon alias | Capability | Effort |
+| --- | --- | --- |
+| `@explorer` | `exploration` | `low` |
+| `@implementer` | `implementation` | `medium` |
+| `@architect` | `architecture` | `high` |
+| `@reviewer` | `review` | `high` |
+| `@adjudicator` | `adjudication` | `high` |
+
+Workflow node-to-alias assignments remain owned by the Archon workflow;
+the manifest does not reclassify OpenCode agents such as Metis or Momus.
 <!-- END GENERATED: workflow-routing -->
 
 OpenRouter owns heterogeneous metered model lanes such as DeepSeek, Gemini, Kimi, Hermes, and MiniMax. GPT Astra/Sol roles use the local OpenCodex service through the Codex subscription and never fall back automatically to OpenRouter. Specialized API routes retain only their documented capability-specific chains. Stream timeouts: **600s**.
