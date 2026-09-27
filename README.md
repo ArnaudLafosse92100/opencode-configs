@@ -321,8 +321,8 @@ references for each core capability.
 | `exploration` | `deepseek-flash-openrouter` | `pi` / `openrouter-pi` | `metered` | yes | `low` |
 | `implementation` | `sol-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `medium` |
 | `architecture` | `astra-subscription` | `codex` / `codex-subscription` | `subscription` | yes | `high` |
-| `review` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | **no — promotion gated** | `high` |
-| `adjudication` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | **no — promotion gated** | `high` |
+| `review` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
+| `adjudication` | `opus-subscription` | `claude` / `claude-subscription` | `subscription` | yes | `high` |
 
 All 5 workflow routes have empty fallback lists, and producer validation
 checks Factory/Archon surface support, transport identity, privacy, tools,

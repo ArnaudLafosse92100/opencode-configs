@@ -1,9 +1,7 @@
 {
   "schema_version": 4,
   "default_profile": "normal",
-  "promotion_gates": {
-    "opus-subscription": "live end-to-end v3 qualification receipt required before promotion"
-  },
+  "promotion_gates": {},
   "retry_policies": {
     "private-text": {
       "primary_attempts": 4,
@@ -126,7 +124,7 @@
       "billing": "subscription",
       "transport": "claude-subscription",
       "active": true,
-      "qualified": false,
+      "qualified": true,
       "supported_efforts": [
         "low",
         "medium",

@@ -744,7 +744,7 @@ class WorkflowRouteTests(unittest.TestCase):
         identity["qualified_models"]["sol-subscription"]["runtime_model"] = "openrouter/evil/model"
         mutations.append((identity, "runtime model identity mismatch"))
         gated = json.loads(json.dumps(self.profile_data))
-        gated["qualified_models"]["opus-subscription"]["qualified"] = True
+        gated["promotion_gates"]["opus-subscription"] = "qualification pending"
         mutations.append((gated, "promotion-gated model must remain unqualified"))
         factory_surface = json.loads(json.dumps(self.profile_data))
         factory_surface["capabilities"]["implementation"]["primary"] = "deepseek-pro-direct"
@@ -910,7 +910,16 @@ class WorkflowRouteTests(unittest.TestCase):
             self.assertNotEqual(relevant_profiles.policy_snapshot_id("normal"), before)
         with tempfile.TemporaryDirectory() as directory:
             wording_only = json.loads(json.dumps(self.profile_data))
-            wording_only["promotion_gates"]["opus-subscription"] = "same gate, revised human explanation"
+            unused = json.loads(
+                json.dumps(wording_only["qualified_models"]["minimax-openrouter"])
+            )
+            unused["runtime_model"] = "openrouter/example/gated-unused"
+            unused["model"] = "openrouter/example/gated-unused"
+            unused["qualified"] = False
+            wording_only["qualified_models"]["gated-unused"] = unused
+            wording_only["promotion_gates"]["gated-unused"] = (
+                "human-only qualification explanation"
+            )
             wording_profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, wording_only))
             self.assertEqual(wording_profiles.policy_snapshot_id("normal"), before)
 
@@ -933,8 +942,11 @@ class WorkflowRouteTests(unittest.TestCase):
         self.assertEqual(contract["policy_snapshot_id"], profiles.policy_snapshot_id("normal"))
         self.assertEqual(metadata["schema_version"], 4)
 
-    def test_opus_promotion_receipt_remains_an_explicit_gate(self) -> None:
-        self.assertIn("live end-to-end v3 qualification receipt required", self.profile_data["promotion_gates"]["opus-subscription"])
+    def test_opus_live_qualification_is_promoted_without_a_stale_gate(self) -> None:
+        self.assertTrue(
+            self.profile_data["qualified_models"]["opus-subscription"]["qualified"]
+        )
+        self.assertNotIn("opus-subscription", self.profile_data["promotion_gates"])
 
 
 class NativeOmoMigrationTests(unittest.TestCase):
