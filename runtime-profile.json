@@ -873,6 +873,10 @@
             "capability": "architecture",
             "effort": "low"
           },
+          "plan": {
+            "capability": "architecture",
+            "effort": "low"
+          },
           "atlas": {
             "capability": "implementation",
             "effort": "low"
@@ -1022,6 +1026,10 @@
             "effort": "high"
           },
           "prometheus": {
+            "capability": "private-text",
+            "effort": "low"
+          },
+          "plan": {
             "capability": "private-text",
             "effort": "low"
           },

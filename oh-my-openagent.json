@@ -64,6 +64,19 @@
         "codex-subscription/gpt-5.6-sol"
       ]
     },
+    "plan": {
+      "mode": "subagent",
+      "name": "Prometheus - Delegated Planner",
+      "temperature": 0.25,
+      "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
+      "color": "#B967FF",
+      "maxTokens": 32768,
+      "model": "codex-subscription/gpt-6-astra",
+      "reasoning": "low",
+      "fallback_models": [
+        "codex-subscription/gpt-5.6-sol"
+      ]
+    },
     "atlas": {
       "mode": "primary",
       "temperature": 0.2,

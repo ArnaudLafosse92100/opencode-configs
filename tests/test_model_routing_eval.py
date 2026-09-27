@@ -135,7 +135,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         profiles = runtime_profile.RuntimeProfiles(REPO)
         self.assertEqual(
             profiles.policy_snapshot_id("pentest"),
-            "69fcff53a27f810abcec7e5b550761d7e245fb19631a7292e94086fd1a1170f9",
+            "2ff0535cb518ae0140f54d54da1b4341682b970d9ec98b3d50cd8bf1ce3370b9",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:

@@ -221,9 +221,13 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("content-aware-deep", prompt)
         self.assertIn("service-role keys", prompt)
         self.assertIn("Do not route these briefs to generic `deep`", prompt)
-        for role in ("explore", "librarian", "metis", "prometheus", "momus", "hephaestus", "oracle"):
+        for role in ("explore", "librarian", "metis", "momus", "hephaestus", "oracle"):
             self.assertIn(f'subagent_type="{role}"', definition)
             self.assertIn(f'subagent_type="{role}"', prompt)
+        self.assertIn('subagent_type="plan"', definition)
+        self.assertIn('subagent_type="plan"', prompt)
+        self.assertIn('Never\n   target `subagent_type="prometheus"`', definition)
+        self.assertIn('Never\n   target `subagent_type="prometheus"`', prompt)
         self.assertIn("bounded Prometheus revision", definition)
         self.assertIn("Factory and Archon", definition)
         self.assertIn("never claim that Opus ran", definition)
@@ -232,6 +236,12 @@ class PromptContractTests(unittest.TestCase):
         self.assertNotIn("`codex-review`", definition)
         config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
         self.assertEqual(config["agents"]["prometheus"]["mode"], "all")
+        self.assertEqual(config["agents"]["plan"]["mode"], "subagent")
+        self.assertEqual(config["agents"]["plan"]["name"], "Prometheus - Delegated Planner")
+        self.assertEqual(config["agents"]["plan"]["prompt_append"], config["agents"]["prometheus"]["prompt_append"])
+        profiles = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))["profiles"]
+        for profile in ("normal", "pentest"):
+            self.assertEqual(profiles[profile]["bindings"]["agents"]["plan"], profiles[profile]["bindings"]["agents"]["prometheus"])
         self.assertEqual(config["agents"]["hephaestus"]["mode"], "all")
         self.assertEqual(config["agents"]["sisyphus"]["mode"], "primary")
         global_policy = (REPO / "AGENTS.md").read_text(encoding="utf-8")
