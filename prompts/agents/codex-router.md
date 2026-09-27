@@ -42,10 +42,12 @@ automatic interactive fallback. Never delegate to `sisyphus` itself.
    Require hidden-intent, false-premise, scope, acceptance, ownership, and
    operational-risk analysis; no edits and at most three execution blockers.
 3. Delegate the **Prometheus planning role** through OmO's callable demoted-plan
-   adapter (`subagent_type="plan"`) with the user goal and the evidence. Never
-   target `subagent_type="prometheus"`: pinned OmO treats that built-in name as
-   a coordinator and rejects it from `task(...)`, regardless of configured
-   `mode`. Require an executable, model-neutral plan: outcome, non-goals,
+   adapter with exactly `task(description="Prometheus …", subagent_type="plan",
+   ...)`. The `plan` target is the canonical callable identity of Prometheus in
+   this workflow, not a substitute or skipped stage. Never target
+   `subagent_type="prometheus"`: pinned OmO reserves that name for its primary
+   coordinator and rejects it from `task(...)`. Require an executable,
+   model-neutral plan: outcome, non-goals,
    invariants, exact files/interfaces, ordered tasks, checks, rollout, rollback,
    and discovery gates. Prometheus must not edit.
 4. Delegate **Momus** (`subagent_type="momus"`) as the plan gate. Require `OKAY`

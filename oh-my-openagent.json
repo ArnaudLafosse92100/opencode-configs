@@ -53,7 +53,7 @@
       ]
     },
     "prometheus": {
-      "mode": "all",
+      "mode": "primary",
       "temperature": 0.25,
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
@@ -66,7 +66,7 @@
     },
     "plan": {
       "mode": "subagent",
-      "name": "Prometheus - Delegated Planner",
+      "name": "Prometheus - Plan Builder",
       "temperature": 0.25,
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
