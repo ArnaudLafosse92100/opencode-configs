@@ -85,6 +85,11 @@ if NO_COLOR=1 "$REPO/oc" help 2>&1 | grep -q $'\033'; then
 else
   ok "oc help respects NO_COLOR"
 fi
+if { "$REPO/oc" profile --help 2>&1 || true; } | grep -qF '[--schema-version 1|3|4]'; then
+  ok "oc profile help lists workflow export schemas 1|3|4"
+else
+  bad "oc profile help has stale workflow export schemas"
+fi
 if python3 - "$REPO" <<'PY'
 import os, subprocess, sys
 repo = sys.argv[1]
@@ -279,13 +284,15 @@ fi
 # In pentest mode, every listed agent/category must take the fixed price-capped
 # Flash 0731 ZDR Throughput then Pro 0813 ZDR Throughput path, with no other provider/model.
 if python3 -c '
-import json, sys
+import importlib.util, json, pathlib, sys
 omo=json.load(open(sys.argv[1]))
 profile=json.load(open(sys.argv[2]))
 prof=profile.get("default_profile", "normal")
-selected=profile.get(prof, {})
-if selected and "agents" not in selected and "categories" not in selected:
-    selected={"categories": selected}
+repo=pathlib.Path(sys.argv[3])
+spec=importlib.util.spec_from_file_location("openconfig_runtime_profile", repo / "scripts/runtime-profile.py")
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+selected=module.RuntimeProfiles(repo).selected(prof)
 expected={}
 for section in ("agents", "categories"):
     for name, cfg in (selected.get(section) or {}).items():
@@ -314,7 +321,7 @@ for section in ("agents", "categories"):
             continue
         if primary.startswith("openrouter/") and (not fbs or not fbs[0].startswith("codex-subscription/")):
             raise SystemExit(2)
-' "$REPO/oh-my-openagent.json" "$REPO/runtime-profile.json"; then
+' "$REPO/oh-my-openagent.json" "$REPO/runtime-profile.json" "$REPO"; then
   ok "fallback isolation, runtime-profile routing, and no paid OpenRouter GPT fallback"
 else
   bad "model fallback isolation drift"

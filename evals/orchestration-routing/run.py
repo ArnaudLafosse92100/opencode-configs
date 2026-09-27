@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import base64
 import datetime as dt
+import importlib.util
 import json
 import os
 import pathlib
@@ -100,33 +101,12 @@ def load_cases() -> dict:
     active = active_path.read_text(encoding="utf-8").strip() if active_path.is_file() else profiles.get("default_profile", "normal")
     if active not in ("normal", "normal-private", "pentest"):
         raise ValueError(f"invalid active profile state: {active!r}")
-    selected = profiles.get(active) or {}
-    # normal-private is declarative composition, not a copied route matrix.
-    # Resolve just the route fields the evaluator grades and remove excluded
-    # providers so its expected terminal models match the rendered profile.
-    if selected.get("compose"):
-        overlay = selected
-        base = profiles.get(selected["compose"])
-        if not isinstance(base, dict):
-            raise ValueError(f"active profile {active} has an invalid compose source")
-        selected = json.loads(json.dumps(base))
-        excluded = set((overlay.get("privacy") or {}).get("exclude_providers") or [])
-        replacement = overlay.get("non_openrouter_route")
-        if not isinstance(replacement, dict):
-            raise ValueError(f"active profile {active} has no private replacement route")
-        for section in ("agents", "categories"):
-            for route in (selected.get(section) or {}).values():
-                if isinstance(route, dict):
-                    chain = [route.get("model"), *(route.get("fallback_models") or [])]
-                    allowed = [
-                        ref for ref in chain
-                        if isinstance(ref, str) and ref.split("/", 1)[0] not in excluded
-                    ]
-                    if not allowed:
-                        route.clear()
-                        route.update(json.loads(json.dumps(replacement)))
-                        continue
-                    route["model"], route["fallback_models"] = allowed[0], allowed[1:]
+    spec = importlib.util.spec_from_file_location("openconfig_runtime_profile", REPO / "scripts/runtime-profile.py")
+    if spec is None or spec.loader is None:
+        raise ValueError("cannot load runtime profile resolver")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    selected = module.RuntimeProfiles(REPO).selected(active)
     categories = selected.get("categories") or {}
     for case in suite["cases"]:
         category = case.get("expected_category")

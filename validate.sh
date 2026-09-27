@@ -31,6 +31,7 @@ done
 
 python3 - "$VALIDATE_REPO" <<'PY'
 import json, sys, os, re, glob, subprocess
+from pathlib import Path
 
 repo = sys.argv[1]
 errors, warns, oks = [], [], []
@@ -727,7 +728,7 @@ if omo:
     # OpenRouter owns heterogeneous external models; GPT Sol/Terra use the
     # local Codex subscription only. Runtime profiles are the authority for routes
     # they list. Normal keeps broad fallbacks where useful; pentest keeps all
-    # listed agents/categories inside the GLM/DeepSeek-only lane.
+    # listed agents/categories inside the canonical private capability lane.
     forbidden_paid_gpt = (
         "openrouter/openai/gpt-5.6-sol",
         "openrouter/openai/gpt-5.6-terra",
@@ -738,36 +739,21 @@ if omo:
             runtime_profile_data = json.load(open(runtime_profile_path))
         except Exception:
             runtime_profile_data = {}
-    workflow_contract = runtime_profile_data.get("workflow_routes") if isinstance(runtime_profile_data, dict) else None
-    expected_workflow_routes = {
-        "exploration": {
-            "provider": "pi", "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-            "billing": "metered", "active": True, "qualified": True, "fallbacks": [],
-        },
-        "implementation": {
-            "provider": "codex", "model": "gpt-5.6-sol",
-            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
-        },
-        "architecture": {
-            "provider": "codex", "model": "gpt-6-astra",
-            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
-        },
-        "adjudication": {
-            "provider": "claude", "model": "claude-opus-5-5",
-            "billing": "subscription", "active": True, "qualified": True, "fallbacks": [],
-        },
-    }
-    if not isinstance(workflow_contract, dict) or workflow_contract.get("schema_version") != 3:
-        err("runtime-profile.json: workflow_routes must use schema_version 3")
-    else:
-        workflow_profiles = workflow_contract.get("profiles")
-        if not isinstance(workflow_profiles, dict) or set(workflow_profiles) != {"normal", "normal-private", "pentest"}:
-            err("runtime-profile.json: workflow_routes profiles must be normal, normal-private, and pentest")
-        elif workflow_profiles.get("normal") != expected_workflow_routes or workflow_profiles.get("normal-private") != {} or workflow_profiles.get("pentest") != {}:
-            err("runtime-profile.json: workflow_routes v3 capability contract drifted")
-        else:
-            ok("workflow_routes v3 exports Flash exploration, Sol implementation, Astra architecture, and Claude adjudication")
-    selected_profile = runtime_profile_data.get(default_profile) if isinstance(runtime_profile_data, dict) else {}
+    runtime_profiles = None
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("openconfig_runtime_profile", os.path.join(repo, "scripts", "runtime-profile.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        runtime_profiles = module.RuntimeProfiles(Path(repo))
+        if set(module.WORKFLOW_ROUTE_NAMES) - set(runtime_profiles.capabilities):
+            raise ValueError("incomplete workflow capability export")
+        if not re.fullmatch(r"[0-9a-f]{64}", runtime_profiles.policy_snapshot_id("normal")):
+            raise ValueError("invalid policy snapshot id")
+        ok("workflow_routes v4 derives all workflow capabilities from qualified model bindings")
+    except Exception as exc:
+        err(f"runtime-profile.json: invalid v4 policy: {exc}")
+    selected_profile = runtime_profiles.selected(default_profile) if runtime_profiles else {}
     if selected_profile and "agents" not in selected_profile and "categories" not in selected_profile:
         # Backward-compatible schema v1: category map at profile root.
         selected_profile = {"categories": selected_profile}
@@ -793,9 +779,9 @@ if omo:
         provider, model_id = ref.split("/", 1)
         pcfg = provider_configs.get(provider) or {}
         return (pcfg.get("models") or {}).get(model_id)
-    normal_profile = _normalize_profile(runtime_profile_data.get("normal") if isinstance(runtime_profile_data, dict) else {})
-    normal_private_profile = _normalize_profile(runtime_profile_data.get("normal-private") if isinstance(runtime_profile_data, dict) else {})
-    pentest_profile = _normalize_profile(runtime_profile_data.get("pentest") if isinstance(runtime_profile_data, dict) else {})
+    normal_profile = _normalize_profile(runtime_profiles.selected("normal") if runtime_profiles else {})
+    normal_private_profile = _normalize_profile(runtime_profiles.selected("normal-private") if runtime_profiles else {})
+    pentest_profile = _normalize_profile(runtime_profiles.selected("pentest") if runtime_profiles else {})
     selected_profile = _normalize_profile(selected_profile)
     pentest_pro = "openrouter/deepseek/deepseek-v4-pro-0813"
     pentest_pro_throughput = "openrouter/deepseek/deepseek-v4-pro-0813-zdr-throughput"
@@ -2243,6 +2229,63 @@ for md in sorted(glob.glob(os.path.join(repo, "agents", "*.md"))):
         err(f"{rel}: unterminated frontmatter block")
     else:
         ok(f"frontmatter present: {rel}")
+
+generic_agents = {
+    "atlas", "codex-router", "explore", "hephaestus", "librarian", "metis",
+    "momus", "multimodal-looker", "oracle", "prometheus", "sisyphus-junior", "sisyphus",
+}
+physical_model = re.compile(r"openrouter/|codex-subscription/|gpt-[0-9]|deepseek-v[0-9]|gemini-[0-9]|glm-[0-9]|claude-opus", re.I)
+for name in sorted(generic_agents):
+    path = os.path.join(repo, "agents", f"{name}.md")
+    text = open(path, encoding="utf-8").read()
+    if physical_model.search(text):
+        err(f"agents/{name}.md: generic agent metadata must not name a physical model")
+if not any("generic agent metadata" in message for message in errors):
+    ok("generic agent metadata is model-neutral")
+
+provider_bound_agents = {
+    "content-aware-fast", "content-aware-research", "context-aware-hermes",
+    "sisyphus-deepseek", "sisyphus-deepseek-junior",
+    "sisyphus-venice-deepseek", "sisyphus-venice-deepseek-flash-junior",
+}
+runtime_identity = re.compile(r"(?:openrouter|codex-subscription|deepseek|venice)/[a-z0-9._/-]+", re.I)
+stale_cross_lane = re.compile(r"default (?:openconfig )?lead remains|not openrouter|not venice|\(venice, tools\)", re.I)
+for name in sorted(provider_bound_agents):
+    path = os.path.join(repo, "agents", f"{name}.md")
+    text = open(path, encoding="utf-8").read()
+    frontmatter, body = text.split("---", 2)[1:]
+    match = re.search(r"^model:\s*(\S+)\s*$", frontmatter, re.M)
+    allowed = match.group(1) if match else None
+    identities = set(runtime_identity.findall(body))
+    if allowed is None or any(identity != allowed for identity in identities):
+        err(f"agents/{name}.md: provider-bound body contains a cross-lane model identity")
+    if stale_cross_lane.search(body):
+        err(f"agents/{name}.md: provider-bound body contains stale cross-lane routing prose")
+    prompt_path = os.path.join(repo, "prompts", "agents", f"{name}.md")
+    if os.path.isfile(prompt_path) and allowed:
+        prompt = open(prompt_path, encoding="utf-8").read()
+        provider_prefix = allowed.split("/", 1)[0] + "/"
+        if any(not identity.startswith(provider_prefix) for identity in runtime_identity.findall(prompt)):
+            err(f"prompts/agents/{name}.md: provider-bound prompt contains a cross-lane model identity")
+        if stale_cross_lane.search(prompt):
+            err(f"prompts/agents/{name}.md: provider-bound prompt contains stale cross-lane routing prose")
+if not any("provider-bound body" in message for message in errors):
+    ok("provider-bound agent metadata retains only its own provider identity")
+
+provider_bound_profile_prompts = {"content-aware"}
+profile_model_identity = re.compile(
+    r"\b(?:astra|sol|deepseek|gemini|glm|kimi|minimax|hermes|opus)\b|"
+    r"(?:openrouter|codex-subscription|deepseek|venice)/|gpt-[0-9]",
+    re.I,
+)
+for path in sorted(glob.glob(os.path.join(repo, "prompts", "profiles", "*.md"))):
+    name = os.path.splitext(os.path.basename(path))[0]
+    if name in provider_bound_profile_prompts:
+        continue
+    if profile_model_identity.search(open(path, encoding="utf-8").read()):
+        err(f"prompts/profiles/{name}.md: generic profile prompt must not name a physical model")
+if not any("generic profile prompt" in message for message in errors):
+    ok("generic profile prompts are model-neutral outside the explicit provider-bound allowlist")
 
 # ---- report ----
 color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")

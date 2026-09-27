@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -83,6 +84,12 @@ class ContentAwareFallbackTests(unittest.TestCase):
         cls.config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
         cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
         cls.profile = cls.profile_data["default_profile"]
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        for profile in ("normal", "normal-private", "pentest"):
+            cls.profile_data[profile] = profiles.selected(profile)
+            for section in ("agents", "categories"):
+                for route in cls.profile_data[profile][section].values():
+                    route.pop("effort", None)
 
     def _selected_profile(self) -> dict:
         selected = self.profile_data[self.profile]
@@ -124,17 +131,18 @@ class ContentAwareFallbackTests(unittest.TestCase):
             for name, expected in selected.get(section, {}).items():
                 self.assertEqual(expected, {"model": flash, "fallback_models": [pro]}, f"{section}.{name}")
 
-    def test_pentest_routes_match_approved_zdr_manifest(self) -> None:
-        canonical = json.dumps(
-            self.profile_data["pentest"], sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+    def test_pentest_policy_snapshot_matches_reviewed_fixture(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
         self.assertEqual(
-            hashlib.sha256(canonical).hexdigest(),
-            "bddfae3efa857cb94a28bfdb1bbddc8e5d103d3f2c4330669edeae902fbb9f35",
+            profiles.policy_snapshot_id("pentest"),
+            "0656794a94eda0f4b77f9218ea6e50160bc1af9b75718bda0dc10b6135ef187c",
         )
 
     def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
         selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
+        private_primary = runtime_profile.RuntimeProfiles(REPO)._resolve_capability("private-text")["model"]
+        self.assertEqual(selected["small_model"], private_primary)
+        self.assertEqual(selected["helper_model"], private_primary)
         for section in ("agents", "categories"):
             for name, route in selected[section].items():
                 with self.subTest(section=section, name=name):
@@ -142,7 +150,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
                     self.assertTrue(all(model.startswith("openrouter/") for model in chain))
 
     def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
-        replacement = self.profile_data["normal-private"]["non_openrouter_route"]
+        replacement = runtime_profile.RuntimeProfiles(REPO)._resolve_capability("private-text")
         selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
         expected = {
             "agents": {
@@ -156,15 +164,16 @@ class ContentAwareFallbackTests(unittest.TestCase):
         for section, names in expected.items():
             for name in names:
                 with self.subTest(section=section, name=name):
-                    self.assertEqual(selected[section][name], replacement)
+                    self.assertEqual(selected[section][name]["model"], replacement["model"])
+                    self.assertEqual(selected[section][name]["fallback_models"], replacement["fallback_models"])
 
     def test_normal_private_rejects_an_invalid_replacement_route(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = pathlib.Path(directory)
-            data = json.loads(json.dumps(self.profile_data))
-            data["normal-private"]["non_openrouter_route"]["model"] = "venice/deepseek-v4-pro"
+            data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
+            data["profiles"]["normal-private"]["replacement_capability"] = "missing"
             (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
-            with self.assertRaisesRegex(SystemExit, "invalid normal-private.non_openrouter_route"):
+            with self.assertRaisesRegex(SystemExit, "invalid composed profile"):
                 runtime_profile.RuntimeProfiles(repo)
 
     def test_new_upstream_models_are_available(self) -> None:
@@ -185,6 +194,9 @@ class ContentAwareFallbackTests(unittest.TestCase):
         self.assertNotIn("subscription-gateway", opencode["provider"])
         codex = opencode["provider"]["codex-subscription"]
         self.assertEqual(codex["options"]["baseURL"], "http://127.0.0.1:10100/v1")
+        self.assertEqual(codex["options"]["timeout"], 3_600_000)
+        self.assertEqual(codex["options"]["headerTimeout"], 3_600_000)
+        self.assertEqual(codex["options"]["chunkTimeout"], 3_600_000)
         self.assertEqual(
             set(codex["models"]),
             {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
@@ -375,11 +387,12 @@ class ContentAwareFallbackTests(unittest.TestCase):
         ):
             rendered = runtime_profile.RuntimeProfiles(REPO).render("pentest", force=True)
             prompt = (rendered / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
-            self.assertIn("starts on DeepSeek V4 Flash 0731 ZDR Throughput", prompt)
-            self.assertIn("retries Flash exactly three times", prompt)
-            self.assertIn("exactly one DeepSeek V4 Pro 0813 ZDR Throughput attempt", prompt)
-            self.assertIn("that failure is terminal", prompt)
-            self.assertIn("Do not dispatch GLM, GPT/codex-subscription, Kimi", prompt)
+            self.assertIn("canonical capability `private-text`", prompt)
+            self.assertIn("model ref `deepseek-flash-zdr`", prompt)
+            self.assertIn("4 total attempts (the initial attempt plus 3 retries)", prompt)
+            self.assertIn("model ref `deepseek-pro-zdr` for exactly 1 attempt", prompt)
+            self.assertIn("exhaustion is terminal", prompt)
+            self.assertIn("Do not dispatch a model outside this canonical capability chain", prompt)
             self.assertNotIn("pentest-safe routes use only GLM 5.3", prompt)
 
     def test_profile_activation_renders_external_state_without_mutating_sources(self) -> None:
@@ -561,9 +574,8 @@ class ExportRouteTests(unittest.TestCase):
     def test_export_validation_rejects_collisions_duplicates_and_invalid_chains(self) -> None:
         mutations = []
         collision = json.loads(json.dumps(self.profile_data))
-        collision["normal"]["categories"]["security-strix-scan"] = {
-            "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-            "fallback_models": [],
+        collision["profiles"]["normal"]["bindings"]["categories"]["security-strix-scan"] = {
+            "capability": "exploration", "effort": "low"
         }
         mutations.append((collision, "collides with runtime route"))
         duplicate = json.loads(json.dumps(self.profile_data))
@@ -613,206 +625,316 @@ class WorkflowRouteTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
 
-    def test_normal_contract_has_exact_qualified_capability_routes(self) -> None:
-        contract = self.profile_data["workflow_routes"]
-        self.assertEqual(contract["schema_version"], 3)
-        self.assertEqual(set(contract["profiles"]), {"normal", "normal-private", "pentest"})
-        self.assertEqual(contract["profiles"]["normal-private"], {})
-        self.assertEqual(contract["profiles"]["pentest"], {})
-        self.assertEqual(
-            contract["profiles"]["normal"],
-            {
-                "exploration": {
-                    "provider": "pi",
-                    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-                    "billing": "metered",
-                    "active": True,
-                    "qualified": True,
-                    "fallbacks": [],
-                },
-                "implementation": {
-                    "provider": "codex",
-                    "model": "gpt-5.6-sol",
-                    "billing": "subscription",
-                    "active": True,
-                    "qualified": True,
-                    "fallbacks": [],
-                },
-                "architecture": {
-                    "provider": "codex",
-                    "model": "gpt-6-astra",
-                    "billing": "subscription",
-                    "active": True,
-                    "qualified": True,
-                    "fallbacks": [],
-                },
-                "adjudication": {
-                    "provider": "claude",
-                    "model": "claude-opus-5-5",
-                    "billing": "subscription",
-                    "active": True,
-                    "qualified": True,
-                    "fallbacks": [],
-                },
-            },
-        )
+    def _write_profile(self, directory: str, data: dict) -> pathlib.Path:
+        repo = pathlib.Path(directory)
+        (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+        return repo
 
-    def test_workflow_export_is_revision_bound_and_observational(self) -> None:
+    def test_v4_export_is_revision_bound_and_has_exact_route_contract(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        payload = profiles.export_workflow_routes("normal")
+        self.assertEqual(payload["schema_version"], 4)
+        self.assertRegex(payload["policy_snapshot_id"], r"^[0-9a-f]{64}$")
+        self.assertEqual(set(payload["routes"]), {"exploration", "implementation", "architecture", "review", "adjudication"})
+        expected_keys = {"model_ref", "provider", "model", "transport", "billing", "active", "qualified", "fallbacks"}
+        for route in payload["routes"].values():
+            self.assertEqual(set(route), expected_keys)
+        self.assertEqual(payload["routes"]["exploration"]["model_ref"], "deepseek-flash-openrouter")
+        self.assertEqual(payload["routes"]["implementation"]["model_ref"], "sol-subscription")
+        self.assertEqual(payload["routes"]["architecture"]["model_ref"], "astra-subscription")
+        self.assertEqual(payload["routes"]["review"]["model_ref"], "opus-subscription")
+        self.assertEqual(payload["routes"]["adjudication"]["model_ref"], "opus-subscription")
+
+    def test_workflow_export_cli_is_observational_and_defaults_to_v4(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             state = pathlib.Path(directory) / "state"
             result = subprocess.run(
                 [str(REPO / "oc"), "profile", "export-workflow-routes", "normal"],
-                check=True,
-                capture_output=True,
-                text=True,
+                check=True, capture_output=True, text=True,
                 env={**os.environ, "OC_RUNTIME_STATE_DIR": str(state)},
             )
-            self.assertFalse(state.exists(), "workflow export must not create runtime state")
+            self.assertFalse(state.exists())
         payload = json.loads(result.stdout)
-        revision = subprocess.run(
-            ["git", "-C", str(REPO), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        dirty = bool(
-            subprocess.run(
-                ["git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=normal"],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-        )
-        self.assertEqual(payload["schema_version"], 3)
-        self.assertEqual(payload["repository_revision"], revision)
-        self.assertEqual(payload["repository_dirty"], dirty)
-        self.assertEqual(payload["profile"], "normal")
-        self.assertEqual(
-            set(payload["routes"]),
-            {"exploration", "implementation", "architecture", "adjudication"},
-        )
-        self.assertEqual(
-            result.stdout.strip(),
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
-        )
+        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(result.stdout.strip(), json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
-    def test_private_and_pentest_workflow_exports_fail_closed(self) -> None:
+    def test_legacy_v1_and_v3_exports_are_derived_rollback_views(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)
-        for profile in ("normal-private", "pentest"):
-            with self.subTest(profile=profile), self.assertRaisesRegex(
-                SystemExit, f"workflow routes unavailable for profile: {profile}"
-            ):
-                profiles.export_workflow_routes(profile)
+        v1 = profiles.export_workflow_routes("normal", 1)
+        v3 = profiles.export_workflow_routes("normal", 3)
+        self.assertEqual(set(v1["routes"]), {"standard", "frontier"})
+        self.assertEqual(v1["routes"]["standard"]["model"], "gpt-5.6-sol")
+        self.assertEqual(v1["routes"]["frontier"]["model"], "gpt-6-astra")
+        self.assertNotIn("model_ref", v3["routes"]["exploration"])
+        self.assertNotIn("transport", v3["routes"]["exploration"])
+        self.assertNotIn("policy_snapshot_id", v3)
+        self.assertEqual(set(v3["routes"]), {"exploration", "implementation", "architecture", "adjudication"})
 
-    def test_workflow_contract_never_renders_into_omo(self) -> None:
+    def test_legacy_v3_adjudication_projects_adjudication_not_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            data["capabilities"]["review"]["primary"] = "astra-subscription"
+            profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+            with mock.patch.object(runtime_profile, "repository_identity", return_value=("0" * 40, True)):
+                v4 = profiles.export_workflow_routes("normal", 4)
+                v3 = profiles.export_workflow_routes("normal", 3)
+        self.assertEqual(v4["routes"]["review"]["model_ref"], "astra-subscription")
+        self.assertEqual(v4["routes"]["adjudication"]["model_ref"], "opus-subscription")
+        self.assertEqual(v3["routes"]["adjudication"]["model"], "claude-opus-5-5")
+
+    def test_single_exploration_binding_swap_updates_every_consumer_and_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            before = runtime_profile.RuntimeProfiles(REPO).policy_snapshot_id("normal")
+            data["capabilities"]["exploration"]["primary"] = "sol-subscription"
+            repo = self._write_profile(directory, data)
+            profiles = runtime_profile.RuntimeProfiles(repo)
+            selected = profiles.selected("normal")
+            consumers = [
+                ("agents", "librarian"), ("agents", "explore"),
+                ("agents", "sisyphus-junior"), ("categories", "quick"),
+                ("categories", "unspecified-low"),
+            ]
+            for section, name in consumers:
+                self.assertEqual(selected[section][name]["model"], "codex-subscription/gpt-5.6-sol")
+            self.assertEqual(selected["small_model"], "codex-subscription/gpt-5.6-sol")
+            self.assertEqual(selected["helper_model"], "codex-subscription/gpt-5.6-sol")
+            with mock.patch.object(runtime_profile, "repository_identity", return_value=("0" * 40, True)):
+                exported = profiles.export_workflow_routes("normal")
+            self.assertEqual(exported["routes"]["exploration"]["model_ref"], "sol-subscription")
+            self.assertEqual(exported["routes"]["exploration"]["billing"], "subscription")
+            self.assertNotEqual(exported["policy_snapshot_id"], before)
         with tempfile.TemporaryDirectory() as state, mock.patch.dict(
             os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
         ):
             profiles = runtime_profile.RuntimeProfiles(REPO)
-            for profile in ("normal", "normal-private", "pentest"):
-                with self.subTest(profile=profile):
-                    rendered = json.loads(
-                        (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
-                            encoding="utf-8"
-                        )
-                    )
-                    self.assertNotIn("workflow_routes", rendered)
+            profiles.capabilities["exploration"]["primary"] = "sol-subscription"
+            generation = profiles.render("normal", force=True)
+            omo = json.loads((generation / "oh-my-openagent.json").read_text())
+            opencode = json.loads((generation / "opencode.json").read_text())
+            for section, name in consumers:
+                self.assertEqual(omo[section][name]["model"], "codex-subscription/gpt-5.6-sol")
+            self.assertEqual(opencode["small_model"], "codex-subscription/gpt-5.6-sol")
+            for helper in ("title", "summary", "compaction"):
+                self.assertEqual(opencode["agent"][helper]["model"], "codex-subscription/gpt-5.6-sol")
 
-    def test_workflow_route_validation_is_billing_and_provider_strict(self) -> None:
+    def test_rejects_unqualified_effort_privacy_and_modality_incompatibility(self) -> None:
         mutations = []
-
-        missing_route = json.loads(json.dumps(self.profile_data))
-        del missing_route["workflow_routes"]["profiles"]["normal"]["architecture"]
-        mutations.append((missing_route, "must declare exactly adjudication, architecture, exploration, implementation"))
-
-        api_provider = json.loads(json.dumps(self.profile_data))
-        api_provider["workflow_routes"]["profiles"]["normal"]["implementation"]["provider"] = "openrouter"
-        mutations.append((api_provider, "invalid workflow route provider"))
-
-        pi_model = json.loads(json.dumps(self.profile_data))
-        pi_model["workflow_routes"]["profiles"]["normal"]["exploration"]["model"] = "deepseek-v4-flash-0731"
-        mutations.append((pi_model, "invalid Pi workflow route model"))
-
-        wrong_billing = json.loads(json.dumps(self.profile_data))
-        wrong_billing["workflow_routes"]["profiles"]["normal"]["exploration"]["billing"] = "subscription"
-        mutations.append((wrong_billing, "invalid workflow route billing"))
-
-        api_fallback = json.loads(json.dumps(self.profile_data))
-        api_fallback["workflow_routes"]["profiles"]["normal"]["architecture"]["fallbacks"] = [
-            "openrouter/z-ai/glm-5.3"
-        ]
-        mutations.append((api_fallback, "cannot declare fallbacks"))
-
         unqualified = json.loads(json.dumps(self.profile_data))
-        unqualified["workflow_routes"]["profiles"]["normal"]["implementation"]["qualified"] = False
-        mutations.append((unqualified, "inactive or unqualified"))
-
+        unqualified["qualified_models"]["deepseek-flash-openrouter"]["qualified"] = False
+        mutations.append((unqualified, "inactive or unqualified model"))
+        effort = json.loads(json.dumps(self.profile_data))
+        effort["profiles"]["normal"]["bindings"]["agents"]["explore"]["effort"] = "xhigh"
+        mutations.append((effort, "effort incompatibility"))
+        privacy = json.loads(json.dumps(self.profile_data))
+        privacy["capabilities"]["exploration"]["required_privacy"] = "zdr"
+        mutations.append((privacy, "privacy incompatibility"))
+        modality = json.loads(json.dumps(self.profile_data))
+        modality["capabilities"]["exploration"]["required_modalities"] = ["text", "multimodal"]
+        mutations.append((modality, "modality incompatibility"))
+        core_fallback = json.loads(json.dumps(self.profile_data))
+        core_fallback["capabilities"]["implementation"]["fallbacks"] = ["deepseek-pro-openrouter"]
+        core_fallback["capabilities"]["implementation"]["allow_metered_fallback"] = True
+        mutations.append((core_fallback, "route_v4_fallback_forbidden"))
+        implicit_metered = json.loads(json.dumps(self.profile_data))
+        implicit_metered["capabilities"]["pasted-context"]["primary"] = "sol-subscription"
+        implicit_metered["capabilities"]["pasted-context"]["fallbacks"] = ["deepseek-pro-openrouter"]
+        mutations.append((implicit_metered, "subscription to metered fallback requires explicit authorization"))
+        identity = json.loads(json.dumps(self.profile_data))
+        identity["qualified_models"]["sol-subscription"]["runtime_model"] = "openrouter/evil/model"
+        mutations.append((identity, "runtime model identity mismatch"))
+        gated = json.loads(json.dumps(self.profile_data))
+        gated["qualified_models"]["opus-subscription"]["qualified"] = True
+        mutations.append((gated, "promotion-gated model must remain unqualified"))
+        factory_surface = json.loads(json.dumps(self.profile_data))
+        factory_surface["capabilities"]["implementation"]["primary"] = "deepseek-pro-direct"
+        mutations.append((factory_surface, "factory-archon surface incompatibility"))
+        false_factory_surface = json.loads(json.dumps(self.profile_data))
+        false_factory_surface["qualified_models"]["deepseek-pro-direct"]["execution_surfaces"].append("factory-archon")
+        mutations.append((false_factory_surface, "unsupported factory-archon provider transport"))
+        tools = json.loads(json.dumps(self.profile_data))
+        tools["capabilities"]["pasted-context"]["requires_tools"] = True
+        mutations.append((tools, "tool capability incompatibility"))
+        workflow_effort = json.loads(json.dumps(self.profile_data))
+        workflow_effort["capabilities"]["adjudication"]["primary"] = "deepseek-flash-openrouter"
+        mutations.append((workflow_effort, "workflow effort incompatibility"))
+        review_effort = json.loads(json.dumps(self.profile_data))
+        review_effort["capabilities"]["review"]["primary"] = "deepseek-flash-openrouter"
+        mutations.append((review_effort, "workflow effort incompatibility"))
+        duplicate_runtime = json.loads(json.dumps(self.profile_data))
+        duplicate_runtime["qualified_models"]["deepseek-flash-openrouter-alias"] = json.loads(
+            json.dumps(duplicate_runtime["qualified_models"]["deepseek-flash-openrouter"])
+        )
+        mutations.append((duplicate_runtime, "duplicate executable runtime_model identity"))
         for data, message in mutations:
             with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
-                repo = pathlib.Path(directory)
-                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
+                repo = self._write_profile(directory, data)
                 with self.assertRaisesRegex(SystemExit, message):
                     runtime_profile.RuntimeProfiles(repo)
 
-    def test_workflow_routes_reject_sol_and_astra_canonical_drift(self) -> None:
-        mutations = []
+    def test_explicit_metered_fallback_opt_in_is_accepted_and_still_capability_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            capability = data["capabilities"]["pasted-context"]
+            capability["primary"] = "sol-subscription"
+            capability["fallbacks"] = ["deepseek-pro-openrouter"]
+            capability["allow_metered_fallback"] = True
+            profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+            route = profiles.selected("normal")["agents"]["context-aware-hermes"]
+        self.assertEqual(route["model"], "codex-subscription/gpt-5.6-sol")
+        self.assertEqual(route["fallback_models"], ["openrouter/deepseek/deepseek-v4-pro-0813"])
 
-        implementation_contract = json.loads(json.dumps(self.profile_data))
-        implementation_contract["workflow_routes"]["profiles"]["normal"]["implementation"][
-            "model"
-        ] = "gpt-5.6-terra"
-        mutations.append(
-            (implementation_contract, "normal.implementation must match normal.agents.hephaestus")
+    def test_every_runtime_binding_is_producer_validated(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        for profile in ("normal", "pentest"):
+            policy = profiles.data["profiles"][profile]
+            for section in ("agents", "categories"):
+                for name, binding in policy["bindings"][section].items():
+                    capability = profiles.capabilities[binding["capability"]]
+                    for reference in (capability["primary"], *capability["fallbacks"]):
+                        model = profiles.models[reference]
+                        with self.subTest(profile=profile, section=section, name=name, model=reference):
+                            self.assertTrue(model["active"])
+                            self.assertTrue(model["qualified"])
+                            self.assertIn("opencode", model["execution_surfaces"])
+                            self.assertIn(binding["effort"], model["supported_efforts"])
+                            self.assertIn(capability["required_privacy"], model["privacy_classes"])
+                            self.assertLessEqual(set(capability["required_modalities"]), set(model["modalities"]))
+                            if capability["requires_tools"]:
+                                self.assertTrue(model["tool_use"])
+        for capability_name in runtime_profile.WORKFLOW_ROUTE_NAMES:
+            capability = profiles.capabilities[capability_name]
+            self.assertIn("factory-archon", profiles.models[capability["primary"]]["execution_surfaces"])
+
+    def test_generic_agent_documents_are_model_neutral(self) -> None:
+        generic = (
+            "atlas", "codex-router", "explore", "hephaestus", "librarian", "metis",
+            "momus", "multimodal-looker", "oracle", "prometheus", "sisyphus-junior", "sisyphus",
         )
+        physical = re.compile(r"openrouter/|codex-subscription/|gpt-[0-9]|deepseek-v[0-9]|gemini-[0-9]|glm-[0-9]|claude-opus", re.I)
+        for name in generic:
+            text = (REPO / "agents" / f"{name}.md").read_text()
+            with self.subTest(agent=name):
+                self.assertIsNone(physical.search(text))
 
-        architecture_contract = json.loads(json.dumps(self.profile_data))
-        architecture_contract["workflow_routes"]["profiles"]["normal"]["architecture"][
-            "model"
-        ] = "gpt-5.6-sol"
-        mutations.append(
-            (architecture_contract, "normal.architecture must match normal.agents.codex-router")
+    def test_provider_bound_agent_bodies_do_not_claim_other_lanes(self) -> None:
+        provider_bound = (
+            "content-aware-fast", "content-aware-research", "context-aware-hermes",
+            "sisyphus-deepseek", "sisyphus-deepseek-junior",
+            "sisyphus-venice-deepseek", "sisyphus-venice-deepseek-flash-junior",
         )
+        identity = re.compile(r"(?:openrouter|codex-subscription|deepseek|venice)/[a-z0-9._/-]+", re.I)
+        stale = re.compile(r"default (?:openconfig )?lead remains|not openrouter|not venice|\(venice, tools\)", re.I)
+        for name in provider_bound:
+            text = (REPO / "agents" / f"{name}.md").read_text()
+            frontmatter, body = text.split("---", 2)[1:]
+            own = re.search(r"^model:\s*(\S+)\s*$", frontmatter, re.M)
+            with self.subTest(agent=name):
+                self.assertIsNotNone(own)
+                self.assertTrue(all(value == own.group(1) for value in identity.findall(body)))
+                self.assertIsNone(stale.search(body))
+                prompt_path = REPO / "prompts" / "agents" / f"{name}.md"
+                if prompt_path.is_file():
+                    prompt = prompt_path.read_text()
+                    provider_prefix = own.group(1).split("/", 1)[0] + "/"
+                    self.assertTrue(all(value.startswith(provider_prefix) for value in identity.findall(prompt)))
+                    self.assertIsNone(stale.search(prompt))
 
-        implementation = json.loads(json.dumps(self.profile_data))
-        implementation["normal"]["categories"]["deep"]["model"] = "codex-subscription/gpt-5.6-terra"
-        mutations.append((implementation, "normal.implementation must match normal.categories.deep"))
-
-        architecture = json.loads(json.dumps(self.profile_data))
-        architecture["normal"]["categories"]["codex-review"]["model"] = (
-            "codex-subscription/gpt-5.6-sol-review"
+    def test_generic_profile_prompts_are_model_neutral(self) -> None:
+        provider_bound_allowlist = {"content-aware"}
+        physical = re.compile(
+            r"\b(?:astra|sol|deepseek|gemini|glm|kimi|minimax|hermes|opus)\b|"
+            r"(?:openrouter|codex-subscription|deepseek|venice)/|gpt-[0-9]",
+            re.I,
         )
-        mutations.append((architecture, "normal.architecture must match normal.categories.codex-review"))
+        for path in sorted((REPO / "prompts/profiles").glob("*.md")):
+            if path.stem in provider_bound_allowlist:
+                continue
+            with self.subTest(profile=path.stem):
+                self.assertIsNone(physical.search(path.read_text()))
 
-        for data, message in mutations:
-            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
-                repo = pathlib.Path(directory)
-                (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
-                with self.assertRaisesRegex(SystemExit, message):
-                    runtime_profile.RuntimeProfiles(repo)
+    def test_rendered_routes_use_canonical_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            rendered = json.loads((profiles.render("normal", force=True) / "oh-my-openagent.json").read_text())
+        self.assertEqual(rendered["agents"]["momus"]["reasoning"], "xhigh")
+        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["reasoning"], "high")
+        self.assertEqual(rendered["categories"]["agentic-deep-kimi"]["variant"], "high")
 
-    def test_claude_adjudication_stays_external_workflow_only(self) -> None:
-        data = json.loads(json.dumps(self.profile_data))
-        data["normal"]["agents"]["momus"]["model"] = "claude-subscription/claude-opus-5-5"
+    def test_resolve_reports_binding_effort_not_baseline_omo_reasoning(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = pathlib.Path(directory)
-            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
-            with self.assertRaisesRegex(
-                SystemExit, "Claude adjudication is external-workflow-only"
-            ):
-                runtime_profile.RuntimeProfiles(repo)
+            data = json.loads(json.dumps(self.profile_data))
+            omo = json.loads((REPO / "oh-my-openagent.json").read_text())
+            omo["agents"]["momus"]["reasoning"] = "low"
+            (repo / "runtime-profile.json").write_text(json.dumps(data))
+            (repo / "oh-my-openagent.json").write_text(json.dumps(omo))
+            resolved = runtime_profile.RuntimeProfiles(repo).resolve("normal", "agents", "momus")
+        self.assertEqual(resolved["reasoning"], "xhigh")
+        self.assertEqual(resolved["variant"], "max")
 
-    def test_legacy_v1_export_is_an_explicit_rollback_view(self) -> None:
-        result = subprocess.run(
-            [str(REPO / "oc"), "profile", "export-workflow-routes", "normal", "--schema-version", "1"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema_version"], 1)
-        self.assertEqual(set(payload["routes"]), {"standard", "frontier"})
-        self.assertEqual(payload["routes"]["standard"]["model"], "gpt-5.6-sol")
-        self.assertEqual(payload["routes"]["frontier"]["model"], "gpt-6-astra")
+    def test_runtime_policy_contract_is_model_neutral_and_private_snapshot_ignores_unexported_workflow(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        contract = profiles.runtime_policy("normal")
+        self.assertEqual(set(contract), {"schema_version", "profile", "entry_agent", "policy_snapshot_id", "privacy", "admission"})
+        self.assertEqual(set(contract["admission"]), {"attachments", "multimodal", "unqualified_models", "capability_mismatch", "metered_fallback"})
+        serialized = json.dumps(contract).lower()
+        for identifier in ("deepseek", "gpt-", "claude", "gemini", "openrouter", "codex-subscription"):
+            self.assertNotIn(identifier, serialized)
+        with tempfile.TemporaryDirectory() as directory:
+            data = json.loads(json.dumps(self.profile_data))
+            private_before = profiles.policy_snapshot_id("normal-private")
+            pentest_before = profiles.policy_snapshot_id("pentest")
+            data["capabilities"]["exploration"]["primary"] = "sol-subscription"
+            changed = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
+            self.assertEqual(changed.policy_snapshot_id("normal-private"), private_before)
+            self.assertEqual(changed.policy_snapshot_id("pentest"), pentest_before)
+
+    def test_policy_snapshot_hashes_only_effective_transitive_closure(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        before = profiles.policy_snapshot_id("normal")
+        with tempfile.TemporaryDirectory() as directory:
+            unrelated = json.loads(json.dumps(self.profile_data))
+            unused = json.loads(json.dumps(unrelated["qualified_models"]["minimax-openrouter"]))
+            unused["runtime_model"] = "openrouter/example/unused"
+            unused["model"] = "openrouter/example/unused"
+            unrelated["qualified_models"]["unused-catalog-entry"] = unused
+            unrelated_profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, unrelated))
+            self.assertEqual(unrelated_profiles.policy_snapshot_id("normal"), before)
+        with tempfile.TemporaryDirectory() as directory:
+            relevant = json.loads(json.dumps(self.profile_data))
+            relevant["qualified_models"]["sol-subscription"]["modalities"].append("multimodal")
+            relevant_profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, relevant))
+            self.assertNotEqual(relevant_profiles.policy_snapshot_id("normal"), before)
+        with tempfile.TemporaryDirectory() as directory:
+            wording_only = json.loads(json.dumps(self.profile_data))
+            wording_only["promotion_gates"]["opus-subscription"] = "same gate, revised human explanation"
+            wording_profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, wording_only))
+            self.assertEqual(wording_profiles.policy_snapshot_id("normal"), before)
+
+    def test_private_and_pentest_workflow_exports_fail_closed(self) -> None:
+        profiles = runtime_profile.RuntimeProfiles(REPO)
+        for profile in ("normal-private", "pentest"):
+            with self.subTest(profile=profile), self.assertRaisesRegex(SystemExit, "workflow routes unavailable"):
+                profiles.export_workflow_routes(profile)
+
+    def test_runtime_contract_is_separate_from_omo(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            generation = profiles.render("normal", force=True)
+            rendered = json.loads((generation / "oh-my-openagent.json").read_text())
+            contract = json.loads((generation / ".runtime-policy.json").read_text())
+            metadata = json.loads((generation / ".runtime-profile.json").read_text())
+        self.assertNotIn("policy_snapshot_id", json.dumps(rendered))
+        self.assertEqual(contract["policy_snapshot_id"], profiles.policy_snapshot_id("normal"))
+        self.assertEqual(metadata["schema_version"], 4)
+
+    def test_opus_promotion_receipt_remains_an_explicit_gate(self) -> None:
+        self.assertIn("live end-to-end v3 qualification receipt required", self.profile_data["promotion_gates"]["opus-subscription"])
 
 
 class NativeOmoMigrationTests(unittest.TestCase):
@@ -888,12 +1010,12 @@ class PentestPromptOverlayTests(unittest.TestCase):
             router = (pentest / "agents/codex-router.md").read_text(encoding="utf-8")
             deep = (pentest / "prompts/categories/content-aware-deep.md").read_text(encoding="utf-8")
             for prompt in (router, deep):
-                self.assertIn("DeepSeek V4 Flash 0731 ZDR Throughput", prompt)
-                self.assertIn("retry Flash exactly three times", prompt)
-                self.assertIn("DeepSeek V4 Pro 0813 ZDR Throughput", prompt)
-                self.assertIn("exactly once", prompt)
-                self.assertIn("terminal failure", prompt)
-                self.assertIn("Do not dispatch GLM, GPT/codex-subscription, Kimi", prompt)
+                self.assertIn("canonical capability `private-text`", prompt)
+                self.assertIn("model ref `deepseek-flash-zdr`", prompt)
+                self.assertIn("4 total attempts (the initial attempt plus 3 retries)", prompt)
+                self.assertIn("model ref `deepseek-pro-zdr` for exactly 1 attempt", prompt)
+                self.assertIn("exhaustion is terminal", prompt)
+                self.assertIn("Do not dispatch a model outside this canonical capability chain", prompt)
                 self.assertNotIn("at most one", prompt)
                 self.assertNotIn("may be resumed once", prompt)
         self.assertEqual((REPO / "runtime-profile.json").read_bytes(), routes_before)
@@ -910,10 +1032,26 @@ class PentestPromptOverlayTests(unittest.TestCase):
     def test_overlay_helper_is_idempotent(self) -> None:
         relative = pathlib.Path("agents/codex-router.md")
         source = (REPO / relative).read_text(encoding="utf-8")
-        once = runtime_profile.render_pentest_prompt_overlay(source, "pentest", relative)
-        twice = runtime_profile.render_pentest_prompt_overlay(once, "pentest", relative)
+        policy = runtime_profile.RuntimeProfiles(REPO).pentest_policy_prose()
+        once = runtime_profile.render_pentest_prompt_overlay(source, "pentest", relative, policy)
+        twice = runtime_profile.render_pentest_prompt_overlay(once, "pentest", relative, policy)
         self.assertEqual(twice, once)
         self.assertEqual(runtime_profile.render_pentest_prompt_overlay(source, "normal", relative), source)
+
+    def test_pentest_prompt_render_follows_canonical_model_ref_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            capability = profiles.capabilities["private-text"]
+            capability["primary"], capability["fallbacks"] = "deepseek-pro-zdr", ["deepseek-flash-zdr"]
+            generation = profiles.render("pentest", force=True)
+            router = (generation / "agents/codex-router.md").read_text(encoding="utf-8")
+            sisyphus = (generation / "prompts/agents/sisyphus.md").read_text(encoding="utf-8")
+        for prompt in (router, sisyphus):
+            self.assertIn("model ref `deepseek-pro-zdr` for 4 total attempts", prompt)
+            self.assertIn("model ref `deepseek-flash-zdr` for exactly 1 attempt", prompt)
+            self.assertNotIn("model ref `deepseek-flash-zdr` for 4 total attempts", prompt)
 
 
 class CampaignLedgerTests(unittest.TestCase):

@@ -5,4 +5,4 @@ model: deepseek/deepseek-flash
 temperature: 0.2
 ---
 
-You are **sisyphus-deepseek-junior** — well-scoped executor on native `deepseek/deepseek-flash`. Not OpenRouter. Policy: `prompts/agents/sisyphus-deepseek-junior.md`.
+You are **sisyphus-deepseek-junior** — well-scoped executor on native `deepseek/deepseek-flash`. Policy: `prompts/agents/sisyphus-deepseek-junior.md`.

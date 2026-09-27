@@ -898,9 +898,9 @@
       "options": {
         "baseURL": "http://127.0.0.1:10100/v1",
         "apiKey": "local-loopback",
-        "timeout": 900000,
-        "headerTimeout": 900000,
-        "chunkTimeout": 900000
+        "timeout": 3600000,
+        "headerTimeout": 3600000,
+        "chunkTimeout": 3600000
       },
       "models": {
         "gpt-6-astra": {

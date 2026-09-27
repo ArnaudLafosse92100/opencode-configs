@@ -1,6 +1,6 @@
-# Category: unspecified-low (DeepSeek Flash 0731 Nitro)
+# Category: unspecified-low
 
-Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools. Uses DeepSeek V4 Flash 0731 without automatic escalation.
+Low-effort general work and hyperplan cheap critic. Keep turns short; batch tools. Uses the configured low-effort capability without implicit escalation.
 
 ## Do
 

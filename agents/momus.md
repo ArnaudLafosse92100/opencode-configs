@@ -1,7 +1,6 @@
 ---
-description: Plan / review gate on Astra subscription
+description: Plan / review gate on the configured adjudication capability
 mode: subagent
-model: openrouter/z-ai/glm-5.3
 temperature: 0.2
 ---
 

@@ -631,6 +631,10 @@ case "$*" in
     instance="$(printf '00000000-0000-4000-8000-%012d' "$count")"
     gateway_health=',"gateway_health":{"catalog_ok":null,"inference_last_success_at":null,"breaker_state":"closed","privacy_eligible":true,"enforcement":"passive"}'
     idempotency_ledger=',"idempotency_ledger":{"healthy":true,"error":null,"entries":0,"max_entries":10000,"remaining_capacity":10000}'
+    health_schema="${FAKE_HEALTH_SCHEMA:-2}"
+    health_v3_fields=''
+    [ "$health_schema" = 3 ] && health_v3_fields=',"runtime_digest":"'"${FAKE_HEALTH_RUNTIME_DIGEST:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"'","policy_snapshot_id":"'"${FAKE_HEALTH_POLICY_SNAPSHOT_ID:-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}"'"'
+    [ "${FAKE_HEALTH_V3_MALFORMED:-0}" = 1 ] && health_v3_fields=''
     case "${FAKE_GATEWAY_HEALTH:-valid}" in
       missing) gateway_health='';;
       malformed) gateway_health=',"gateway_health":{"catalog_ok":"unknown","inference_last_success_at":null,"breaker_state":"closed","privacy_eligible":true,"enforcement":"passive"}';;
@@ -640,10 +644,10 @@ case "$*" in
       malformed) idempotency_ledger=',"idempotency_ledger":{"healthy":true,"error":null,"entries":1,"max_entries":10000,"remaining_capacity":10000}';;
     esac
     if [ "${FAKE_PREVIOUS_503:-0}" = 1 ] && [ ! -f "$state.previous" ]; then
-      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":null,"error":"upstream recovering"%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger"
+      printf '{"schema_version":%s,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":false,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":null,"error":"upstream recovering"%s%s%s}\n' "$health_schema" "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger" "$health_v3_fields"
       case "$*" in *-fsS*) exit 22;; esac
     else
-      printf '{"schema_version":2,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":{"healthy":true},"error":null%s%s}\n' "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger"
+      printf '{"schema_version":%s,"service":"opencode-codex-bridge","launchd_label":"com.arnaud.opencode-codex-bridge","instance_id":"%s","pid":%s,"started_at":"2026-08-24T12:00:00Z","ok":true,"model":"opencode/router","active_executions":%s,"accepting_executions":true,"opencode":{"healthy":true},"error":null%s%s%s}\n' "$health_schema" "$instance" "${FAKE_HEALTH_PID:-${FAKE_LAUNCHD_PID:-$PPID}}" "${FAKE_ACTIVE_EXECUTIONS:-0}" "$gateway_health" "$idempotency_ledger" "$health_v3_fields"
     fi;;
   *) [ "${FAKE_HEALTH_FAIL:-0}" = 1 ] && exit 1 || exit 0;;
 esac
@@ -709,6 +713,37 @@ if PATH="$BRIDGE_FAKE:$PATH" OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PR
   && PATH="$BRIDGE_FAKE:$PATH" OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "${applied_cmd[@]}" | grep -q '"profile": "normal"'; then
   ok "verified bridge switch writes; ensure/current are generation no-ops"
 else bad "verified bridge applied marker"; fi
+V3_STATE="$TMP/v3-health-state"; V3_NATIVE="$TMP/v3-health-native/omo.jsonc"; V3_BRIDGE_STATE="$TMP/v3-health-bridge"
+if PATH="$BRIDGE_FAKE:$PATH" FAKE_HEALTH_SCHEMA=3 FAKE_BRIDGE_STATE="$V3_BRIDGE_STATE" FAKE_KICKSTART_RC=0 OC_RUNTIME_STATE_DIR="$V3_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/v3-health-prompts" OC_NATIVE_OMO_PATH="$V3_NATIVE" "$REPO/runtime-profile.sh" normal >/dev/null \
+  && [[ "$(OC_RUNTIME_STATE_DIR="$V3_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/v3-health-prompts" OC_NATIVE_OMO_PATH="$V3_NATIVE" "${applied_cmd[@]}")" != null ]]; then
+  ok "bridge health consumers accept strict schema v3 runtime identity"
+else bad "bridge schema v3 health compatibility"; fi
+for legacy_runtime in legacy aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; do
+  suffix="${legacy_runtime:0:6}"
+  legacy_state="$TMP/v3-legacy-$suffix-state"
+  if PATH="$BRIDGE_FAKE:$PATH" FAKE_HEALTH_SCHEMA=3 FAKE_HEALTH_RUNTIME_DIGEST="$legacy_runtime" FAKE_HEALTH_POLICY_SNAPSHOT_ID=legacy FAKE_BRIDGE_STATE="$TMP/v3-legacy-$suffix-bridge" FAKE_KICKSTART_RC=0 OC_RUNTIME_STATE_DIR="$legacy_state" OC_RUNTIME_PROMPT_DIR="$TMP/v3-legacy-$suffix-prompts" OC_NATIVE_OMO_PATH="$TMP/v3-legacy-$suffix-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null; then
+    ok "bridge schema v3 accepts coherent legacy identity ($suffix)"
+  else
+    bad "bridge schema v3 legacy identity compatibility ($suffix)"
+  fi
+done
+for runtime_policy in \
+  'legacy bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' \
+  'not-a-digest legacy'; do
+  read -r mixed_runtime mixed_policy <<<"$runtime_policy"
+  suffix="${mixed_runtime:0:6}-${mixed_policy:0:6}"
+  if PATH="$BRIDGE_FAKE:$PATH" FAKE_HEALTH_SCHEMA=3 FAKE_HEALTH_RUNTIME_DIGEST="$mixed_runtime" FAKE_HEALTH_POLICY_SNAPSHOT_ID="$mixed_policy" FAKE_BRIDGE_STATE="$TMP/v3-mixed-$suffix-bridge" OC_RUNTIME_STATE_DIR="$TMP/v3-mixed-$suffix-state" OC_RUNTIME_PROMPT_DIR="$TMP/v3-mixed-$suffix-prompts" OC_NATIVE_OMO_PATH="$TMP/v3-mixed-$suffix-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+    bad "bridge schema v3 rejects incoherent legacy identity ($suffix)"
+  else
+    ok "bridge schema v3 rejects incoherent legacy identity ($suffix)"
+  fi
+done
+V3_BAD_STATE="$TMP/v3-bad-health-state"
+if PATH="$BRIDGE_FAKE:$PATH" FAKE_HEALTH_SCHEMA=3 FAKE_HEALTH_V3_MALFORMED=1 FAKE_BRIDGE_STATE="$TMP/v3-bad-health-bridge" OC_RUNTIME_STATE_DIR="$V3_BAD_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/v3-bad-health-prompts" OC_NATIVE_OMO_PATH="$TMP/v3-bad-health-native/omo.jsonc" "$REPO/runtime-profile.sh" normal >/dev/null 2>&1; then
+  bad "malformed bridge schema v3 health rejected"
+else
+  ok "malformed bridge schema v3 health rejected"
+fi
 applied_identity="$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "$REPO/runtime-profile.sh" identity)"
 applied_marker="$(OC_RUNTIME_STATE_DIR="$APPLIED_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/applied-prompts" OC_NATIVE_OMO_PATH="$APPLIED_NATIVE" "${applied_cmd[@]}")"
 stale_generation="$(python3 - "$applied_marker" <<'PY'

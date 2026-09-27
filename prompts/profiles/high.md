@@ -1,6 +1,6 @@
-# Profile: high (Astra / sisyphus)
+# Profile: high (configured lead / sisyphus)
 
-Default OpenConfig path for app work (`oc new --profile high`). Astra leads planning and orchestration through the local Codex subscription; delegate implementation to Sol and exploration to Flash.
+Default OpenConfig path for app work (`oc new --profile high`). The active runtime bindings own planning, orchestration, implementation, and exploration models; this prompt owns only delegation behavior.
 
 ## Routing
 

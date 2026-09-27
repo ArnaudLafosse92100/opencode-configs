@@ -30,55 +30,30 @@ EXPORT_ROUTE_FIELDS = {
     "data_classification",
     "admission",
 }
-WORKFLOW_ROUTE_FIELDS = {
-    "provider",
-    "model",
-    "billing",
-    "active",
-    "qualified",
-    "fallbacks",
+WORKFLOW_ROUTE_NAMES = {"exploration", "implementation", "architecture", "review", "adjudication"}
+WORKFLOW_ROUTE_ORDER = ("exploration", "implementation", "architecture", "review", "adjudication")
+WORKFLOW_ROUTE_EFFORTS = {
+    "exploration": ["low"],
+    "implementation": ["medium"],
+    "architecture": ["high"],
+    "review": ["high"],
+    "adjudication": ["high"],
 }
-WORKFLOW_ROUTE_NAMES = {"exploration", "implementation", "architecture", "adjudication"}
-WORKFLOW_ROUTE_PROVIDERS = {"pi", "codex", "claude"}
-WORKFLOW_ROUTE_BILLING = {
-    "exploration": "metered",
-    "implementation": "subscription",
-    "architecture": "subscription",
-    "adjudication": "subscription",
+MODEL_FIELDS = {
+    "runtime_model", "provider", "model", "billing", "transport", "active",
+    "qualified", "supported_efforts", "privacy_classes", "modalities",
+    "execution_surfaces", "tool_use",
 }
-WORKFLOW_ROUTE_CANONICAL_ROUTES = {
-    "exploration": (
-        ("agents", "librarian"),
-        ("agents", "explore"),
-        ("agents", "sisyphus-junior"),
-        ("categories", "quick"),
-        ("categories", "unspecified-low"),
-    ),
-    "implementation": (
-        ("agents", "hephaestus"),
-        ("agents", "atlas"),
-        ("categories", "deep"),
-        ("categories", "bug-hunt"),
-        ("categories", "refactor-safe"),
-        ("categories", "codex-implement"),
-    ),
-    "architecture": (
-        ("agents", "codex-router"),
-        ("agents", "sisyphus"),
-        ("agents", "prometheus"),
-        ("agents", "oracle"),
-        ("agents", "metis"),
-        ("agents", "momus"),
-        ("categories", "ultrabrain"),
-        ("categories", "unspecified-high"),
-        ("categories", "arch-review"),
-        ("categories", "codex-plan"),
-        ("categories", "codex-review"),
-    ),
-    # Claude is intentionally external-workflow-only. OmO has no native
-    # Claude Max subscription transport, so direct OpenConfig must not pretend
-    # that this route is locally executable.
-    "adjudication": (),
+CAPABILITY_FIELDS = {
+    "primary", "fallbacks", "required_privacy", "required_modalities", "allowed_billing",
+    "allow_metered_fallback", "requires_tools", "workflow_efforts",
+}
+EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+PRIVACY_CLASSES = {"standard", "private", "security", "zdr"}
+FACTORY_ARCHON_PROVIDER_TRANSPORTS = {
+    ("pi", "openrouter-pi"),
+    ("codex", "codex-subscription"),
+    ("claude", "claude-subscription"),
 }
 NATIVE_OMO_MIGRATIONS = (
     "2026-07-opencode-config-unification",
@@ -106,7 +81,7 @@ PENTEST_PROMPT_OVERLAY_START = "<!-- BEGIN GENERATED: pentest-cost-policy -->"
 PENTEST_PROMPT_OVERLAY_END = "<!-- END GENERATED: pentest-cost-policy -->"
 
 
-def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
+def render_pentest_prompt_overlay(text: str, profile: str, path: Path, policy: str | None = None) -> str:
     """Apply the pentest-only delegation policy to generated prompt copies.
 
     Source prompts stay the normal baseline. Removing a prior generated block
@@ -126,13 +101,10 @@ def render_pentest_prompt_overlay(text: str, profile: str, path: Path) -> str:
     if profile != "pentest":
         raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
 
-    policies = {
-        "agents/codex-router.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
-        "prompts/categories/content-aware-deep.md": """## Pentest routing policy\n\nFor every pentest agent or category, dispatch **DeepSeek V4 Flash 0731 ZDR Throughput** first and retry Flash exactly three times. Only after those four Flash attempts, dispatch **DeepSeek V4 Pro 0813 ZDR Throughput** exactly once. If Pro fails, stop with terminal failure; do not launch another child, retry Pro, or select another model.\n\nDo not dispatch GLM, GPT/codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other model for pentest work.\n""",
-    }
-    policy = policies.get(path.as_posix())
-    if policy is None:
+    if path.as_posix() not in {"agents/codex-router.md", "prompts/categories/content-aware-deep.md"}:
         return text
+    if not policy:
+        raise SystemExit("missing canonical pentest routing policy")
     return "\n".join((text.rstrip(), "", PENTEST_PROMPT_OVERLAY_START, policy.rstrip(), PENTEST_PROMPT_OVERLAY_END, ""))
 
 
@@ -481,6 +453,9 @@ def update_frontmatter_model(text: str, model: str, path: Path) -> str:
             updated.append(line)
             continue
         if in_frontmatter and line == "---":
+            if not replaced:
+                updated.append(f"model: {model}")
+                replaced = True
             in_frontmatter = False
             updated.append(line)
             continue
@@ -490,23 +465,16 @@ def update_frontmatter_model(text: str, model: str, path: Path) -> str:
             continue
         updated.append(line)
     if not replaced:
-        raise SystemExit(f"missing model frontmatter in {path}")
+        raise SystemExit(f"missing YAML frontmatter in {path}")
     return "\n".join(updated).rstrip() + "\n"
 
 
-def update_sisyphus_prompt(text: str, profile: str) -> str:
+def update_sisyphus_prompt(text: str, profile: str, policy: str | None = None) -> str:
     normal_line = (
         "- Runtime profile `normal`: security/pentest work should still prefer "
         "`content-aware-*`, but normal model breadth remains available for non-security work."
     )
-    pentest_line = (
-        "- Runtime profile `pentest`: keep all agents/categories available, but "
-        "every agent/category starts on DeepSeek V4 Flash 0731 ZDR Throughput, "
-        "retries Flash exactly three times, then makes exactly one DeepSeek V4 Pro 0813 "
-        "ZDR Throughput attempt; that failure is terminal. Do not dispatch GLM, GPT/"
-        "codex-subscription, Kimi, Gemini, Claude/Opus, MiniMax, Hermes, or any other "
-        "model for pentest work."
-    )
+    pentest_line = f"- Runtime profile `pentest`: {policy}" if policy else None
     lines = [
         line
         for line in text.splitlines()
@@ -515,6 +483,8 @@ def update_sisyphus_prompt(text: str, profile: str) -> str:
         and not line.startswith("- Authorized pentest/security briefs must not use `ultrawork`")
     ]
     needle = "- Direct implementation bursts → Hephaestus. Use `deep` / `ultrabrain` only when stronger reasoning is required."
+    if profile == "pentest" and pentest_line is None:
+        raise SystemExit("missing canonical pentest routing policy")
     insert = pentest_line if profile == "pentest" else normal_line
     try:
         lines.insert(lines.index(needle) + 1, insert)
@@ -531,73 +501,170 @@ class RuntimeProfiles:
         self.default = str(self.data.get("default_profile") or "normal")
         if self.default not in VALID_PROFILES:
             raise SystemExit(f"invalid default_profile in {self.profile_path}: {self.default!r}")
-        workflow_routes = self.data.get("workflow_routes")
-        if not isinstance(workflow_routes, dict) or set(workflow_routes) != {"schema_version", "profiles"}:
-            raise SystemExit("workflow_routes must declare schema_version and profiles")
-        if workflow_routes.get("schema_version") != 3:
-            raise SystemExit("workflow_routes.schema_version must be 3")
-        workflow_profiles = workflow_routes.get("profiles")
-        if not isinstance(workflow_profiles, dict) or set(workflow_profiles) != set(VALID_PROFILES):
-            raise SystemExit(
-                f"workflow_routes.profiles must declare exactly {', '.join(VALID_PROFILES)}"
-            )
+        if self.data.get("schema_version") != 4:
+            raise SystemExit("runtime-profile.schema_version must be 4")
+        self.models = self.data.get("qualified_models")
+        self.capabilities = self.data.get("capabilities")
+        self.promotion_gates = self.data.get("promotion_gates")
+        self.retry_policies = self.data.get("retry_policies")
+        profiles = self.data.get("profiles")
+        if not isinstance(self.models, dict) or not self.models:
+            raise SystemExit("qualified_models must be a non-empty object")
+        if not isinstance(self.capabilities, dict) or not self.capabilities:
+            raise SystemExit("capabilities must be a non-empty object")
+        if not isinstance(self.promotion_gates, dict):
+            raise SystemExit("promotion_gates must be an object")
+        if not isinstance(self.retry_policies, dict):
+            raise SystemExit("retry_policies must be an object")
+        if not isinstance(profiles, dict) or set(profiles) != set(VALID_PROFILES):
+            raise SystemExit(f"profiles must declare exactly {', '.join(VALID_PROFILES)}")
+        for reference, model in self.models.items():
+            if not isinstance(model, dict) or set(model) != MODEL_FIELDS:
+                raise SystemExit(f"invalid qualified model fields: {reference}")
+            runtime_model = model.get("runtime_model")
+            if runtime_model is not None and (not isinstance(runtime_model, str) or "/" not in runtime_model):
+                raise SystemExit(f"invalid runtime model: {reference}")
+            if not all(isinstance(model.get(key), str) and model[key] for key in ("provider", "model", "billing", "transport")):
+                raise SystemExit(f"invalid qualified model identity: {reference}")
+            expected_runtime = {
+                "codex-subscription": f"codex-subscription/{model['model']}",
+                "openrouter-pi": model["model"],
+                "venice-api": f"venice/{model['model']}",
+                "deepseek-api": f"deepseek/{model['model']}",
+                "claude-subscription": None,
+            }.get(model["transport"])
+            if model["transport"] == "openrouter-pi" and not model["model"].startswith("openrouter/"):
+                raise SystemExit(f"invalid OpenRouter model identity: {reference}")
+            if model["transport"] == "codex-subscription" and model["provider"] != "codex":
+                raise SystemExit(f"invalid Codex model provider: {reference}")
+            if model["transport"] == "claude-subscription" and model["provider"] != "claude":
+                raise SystemExit(f"invalid Claude model provider: {reference}")
+            if model["transport"] not in {"codex-subscription", "openrouter-pi", "venice-api", "deepseek-api", "claude-subscription"}:
+                raise SystemExit(f"unsupported model transport: {reference}")
+            if runtime_model != expected_runtime:
+                raise SystemExit(f"runtime model identity mismatch: {reference}")
+            if not isinstance(model.get("active"), bool) or not isinstance(model.get("qualified"), bool):
+                raise SystemExit(f"invalid model lifecycle state: {reference}")
+            efforts = model.get("supported_efforts")
+            privacy = model.get("privacy_classes")
+            modalities = model.get("modalities")
+            surfaces = model.get("execution_surfaces")
+            if not isinstance(efforts, list) or not efforts or not set(efforts) <= EFFORTS:
+                raise SystemExit(f"invalid supported efforts: {reference}")
+            if not isinstance(privacy, list) or not privacy or not set(privacy) <= PRIVACY_CLASSES:
+                raise SystemExit(f"invalid privacy classes: {reference}")
+            if not isinstance(modalities, list) or "text" not in modalities:
+                raise SystemExit(f"invalid modalities: {reference}")
+            if not isinstance(surfaces, list) or not surfaces or not set(surfaces) <= {"opencode", "factory-archon"}:
+                raise SystemExit(f"invalid execution surfaces: {reference}")
+            if not isinstance(model.get("tool_use"), bool):
+                raise SystemExit(f"invalid tool capability: {reference}")
+            if "factory-archon" in surfaces and (model["provider"], model["transport"]) not in FACTORY_ARCHON_PROVIDER_TRANSPORTS:
+                raise SystemExit(f"unsupported factory-archon provider transport: {reference}")
+        executable_identities = [model["runtime_model"] for model in self.models.values() if model["runtime_model"] is not None]
+        if len(executable_identities) != len(set(executable_identities)):
+            raise SystemExit("duplicate executable runtime_model identity")
+        for reference, reason in self.promotion_gates.items():
+            if reference not in self.models or not isinstance(reason, str) or not reason.strip():
+                raise SystemExit(f"invalid promotion gate: {reference}")
+            if self.models[reference]["qualified"] is not False:
+                raise SystemExit(f"promotion-gated model must remain unqualified: {reference}")
+        for name, capability in self.capabilities.items():
+            if not isinstance(capability, dict) or set(capability) != CAPABILITY_FIELDS:
+                raise SystemExit(f"invalid capability fields: {name}")
+            references = [capability.get("primary"), *(capability.get("fallbacks") or [])]
+            if not references or any(reference not in self.models for reference in references):
+                raise SystemExit(f"unknown model reference in capability: {name}")
+            if len(references) != len(set(references)):
+                raise SystemExit(f"duplicate model reference in capability: {name}")
+            if name in WORKFLOW_ROUTE_NAMES and capability["fallbacks"]:
+                raise SystemExit(f"route_v4_fallback_forbidden: {name}")
+            required_privacy = capability.get("required_privacy")
+            required_modalities = capability.get("required_modalities")
+            allowed_billing = capability.get("allowed_billing")
+            workflow_efforts = capability.get("workflow_efforts")
+            if required_privacy not in PRIVACY_CLASSES:
+                raise SystemExit(f"invalid capability privacy: {name}")
+            if not isinstance(required_modalities, list) or not required_modalities:
+                raise SystemExit(f"invalid capability modalities: {name}")
+            if not isinstance(allowed_billing, list) or not allowed_billing:
+                raise SystemExit(f"invalid capability billing: {name}")
+            if not isinstance(capability.get("allow_metered_fallback"), bool):
+                raise SystemExit(f"invalid metered fallback authorization: {name}")
+            if not isinstance(capability.get("requires_tools"), bool):
+                raise SystemExit(f"invalid capability tool requirement: {name}")
+            if not isinstance(workflow_efforts, list) or not set(workflow_efforts) <= EFFORTS:
+                raise SystemExit(f"invalid workflow efforts: {name}")
+            if name in WORKFLOW_ROUTE_NAMES and not workflow_efforts:
+                raise SystemExit(f"missing workflow effort contract: {name}")
+            if name in WORKFLOW_ROUTE_NAMES and workflow_efforts != WORKFLOW_ROUTE_EFFORTS[name]:
+                raise SystemExit(f"invalid core workflow effort contract: {name}")
+            if name not in WORKFLOW_ROUTE_NAMES and workflow_efforts:
+                raise SystemExit(f"workflow efforts reserved for exported routes: {name}")
+            for reference in references:
+                model = self.models[reference]
+                if required_privacy not in model["privacy_classes"]:
+                    raise SystemExit(f"privacy incompatibility: {name} -> {reference}")
+                if not set(required_modalities) <= set(model["modalities"]):
+                    raise SystemExit(f"modality incompatibility: {name} -> {reference}")
+                if model["billing"] not in allowed_billing:
+                    raise SystemExit(f"billing incompatibility: {name} -> {reference}")
+                if capability["requires_tools"] and model["tool_use"] is not True:
+                    raise SystemExit(f"tool capability incompatibility: {name} -> {reference}")
+                if not set(workflow_efforts) <= set(model["supported_efforts"]):
+                    raise SystemExit(f"workflow effort incompatibility: {name} -> {reference}")
+            if name in WORKFLOW_ROUTE_NAMES and "factory-archon" not in self.models[capability["primary"]]["execution_surfaces"]:
+                raise SystemExit(f"factory-archon surface incompatibility: {name} -> {capability['primary']}")
+            primary_billing = self.models[capability["primary"]]["billing"]
+            fallback_billings = [self.models[reference]["billing"] for reference in capability["fallbacks"]]
+            if primary_billing == "subscription" and "metered" in fallback_billings \
+                    and capability["allow_metered_fallback"] is not True:
+                raise SystemExit(f"subscription to metered fallback requires explicit authorization: {name}")
+        for capability_name, retry in self.retry_policies.items():
+            if capability_name not in self.capabilities or not isinstance(retry, dict) or set(retry) != {
+                "primary_attempts", "fallback_attempts", "terminal_on_exhaustion",
+            }:
+                raise SystemExit(f"invalid retry policy: {capability_name}")
+            fallback_attempts = retry.get("fallback_attempts")
+            if (
+                not isinstance(retry.get("primary_attempts"), int)
+                or isinstance(retry.get("primary_attempts"), bool)
+                or retry["primary_attempts"] < 1
+                or not isinstance(fallback_attempts, list)
+                or len(fallback_attempts) != len(self.capabilities[capability_name]["fallbacks"])
+                or any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in fallback_attempts)
+                or retry.get("terminal_on_exhaustion") is not True
+            ):
+                raise SystemExit(f"invalid retry policy: {capability_name}")
         for profile in VALID_PROFILES:
-            profile_routes = workflow_profiles[profile]
-            if not isinstance(profile_routes, dict):
-                raise SystemExit(f"invalid workflow_routes.profiles.{profile}")
-            expected_names = WORKFLOW_ROUTE_NAMES if profile == "normal" else set()
-            if set(profile_routes) != expected_names:
-                raise SystemExit(
-                    f"workflow_routes.profiles.{profile} must declare exactly "
-                    f"{', '.join(sorted(expected_names)) if expected_names else 'no routes'}"
-                )
-            for name, route in profile_routes.items():
-                if not isinstance(route, dict) or set(route) != WORKFLOW_ROUTE_FIELDS:
-                    raise SystemExit(f"invalid workflow route fields: {profile}.{name}")
-                provider = route.get("provider")
-                model = route.get("model")
-                if provider not in WORKFLOW_ROUTE_PROVIDERS:
-                    raise SystemExit(f"invalid workflow route provider: {profile}.{name}")
-                if not isinstance(model, str) or not model.strip():
-                    raise SystemExit(f"invalid workflow route model: {profile}.{name}")
-                if provider == "pi":
-                    if not model.startswith("openrouter/"):
-                        raise SystemExit(f"invalid Pi workflow route model: {profile}.{name}")
-                elif "/" in model:
-                    raise SystemExit(f"invalid subscription workflow route model: {profile}.{name}")
-                if route.get("billing") != WORKFLOW_ROUTE_BILLING[name]:
-                    raise SystemExit(f"invalid workflow route billing: {profile}.{name}")
-                if route.get("active") is not True or route.get("qualified") is not True:
-                    raise SystemExit(f"inactive or unqualified workflow route: {profile}.{name}")
-                if route.get("fallbacks") != []:
-                    raise SystemExit(f"workflow route cannot declare fallbacks: {profile}.{name}")
-        normal_routes = workflow_profiles["normal"]
-        normal_profile = self.data.get("normal")
-        if not isinstance(normal_profile, dict):
-            raise SystemExit("normal profile is required for workflow route binding")
-        for section in VALID_SECTIONS:
-            for reference, route in (normal_profile.get(section) or {}).items():
-                model = route.get("model") if isinstance(route, dict) else None
-                if isinstance(model, str) and model.startswith("claude-subscription/"):
-                    raise SystemExit(
-                        "Claude adjudication is external-workflow-only: "
-                        f"normal.{section}.{reference} cannot use {model}"
-                    )
-        for name, references in WORKFLOW_ROUTE_CANONICAL_ROUTES.items():
-            route = normal_routes[name]
-            expected_model = (
-                route["model"]
-                if route["provider"] == "pi"
-                else f"{route['provider']}-subscription/{route['model']}"
-            )
-            for section, reference in references:
-                section_routes = normal_profile.get(section)
-                canonical = section_routes.get(reference) if isinstance(section_routes, dict) else None
-                if not isinstance(canonical, dict) or canonical.get("model") != expected_model:
-                    raise SystemExit(
-                        "workflow route canonical drift: "
-                        f"normal.{name} must match normal.{section}.{reference} ({expected_model})"
-                    )
+            selected = profiles[profile]
+            if not isinstance(selected, dict):
+                raise SystemExit(f"invalid profile: {profile}")
+            if selected.get("compose") == "normal":
+                if profile != "normal-private" or selected.get("replacement_capability") not in self.capabilities:
+                    raise SystemExit(f"invalid composed profile: {profile}")
+                continue
+            bindings = selected.get("bindings")
+            if not isinstance(bindings, dict) or set(bindings) != set(VALID_SECTIONS):
+                raise SystemExit(f"invalid bindings: {profile}")
+            for section in VALID_SECTIONS:
+                for name, binding in bindings[section].items():
+                    if not isinstance(binding, dict) or set(binding) != {"capability", "effort"}:
+                        raise SystemExit(f"invalid binding: {profile}.{section}.{name}")
+                    capability = binding.get("capability")
+                    effort = binding.get("effort")
+                    if capability not in self.capabilities or effort not in EFFORTS:
+                        raise SystemExit(f"invalid binding value: {profile}.{section}.{name}")
+                    for reference in (self.capabilities[capability]["primary"], *self.capabilities[capability]["fallbacks"]):
+                        model = self.models[reference]
+                        if model["active"] is not True or model["qualified"] is not True:
+                            raise SystemExit(f"inactive or unqualified model bound to runtime: {profile}.{section}.{name} -> {reference}")
+                        if model["runtime_model"] is None:
+                            raise SystemExit(f"non-runtime model bound to OpenConfig: {profile}.{section}.{name}")
+                        if "opencode" not in model["execution_surfaces"]:
+                            raise SystemExit(f"opencode surface incompatibility: {profile}.{section}.{name} -> {reference}")
+                        if effort not in model["supported_efforts"]:
+                            raise SystemExit(f"effort incompatibility: {profile}.{section}.{name} -> {reference}")
         exports = self.data.get("export_routes")
         if not isinstance(exports, dict) or set(exports) != set(VALID_PROFILES):
             raise SystemExit(f"export_routes must declare exactly {', '.join(VALID_PROFILES)}")
@@ -606,7 +673,7 @@ class RuntimeProfiles:
             name
             for profile in VALID_PROFILES
             for section in VALID_SECTIONS
-            for name in ((self.data.get(profile) or {}).get(section) or {})
+            for name in ((((profiles.get(profile) or {}).get("bindings") or {}).get(section)) or {})
         }
         for profile in VALID_PROFILES:
             profile_exports = exports[profile]
@@ -647,36 +714,6 @@ class RuntimeProfiles:
                     raise SystemExit(f"invalid exported data classification: {profile}.{name}")
                 if route.get("admission") != "primary-only":
                     raise SystemExit(f"invalid exported admission: {profile}.{name}")
-        for profile in VALID_PROFILES:
-            selected = self.data.get(profile)
-            if not isinstance(selected, dict):
-                raise SystemExit(f"missing runtime profile {profile!r} in {self.profile_path}")
-            if selected.get("compose") == "normal":
-                if profile != "normal-private" or not isinstance(selected.get("privacy"), dict):
-                    raise SystemExit(f"invalid composed runtime profile {profile!r} in {self.profile_path}")
-                replacement = selected.get("non_openrouter_route")
-                if not isinstance(replacement, dict):
-                    raise SystemExit(f"missing {profile}.non_openrouter_route in {self.profile_path}")
-                replacement_chain = [
-                    replacement.get("model"),
-                    *(replacement.get("fallback_models") or []),
-                ]
-                if (
-                    not isinstance(replacement.get("fallback_models"), list)
-                    or not replacement_chain
-                    or any(
-                        not isinstance(model, str) or not model.startswith("openrouter/")
-                        for model in replacement_chain
-                    )
-                ):
-                    raise SystemExit(
-                        f"invalid {profile}.non_openrouter_route in {self.profile_path}"
-                    )
-                continue
-            for section in VALID_SECTIONS:
-                if not isinstance(selected.get(section), dict):
-                    raise SystemExit(f"invalid {profile}.{section} in {self.profile_path}")
-
         state_override = os.environ.get("OC_RUNTIME_STATE_DIR")
         if state_override:
             self.state_root = Path(state_override).expanduser().resolve()
@@ -918,29 +955,171 @@ class RuntimeProfiles:
     def selected(self, profile: str) -> dict:
         if profile not in VALID_PROFILES:
             raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
-        selected = self.data[profile]
-        if selected.get("compose") != "normal":
-            return selected
+        profile_policy = self.data["profiles"][profile]
+        if profile_policy.get("compose") == "normal":
+            base = copy.deepcopy(self.data["profiles"]["normal"])
+            replacement = profile_policy["replacement_capability"]
+            def compatible_with_private_composition(capability_name: str) -> bool:
+                capability = self.capabilities[capability_name]
+                return all(
+                    "zdr" in self.models[reference]["privacy_classes"]
+                    and str(self.models[reference]["runtime_model"]).startswith("openrouter/")
+                    for reference in (capability["primary"], *capability["fallbacks"])
+                )
+            for section in VALID_SECTIONS:
+                for binding in base["bindings"][section].values():
+                    if not compatible_with_private_composition(binding["capability"]):
+                        binding["capability"] = replacement
+            for key in ("small_model", "helper_model"):
+                if key in base and not compatible_with_private_composition(base[key]):
+                    base[key] = replacement
+            base["privacy"] = copy.deepcopy(profile_policy["privacy"])
+            base["admission"] = copy.deepcopy(profile_policy["admission"])
+            profile_policy = base
 
-        # `normal-private` is intentionally a render-time composition, never
-        # a hand-maintained duplicate route matrix.  Preserve normal route
-        # order while removing non-OpenRouter rungs and promoting the first
-        # remaining OpenRouter rung when the normal primary was another
-        # provider. Routes with no OpenRouter rung use the single explicit
-        # private replacement rather than duplicating the normal matrix.
-        private = copy.deepcopy(self.data["normal"])
-        replacement = selected["non_openrouter_route"]
+        resolved = {
+            "entry_agent": profile_policy["entry_agent"],
+            "privacy": copy.deepcopy(profile_policy["privacy"]),
+            "admission": copy.deepcopy(profile_policy["admission"]),
+            "agents": {},
+            "categories": {},
+        }
+        for key in ("small_model", "helper_model"):
+            capability = profile_policy.get(key)
+            if capability:
+                resolved[key] = self._resolve_capability(capability)["model"]
         for section in VALID_SECTIONS:
-            for name, route in private[section].items():
-                chain = [route.get("model"), *(route.get("fallback_models") or [])]
-                openrouter = [model for model in chain if isinstance(model, str) and model.startswith("openrouter/")]
-                if not openrouter:
-                    private[section][name] = copy.deepcopy(replacement)
-                    continue
-                route["model"] = openrouter[0]
-                route["fallback_models"] = openrouter[1:]
-        private["privacy"] = copy.deepcopy(selected["privacy"])
-        return private
+            for name, binding in profile_policy["bindings"][section].items():
+                resolved[section][name] = self._resolve_capability(binding["capability"], binding["effort"])
+        return resolved
+
+    def _resolve_capability(self, name: str, effort: str | None = None) -> dict:
+        capability = self.capabilities[name]
+        primary = self.models[capability["primary"]]
+        fallbacks = [self.models[reference] for reference in capability["fallbacks"]]
+        if primary["runtime_model"] is None or any(model["runtime_model"] is None for model in fallbacks):
+            raise SystemExit(f"capability is not executable by OpenConfig: {name}")
+        resolved = {
+            "model": primary["runtime_model"],
+            "fallback_models": [model["runtime_model"] for model in fallbacks],
+        }
+        if effort is not None:
+            resolved["effort"] = effort
+        return resolved
+
+    def _effective_capability_names(self, profile: str) -> set[str]:
+        policy = self.data["profiles"][profile]
+        source = self.data["profiles"]["normal"] if policy.get("compose") == "normal" else policy
+        names = {
+            binding["capability"]
+            for section in VALID_SECTIONS
+            for binding in source["bindings"][section].values()
+        }
+        names.update(
+            capability for key in ("small_model", "helper_model")
+            if isinstance((capability := source.get(key)), str)
+        )
+        if policy.get("compose") != "normal":
+            return names
+        replacement = policy["replacement_capability"]
+        return {
+            name if all(
+                "zdr" in self.models[reference]["privacy_classes"]
+                and str(self.models[reference]["runtime_model"]).startswith("openrouter/")
+                for reference in (
+                    self.capabilities[name]["primary"], *self.capabilities[name]["fallbacks"]
+                )
+            ) else replacement
+            for name in names
+        }
+
+    def pentest_policy_prose(self) -> str:
+        capability_name = self.data["profiles"]["pentest"]["small_model"]
+        capability = self.capabilities[capability_name]
+        retry = self.retry_policies.get(capability_name)
+        if retry is None:
+            raise SystemExit(f"missing retry policy for pentest capability: {capability_name}")
+        primary = capability["primary"]
+        primary_attempts = retry["primary_attempts"]
+        primary_retries = primary_attempts - 1
+        stages = [
+            f"dispatch canonical capability `{capability_name}` on model ref `{primary}` for "
+            f"{primary_attempts} total attempts (the initial attempt plus {primary_retries} retries)"
+        ]
+        for reference, attempts in zip(capability["fallbacks"], retry["fallback_attempts"]):
+            stages.append(f"then model ref `{reference}` for exactly {attempts} attempt{'s' if attempts != 1 else ''}")
+        terminal = "; exhaustion is terminal" if retry["terminal_on_exhaustion"] else ""
+        return (
+            "keep all agents/categories available, but " + ", ".join(stages) + terminal
+            + ". Do not dispatch a model outside this canonical capability chain."
+        )
+
+    def policy_snapshot_id(self, profile: str) -> str:
+        selected = self.selected(profile)
+        runtime_models: set[str] = set()
+        for key in ("small_model", "helper_model"):
+            if isinstance(selected.get(key), str):
+                runtime_models.add(selected[key])
+        for section in VALID_SECTIONS:
+            for route in selected[section].values():
+                runtime_models.add(route["model"])
+                runtime_models.update(route["fallback_models"])
+        model_refs = {
+            reference
+            for reference, model in self.models.items()
+            if model["runtime_model"] in runtime_models
+        }
+        core_capabilities = {}
+        if profile == "normal":
+            core_capabilities = {
+                name: self.capabilities[name]
+                for name in WORKFLOW_ROUTE_ORDER
+            }
+            for capability in core_capabilities.values():
+                model_refs.add(capability["primary"])
+                model_refs.update(capability["fallbacks"])
+        effective_capabilities = self._effective_capability_names(profile)
+        relevant_retry = {
+            name: retry for name, retry in self.retry_policies.items()
+            if (profile == "normal" and name in WORKFLOW_ROUTE_NAMES) or name in effective_capabilities
+        }
+        canonical = json.dumps(
+            {
+                "profile": profile,
+                "effective_policy": selected,
+                "runtime_capabilities": {
+                    name: self.capabilities[name] for name in sorted(effective_capabilities)
+                },
+                "core_workflow_capabilities": core_capabilities,
+                "models": {reference: self.models[reference] for reference in sorted(model_refs)},
+                "retry_policies": relevant_retry,
+                "promotion_gates": sorted(model_refs & self.promotion_gates.keys()),
+            },
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")
+        return hashlib.sha256(canonical).hexdigest()
+
+    def runtime_policy(self, profile: str) -> dict:
+        selected = self.selected(profile)
+        entry_agent = self.data["profiles"][profile].get("entry_agent", "codex-router")
+        entry_runtime_model = selected["agents"][entry_agent]["model"]
+        primary = next(
+            model for model in self.models.values()
+            if model["runtime_model"] == entry_runtime_model
+        )
+        modalities = set(primary["modalities"])
+        return {
+            "schema_version": 1,
+            "profile": profile,
+            "entry_agent": entry_agent,
+            "policy_snapshot_id": self.policy_snapshot_id(profile),
+            "privacy": copy.deepcopy(selected["privacy"]),
+            "admission": {
+                "attachments": "attachments" in modalities,
+                "multimodal": "multimodal" in modalities,
+                **copy.deepcopy(selected["admission"]),
+            },
+        }
 
     def resolve(self, profile: str, section: str, name: str) -> dict:
         if section not in VALID_SECTIONS:
@@ -949,12 +1128,10 @@ class RuntimeProfiles:
         route = (selected.get(section) or {}).get(name)
         if not isinstance(route, dict) or not isinstance(route.get("model"), str):
             raise SystemExit(f"route not found: {profile}.{section}.{name}")
-        base = load_json(self.repo / "oh-my-openagent.json")
-        base_route = ((base.get(section) or {}).get(name) or {})
-        reasoning = base_route.get("reasoning")
-        variant = base_route.get("variant")
-        if variant is None and reasoning in ("low", "medium", "high", "max", "xhigh"):
-            variant = "max" if reasoning == "xhigh" else reasoning
+        profile_policy = self.data["profiles"]["normal" if profile == "normal-private" else profile]
+        binding = (((profile_policy.get("bindings") or {}).get(section) or {}).get(name) or {})
+        reasoning = binding.get("effort")
+        variant = "max" if reasoning == "xhigh" else reasoning
         return {
             "profile": profile,
             "section": section,
@@ -980,17 +1157,40 @@ class RuntimeProfiles:
             **copy.deepcopy(route),
         }
 
-    def export_workflow_routes(self, profile: str, schema_version: int = 3) -> dict:
-        contract = self.data["workflow_routes"]
-        routes = contract["profiles"][profile]
-        if not routes:
+    def export_workflow_routes(self, profile: str, schema_version: int = 4) -> dict:
+        if profile != "normal":
             raise SystemExit(f"workflow routes unavailable for profile: {profile}")
+        routes = {}
+        for name in WORKFLOW_ROUTE_ORDER:
+            capability = self.capabilities[name]
+            reference = capability["primary"]
+            model = self.models[reference]
+            routes[name] = {
+                "model_ref": reference,
+                "provider": model["provider"],
+                "model": model["model"],
+                "transport": model["transport"],
+                "billing": model["billing"],
+                "active": model["active"],
+                "qualified": model["qualified"],
+                "fallbacks": list(capability["fallbacks"]),
+            }
         if schema_version == 1:
             routes = {
                 "standard": routes["implementation"],
                 "frontier": routes["architecture"],
             }
-        elif schema_version != 3:
+        if schema_version == 3:
+            routes.pop("review")
+        if schema_version in (1, 3):
+            routes = {
+                name: {
+                    key: value for key, value in route.items()
+                    if key in {"provider", "model", "billing", "active", "qualified", "fallbacks"}
+                }
+                for name, route in routes.items()
+            }
+        elif schema_version != 4:
             raise SystemExit(f"unsupported workflow route export schema: {schema_version}")
         revision, dirty = repository_identity(self.repo)
         return {
@@ -998,6 +1198,7 @@ class RuntimeProfiles:
             "repository_revision": revision,
             "repository_dirty": dirty,
             "profile": profile,
+            **({"policy_snapshot_id": self.policy_snapshot_id(profile)} if schema_version == 4 else {}),
             "routes": copy.deepcopy(routes),
         }
 
@@ -1054,7 +1255,7 @@ class RuntimeProfiles:
         """Content proof for copied compat inputs; raw OpenCode junk is absent."""
         managed = (
             *RUNTIME_RENDER_INPUTS,
-            ".active-profile", ".runtime-profile.json", ".omo.jsonc", "oc", "opencode.sh",
+            ".active-profile", ".runtime-profile.json", ".runtime-policy.json", ".omo.jsonc", "oc", "opencode.sh",
             "run.sh", "openrouter-admin.sh", "xdg", ".openconfig-source", "lib",
             "zshrc.snippet", ".runtime",
         )
@@ -1083,7 +1284,7 @@ class RuntimeProfiles:
 
     @staticmethod
     def _runtime_manifest(root: Path) -> dict:
-        managed = (*RUNTIME_RENDER_INPUTS, ".runtime-profile.json")
+        managed = (*RUNTIME_RENDER_INPUTS, ".runtime-profile.json", ".runtime-policy.json")
         entries: list[dict[str, str]] = []
         for name in managed:
             base = root / name
@@ -1248,14 +1449,18 @@ class RuntimeProfiles:
                     raise SystemExit(f"missing source route: {section}.{name}")
                 target[name]["model"] = patch["model"]
                 target[name]["fallback_models"] = list(patch.get("fallback_models") or [])
+                target[name]["reasoning"] = patch["effort"]
+                if "variant" in target[name]:
+                    target[name]["variant"] = "max" if patch["effort"] == "xhigh" else patch["effort"]
 
         write_if_changed(runtime_dir / "opencode.json", json.dumps(opencode, indent=2, ensure_ascii=False) + "\n")
         write_if_changed(runtime_dir / "oh-my-openagent.json", json.dumps(omo, indent=2, ensure_ascii=False) + "\n")
         self._maybe_render_interrupt("runtime-config")
 
         agent_overrides = {
-            "codex-router.md": selected["agents"]["codex-router"]["model"],
-            "content-aware-research.md": selected["agents"]["content-aware-research"]["model"],
+            f"{name}.md": route["model"]
+            for name, route in selected["agents"].items()
+            if (self.repo / "agents" / f"{name}.md").is_file()
         }
         # Each generation is self-contained.  In particular, it never points
         # back into the checkout for mutable configuration inputs.
@@ -1269,9 +1474,15 @@ class RuntimeProfiles:
             target = runtime_dir / "agents" / filename
             write_if_changed(target, update_frontmatter_model(source.read_text(encoding="utf-8"), model, source))
 
+        pentest_policy = self.pentest_policy_prose() if profile == "pentest" else None
         for relative in ("agents/codex-router.md", "prompts/categories/content-aware-deep.md"):
             target = runtime_dir / relative
-            write_if_changed(target, render_pentest_prompt_overlay(target.read_text(encoding="utf-8"), profile, Path(relative)))
+            write_if_changed(
+                target,
+                render_pentest_prompt_overlay(
+                    target.read_text(encoding="utf-8"), profile, Path(relative), pentest_policy,
+                ),
+            )
 
         content_aware_source = self.repo / "profiles/content-aware.json"
         content_aware = load_json(content_aware_source)
@@ -1281,13 +1492,16 @@ class RuntimeProfiles:
 
         prompt_source = self.repo / "prompts/agents/sisyphus.md"
         prompt_runtime = runtime_dir / "prompts/agents/sisyphus.md"
-        write_if_changed(prompt_runtime, update_sisyphus_prompt(prompt_source.read_text(encoding="utf-8"), profile))
+        write_if_changed(
+            prompt_runtime,
+            update_sisyphus_prompt(prompt_source.read_text(encoding="utf-8"), profile, pentest_policy),
+        )
         omo["agents"]["sisyphus"]["prompt_append"] = SISYPHUS_PROMPT_URI
         # Rewrite after the generated prompt path is known.
         write_if_changed(runtime_dir / "oh-my-openagent.json", json.dumps(omo, indent=2, ensure_ascii=False) + "\n")
 
         metadata = {
-            "schema_version": 2,
+            "schema_version": 4,
             "profile": profile,
             "source": str(self.profile_path),
             "source_root": str(self.repo),
@@ -1296,6 +1510,10 @@ class RuntimeProfiles:
         }
         metadata["generation"] = generation.name
         write_if_changed(runtime_dir / ".runtime-profile.json", json.dumps(metadata, indent=2) + "\n")
+        write_if_changed(
+            runtime_dir / ".runtime-policy.json",
+            json.dumps(self.runtime_policy(profile), indent=2, ensure_ascii=False) + "\n",
+        )
         self._write_runtime_manifest(runtime_dir)
         self._validate_runtime_generation(runtime_dir, profile, fingerprint)
         self._maybe_render_interrupt("runtime-validated")
@@ -1313,12 +1531,31 @@ class RuntimeProfiles:
         metadata = load_json(runtime_dir / ".runtime-profile.json")
         if metadata.get("profile") != profile or metadata.get("fingerprint") != fingerprint:
             raise SystemExit("invalid staged runtime generation metadata")
-        for required in ("opencode.json", "oh-my-openagent.json", "agents", "profiles", "prompts"):
+        for required in ("opencode.json", "oh-my-openagent.json", "agents", "profiles", "prompts", ".runtime-policy.json"):
             if not (runtime_dir / required).exists():
                 raise SystemExit(f"incomplete staged runtime generation: {required}")
         omo = load_json(runtime_dir / "oh-my-openagent.json")
         if ((omo.get("agents") or {}).get("sisyphus") or {}).get("prompt_append") != SISYPHUS_PROMPT_URI:
             raise SystemExit("runtime Sisyphus prompt must use the allowed stable config-home alias")
+        policy = load_json(runtime_dir / ".runtime-policy.json")
+        if set(policy) != {"schema_version", "profile", "entry_agent", "policy_snapshot_id", "privacy", "admission"}:
+            raise SystemExit("invalid runtime policy fields")
+        if policy.get("schema_version") != 1 or policy.get("profile") != profile:
+            raise SystemExit("invalid runtime policy identity")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(policy.get("policy_snapshot_id") or "")):
+            raise SystemExit("invalid runtime policy snapshot id")
+        privacy = policy.get("privacy")
+        admission = policy.get("admission")
+        if not isinstance(privacy, dict) or set(privacy) != {"classification", "enforcement"}:
+            raise SystemExit("invalid runtime privacy contract")
+        if privacy["classification"] not in {"standard", "private", "security"} or privacy["enforcement"] not in {"policy", "zdr_required"}:
+            raise SystemExit("invalid runtime privacy values")
+        if not isinstance(admission, dict) or set(admission) != {"attachments", "multimodal", "unqualified_models", "capability_mismatch", "metered_fallback"}:
+            raise SystemExit("invalid runtime admission contract")
+        if not isinstance(admission["attachments"], bool) or not isinstance(admission["multimodal"], bool):
+            raise SystemExit("invalid runtime modality admission")
+        if admission["unqualified_models"] not in {"deny", "allow"} or admission["capability_mismatch"] not in {"deny", "allow"} or admission["metered_fallback"] not in {"explicit", "forbidden"}:
+            raise SystemExit("invalid runtime admission values")
         RuntimeProfiles._validate_runtime_manifest(runtime_dir)
 
     def native_document(self, mirrored: dict) -> str:
@@ -1365,6 +1602,7 @@ class RuntimeProfiles:
             source = runtime_dir / entry
             if source.exists() or source.is_symlink():
                 self._copy_entry(source.resolve(), compat_dir / entry)
+        self._copy_entry(runtime_dir / ".runtime-policy.json", compat_dir / ".runtime-policy.json")
         replace_symlink(compat_dir / "lib", (self.repo / "lib").resolve())
 
         # Keep secrets owned by the source checkout but reachable at the legacy
@@ -1419,7 +1657,7 @@ class RuntimeProfiles:
         metadata = load_json(compat_dir / ".runtime-profile.json")
         if metadata.get("profile") != profile or (compat_dir / ".runtime").resolve(strict=True) != runtime_dir.resolve(strict=True):
             raise SystemExit("invalid staged compatibility generation")
-        for required in ("opencode.json", "oh-my-openagent.json", ".omo.jsonc", ".openconfig-source", "oc", "xdg/opencode"):
+        for required in ("opencode.json", "oh-my-openagent.json", ".runtime-policy.json", ".omo.jsonc", ".openconfig-source", "oc", "xdg/opencode"):
             if not (compat_dir / required).exists():
                 raise SystemExit(f"incomplete staged compatibility generation: {required}")
         source_marker = compat_dir / ".openconfig-source"
@@ -1568,7 +1806,7 @@ def parser() -> argparse.ArgumentParser:
     export_route.add_argument("name")
     export_workflow_routes = sub.add_parser("export-workflow-routes")
     export_workflow_routes.add_argument("profile", choices=VALID_PROFILES)
-    export_workflow_routes.add_argument("--schema-version", type=int, choices=(1, 3), default=3)
+    export_workflow_routes.add_argument("--schema-version", type=int, choices=(1, 3, 4), default=4)
     return result
 
 

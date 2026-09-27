@@ -21,7 +21,7 @@ Usage:
   oc profile env [normal|normal-private|pentest] [--shell]
   oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>
   oc profile export-route <normal|normal-private|pentest> <name>
-  oc profile export-workflow-routes <normal|normal-private|pentest> [--schema-version 1|3]
+  oc profile export-workflow-routes <normal|normal-private|pentest> [--schema-version 1|3|4]
   oc profile ensure [--quiet]
   oc profile prepare-native-alias
 EOF
@@ -208,7 +208,7 @@ bridge_observed_instance() {
   bridge_listener_matches_pid "$expected_pid" || return 1
   payload="$(curl -sS --max-time 2 http://127.0.0.1:10101/healthz 2>/dev/null)" || return 1
   printf '%s' "$payload" | python3 -c '
-import datetime, json, sys, uuid
+import datetime, json, re, sys, uuid
 expected_pid = int(sys.argv[1])
 try:
     body = json.load(sys.stdin)
@@ -242,10 +242,27 @@ def valid_idempotency_ledger(value):
         and type(value.get("remaining_capacity")) is int
         and value.get("remaining_capacity") == max(0, value.get("max_entries") - value.get("entries"))
     )
+base_fields = {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
+schema = body.get("schema_version") if isinstance(body, dict) else None
+def valid_runtime_policy_identity(value):
+    runtime_digest = value.get("runtime_digest")
+    policy_snapshot_id = value.get("policy_snapshot_id")
+    digest_is_hex = isinstance(runtime_digest, str) and re.fullmatch(r"[0-9a-f]{64}", runtime_digest) is not None
+    policy_is_hex = isinstance(policy_snapshot_id, str) and re.fullmatch(r"[0-9a-f]{64}", policy_snapshot_id) is not None
+    return (digest_is_hex and policy_is_hex) or (
+        policy_snapshot_id == "legacy" and (runtime_digest == "legacy" or digest_is_hex)
+    )
+schema_fields_ok = (
+    (schema == 2 and set(body) == base_fields)
+    or (
+        schema == 3
+        and set(body) == base_fields | {"runtime_digest", "policy_snapshot_id"}
+        and valid_runtime_policy_identity(body)
+    )
+)
 identity_ok = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
-    and body.get("schema_version") == 2
+    and schema_fields_ok
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
     and instance.version == 4
@@ -287,7 +304,7 @@ bridge_valid_instance() {
   bridge_listener_matches_pid "$expected_pid" || return 1
   payload="$(curl -fsS --max-time 2 http://127.0.0.1:10101/healthz 2>/dev/null)" || return 1
   printf '%s' "$payload" | python3 -c '
-import datetime, json, sys, uuid
+import datetime, json, re, sys, uuid
 expected_pid = int(sys.argv[1])
 previous = sys.argv[2]
 try:
@@ -322,10 +339,27 @@ def valid_idempotency_ledger(value):
         and type(value.get("remaining_capacity")) is int
         and value.get("remaining_capacity") == max(0, value.get("max_entries") - value.get("entries"))
     )
+base_fields = {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
+schema = body.get("schema_version") if isinstance(body, dict) else None
+def valid_runtime_policy_identity(value):
+    runtime_digest = value.get("runtime_digest")
+    policy_snapshot_id = value.get("policy_snapshot_id")
+    digest_is_hex = isinstance(runtime_digest, str) and re.fullmatch(r"[0-9a-f]{64}", runtime_digest) is not None
+    policy_is_hex = isinstance(policy_snapshot_id, str) and re.fullmatch(r"[0-9a-f]{64}", policy_snapshot_id) is not None
+    return (digest_is_hex and policy_is_hex) or (
+        policy_snapshot_id == "legacy" and (runtime_digest == "legacy" or digest_is_hex)
+    )
+schema_fields_ok = (
+    (schema == 2 and set(body) == base_fields)
+    or (
+        schema == 3
+        and set(body) == base_fields | {"runtime_digest", "policy_snapshot_id"}
+        and valid_runtime_policy_identity(body)
+    )
+)
 healthy = (
     isinstance(body, dict)
-    and set(body) == {"schema_version", "service", "launchd_label", "instance_id", "pid", "started_at", "ok", "model", "active_executions", "accepting_executions", "opencode", "error", "gateway_health", "idempotency_ledger"}
-    and body.get("schema_version") == 2
+    and schema_fields_ok
     and body.get("service") == "opencode-codex-bridge"
     and body.get("launchd_label") == "com.arnaud.opencode-codex-bridge"
     and instance.version == 4

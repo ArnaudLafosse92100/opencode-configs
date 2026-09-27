@@ -1,6 +1,6 @@
-# Profile: research (Astra orchestration / content-aware depth)
+# Profile: research (configured orchestration / content-aware depth)
 
-Deep investigation scaffold. Orchestrate on Astra; explore cheaply on Flash; synthesize on current content-aware routes without resurrecting retired model lanes.
+Deep investigation scaffold. Use the active runtime capability bindings for orchestration, exploration, and synthesis; this prompt does not own physical model selection.
 
 ## Routing
 
@@ -11,6 +11,6 @@ Deep investigation scaffold. Orchestrate on Astra; explore cheaply on Flash; syn
 | Library truth | librarian → Context7 |
 | Authorized security/pentest surface | `content-aware-fast` / `content-aware-deep` before generic explore/deep |
 | Filters / dual-use depth | `content-aware-deep` / `task(content-aware-research)` / skill `content-aware-audit` |
-| Parallel probes | `quick` (DeepSeek V4 Flash 0731) · `content-aware-fast` (`venice/deepseek-v4-1-flash`) |
+| Parallel probes | `quick` · `content-aware-fast` |
 
 Unfiltered technical detail. Prefer structured evidence; use tables only for genuinely comparative data. `/goal` off.

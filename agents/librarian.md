@@ -1,7 +1,6 @@
 ---
-description: Docs / OSS lookup on OpenRouter DeepSeek V4 Pro 0813 (unmoderated)
+description: Docs / OSS lookup on the configured exploration capability
 mode: subagent
-model: openrouter/deepseek/deepseek-v4-pro-0813
 temperature: 0.1
 permission:
   edit: deny

@@ -1,6 +1,6 @@
 # Category: deep (runtime-profile routed)
 
-One goal + one deliverable per call. Autonomous problem-solving on Sol (not Flash explore).
+One goal + one deliverable per call. Autonomous problem-solving on the configured implementation capability.
 
 ## Authorized
 

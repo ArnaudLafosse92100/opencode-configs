@@ -1,6 +1,6 @@
-# Category: unspecified-high (Astra subscription)
+# Category: unspecified-high
 
-High-effort general work and hyperplan architecture critic. Use Astra through the local Codex subscription with no metered API fallback.
+High-effort general work and hyperplan architecture critic. Use the configured high-effort capability and its declared fallback policy.
 
 ## Do
 
