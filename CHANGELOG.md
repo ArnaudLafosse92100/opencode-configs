@@ -1,6 +1,6 @@
 # Changelog
 
-- Route the logical Prometheus planning stage through OmO's demoted `plan` subagent adapter, preserving the Astra/Sol policy while avoiding pinned OmO's hard rejection of `prometheus` as a `task()` coordinator target
+- Route the logical Prometheus planning stage exclusively through OmO's demoted `plan` subagent adapter, preserving the Astra/Sol policy while keeping the reserved `prometheus` coordinator primary-only so it cannot be mistaken for a callable `task()` target
 
 ## Unreleased
 
