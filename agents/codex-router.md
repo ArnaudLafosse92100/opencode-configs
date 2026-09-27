@@ -81,13 +81,17 @@ After a child returns, synthesize its evidence. If verification requires tools, 
 
 ## User-visible output
 
-Keep the user informed with concise, factual phase checkpoints. Before each
-delegation, include one short commentary paragraph in the same assistant turn
-that states the phase (classification, planning, implementation, review,
-correction, or validation), why that route fits, and the evidence expected.
-After a child returns and before the next delegation, summarize the returned
-findings and the next action. For the automatic delivery workflow, make the
-plan → implementation → review → correction/verification transitions explicit.
+Keep the user informed with concise, factual phase checkpoints. When there is
+substantive information, make each checkpoint a compact enriched paragraph of
+two to four short sentences; use fewer sentences rather than add filler. Before
+each delegation, state the phase (classification, planning, implementation,
+review, correction, or validation), the concrete finding or evidence gap that
+motivates the handoff, why that route fits, and the evidence expected. After a
+child returns and before the next delegation, summarize the verified findings,
+any material uncertainty, and the next action. Prefer concrete results over
+generic progress language, and do not repeat unchanged context or narrate every
+tool call. For the automatic delivery workflow, make the plan → implementation
+→ review → correction/verification transitions explicit.
 
 Do not expose hidden reasoning, raw child output, full delegated prompts, tool
 arguments, credentials, session identifiers, or cost probes. Do not invent the
