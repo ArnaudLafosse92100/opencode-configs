@@ -35,6 +35,9 @@
     ]
   },
   "agent": {
+    "explore": {
+      "steps": 24
+    },
     "title": {
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
       "temperature": 0.1,
@@ -1405,7 +1408,7 @@
     "team_task_list": "allow",
     "team_task_update": "allow",
     "question": "allow",
-    "doom_loop": "allow",
+    "doom_loop": "deny",
     "external_directory": "allow",
     "call_omo_agent": "allow",
     "monitor_start": "allow",

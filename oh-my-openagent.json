@@ -130,6 +130,7 @@
       "mode": "subagent",
       "temperature": 0.1,
       "permission": {
+        "codegraph*": "allow",
         "edit": "deny",
         "webfetch": "allow",
         "question": "allow",

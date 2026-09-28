@@ -98,6 +98,7 @@ is never proof of the active profile, provider, model, deployment or success.
 ## Permissions
 
 - Allow-everything on this trusted local box (no interactive prompts for normal tools).
+- Repeated identical tool loops are denied (`doom_loop: deny`) so headless runs cannot wait on loop approval. Explore keeps CodeGraph access and a native 24-step synthesis cue; this cue is not a hard execution limit. Return a partial map when its progress budget is exhausted; the Codex bridge separately stops repeated read-only calls.
 - Hard-deny catastrophic bash: `rm -rf /`, `rm -rf ~`, `mkfs`, `sudo`, `git push --force`, `gh repo delete`.
 - External directories, team tools, LSP, MCP allowed: Context7 · Exa websearch · grep_app · codegraph · lsp (OmO builtins + `opencode.json` Context7).
 - Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.

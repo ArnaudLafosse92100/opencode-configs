@@ -1994,47 +1994,47 @@ function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
 }
 
 // Canonical route patch follows the existing runtime-fallback patch.
-export function patchDist(original) {
+function patchFallbackDist(original) {
   assertNoUnsupportedOpenConfigRuntimePatchMarkers(original);
   if (original.includes(MARKER)) return { text: original, changed: false };
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v34")) {
     const text = `${applyNativeIdleTurnPreservationV35(original)}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v33")) {
     const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(original))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v32")) {
     const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v31")) {
     const text = `${applyCurrentRuntimeFixes(original)}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v30")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v29")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyPentestThroughputAliasMigrationV30(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v28")) {
     const text = `${applyCurrentRuntimeFixes(applyPentestThroughputAliasMigrationV30(applyExploreSecurityIntentRejection(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v27")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyCanonicalAgentModels(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   // v23 is the complete governed bundle deployed by this repository. Its
@@ -2042,17 +2042,17 @@ export function patchDist(original) {
   // string transforms would be both brittle and unsafe.
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v25")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(original))))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v26")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(original)))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v24")) {
     const text = `${applyCurrentRuntimeFixes(applyExploreSecurityIntentRejection(applyDurableUserTurnLatchV27(applyDurableUserTurnResetV26(applyPerModelRetryAndDispatchBoundsV25(original)))))}\n/* ${MARKER} */\n`;
-    assertPatched(text);
+    assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v23")) {
@@ -2368,7 +2368,7 @@ function prepareFallback(sessionID, state3, fallbackModels, config3, options = {
   return { text, changed: true };
 }
 
-export function assertPatched(text) {
+function assertFallbackPatched(text) {
   assertNoUnsupportedOpenConfigRuntimePatchMarkers(text);
   const required = [
     MARKER,
@@ -2481,6 +2481,132 @@ export function assertPatched(text) {
   ];
   const duplicated = exactOnce.filter(value => text.split(value).length - 1 !== 1);
   if (duplicated.length > 0) throw new Error(`OmO governed runtime patch has non-unique canonical blocks: ${duplicated.join(", ")}`);
+}
+
+// OmO 4.19.4 deliberately filters native overrides of protected builtins.
+// Preserve only Explore's native step synthesis cue; never bypass model/tool protection.
+export function applyExploreStepBound(original) {
+  if (original.includes("// OpenConfig native Explore step bound v1")) return original;
+  return replaceOnce(original, "async function assembleAgentConfig(params) {", `async function assembleAgentConfig(params) {
+  // OpenConfig native Explore step bound v1
+  const exploreSteps = params.sources.configAgent?.explore?.steps;
+  if (Number.isInteger(exploreSteps) && exploreSteps > 0 && exploreSteps <= 24 && params.builtinAgents.explore) {
+    params.builtinAgents.explore.steps = exploreSteps;
+  }`, "native Explore step bound through protected builtin assembly");
+}
+
+// OmO 4.19.4 demotes the native `plan` agent by copying only model settings.
+// That accidentally retains OpenCode's read-only plan prompt and drops the
+// Prometheus prompt/permissions that permit guarded `.omo/*.md` artifacts.
+export function applyPlanArtifactContract(original) {
+  let text = original;
+  if (!text.includes("// OpenConfig demoted Plan artifact contract v1")) {
+    text = replaceOnce(
+      text,
+      `  return { mode: "subagent", hidden: true, ...modelSettings };
+}`,
+      `  // OpenConfig demoted Plan artifact contract v1
+  const prompt = planOverride?.prompt ?? prometheusConfig?.prompt;
+  const permission = planOverride?.permission ?? prometheusConfig?.permission;
+  const description = planOverride?.description ?? prometheusConfig?.description;
+  return {
+    mode: "subagent",
+    hidden: false,
+    ...modelSettings,
+    ...typeof prompt === "string" ? { prompt } : {},
+    ...permission && typeof permission === "object" ? { permission } : {},
+    ...typeof description === "string" ? { description } : {}
+  };
+}`,
+      "demoted Plan inherits guarded Prometheus artifact contract",
+    );
+  }
+  if (text.includes("// OpenConfig demoted Plan artifact contract v1") && !text.includes('mode: "subagent",\n    hidden: false,\n    ...modelSettings')) {
+    text = replaceOnce(
+      text,
+      `// OpenConfig demoted Plan artifact contract v1
+  const prompt = planOverride?.prompt ?? prometheusConfig?.prompt;
+  const permission = planOverride?.permission ?? prometheusConfig?.permission;
+  const description = planOverride?.description ?? prometheusConfig?.description;
+  return {
+    mode: "subagent",
+    hidden: true,
+    ...modelSettings`,
+      `// OpenConfig demoted Plan artifact contract v1
+  const prompt = planOverride?.prompt ?? prometheusConfig?.prompt;
+  const permission = planOverride?.permission ?? prometheusConfig?.permission;
+  const description = planOverride?.description ?? prometheusConfig?.description;
+  return {
+    mode: "subagent",
+    hidden: false,
+    ...modelSettings`,
+      "collision-free Prometheus adapter is callable",
+    );
+  }
+  if (!text.includes('normalized === "prometheus-plan"')) {
+    if (text.includes('// OpenConfig demoted Plan uses Prometheus markdown guard v1')) {
+      text = replaceOnce(
+        text,
+        'return normalized === "plan" || normalized?.includes(PROMETHEUS_AGENT) || false;',
+        'return normalized === "plan" || normalized === "prometheus-plan" || normalized?.includes(PROMETHEUS_AGENT) || false;',
+        "existing Prometheus markdown-only guard gains collision-free identity",
+      );
+    } else {
+      text = replaceOnce(
+        text,
+        `function isPrometheusAgent(agentName) {
+  return agentName?.toLowerCase().includes(PROMETHEUS_AGENT) ?? false;
+}`,
+        `function isPrometheusAgent(agentName) {
+  // OpenConfig demoted Plan uses Prometheus markdown guard v1
+  const normalized = agentName?.trim().toLowerCase();
+  return normalized === "plan" || normalized === "prometheus-plan" || normalized?.includes(PROMETHEUS_AGENT) || false;
+}`,
+        "demoted Plan is covered by Prometheus markdown-only hook",
+      );
+    }
+  }
+  if (!text.includes('// OpenConfig collision-free Prometheus subagent identity v1')) {
+    text = replaceOnce(
+      text,
+      `    ...planDemoteConfig ? { plan: planDemoteConfig } : {}
+  };`,
+      `    // OpenConfig collision-free Prometheus subagent identity v1
+    // OpenCode reserves the literal \`plan\` identity and injects its native
+    // read-only system prompt. Publish the guarded Prometheus contract under a
+    // non-reserved callable identity instead.
+    ...planDemoteConfig ? { "prometheus-plan": planDemoteConfig } : {}
+  };`,
+      "Prometheus uses a non-reserved callable subagent identity",
+    );
+  }
+  return text;
+}
+
+export function patchDist(original) {
+  const fallback = patchFallbackDist(original);
+  const text = applyPlanArtifactContract(applyExploreStepBound(fallback.text));
+  assertPatched(text);
+  return { text, changed: text !== original };
+}
+
+export function assertPatched(text) {
+  assertFallbackPatched(text);
+  for (const marker of ["// OpenConfig native Explore step bound v1", "params.builtinAgents.explore.steps = exploreSteps;"]) {
+    if (text.split(marker).length !== 2) throw new Error(`Missing or duplicate Explore step bound: ${marker}`);
+  }
+  for (const marker of [
+    "// OpenConfig demoted Plan artifact contract v1",
+    "const prompt = planOverride?.prompt ?? prometheusConfig?.prompt;",
+    "const permission = planOverride?.permission ?? prometheusConfig?.permission;",
+    'mode: "subagent",\n    hidden: false,',
+    "// OpenConfig demoted Plan uses Prometheus markdown guard v1",
+    'return normalized === "plan" || normalized === "prometheus-plan" || normalized?.includes(PROMETHEUS_AGENT) || false;',
+    "// OpenConfig collision-free Prometheus subagent identity v1",
+    '...planDemoteConfig ? { "prometheus-plan": planDemoteConfig } : {}',
+  ]) {
+    if (text.split(marker).length !== 2) throw new Error(`Missing or duplicate Plan artifact contract: ${marker}`);
+  }
 }
 
 function main() {

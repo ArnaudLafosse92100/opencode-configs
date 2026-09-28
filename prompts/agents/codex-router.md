@@ -41,12 +41,13 @@ automatic interactive fallback. Never delegate to `sisyphus` itself.
 2. Delegate **Metis** (`subagent_type="metis"`) with those compact findings.
    Require hidden-intent, false-premise, scope, acceptance, ownership, and
    operational-risk analysis; no edits and at most three execution blockers.
-3. Delegate the **Prometheus planning role** through OmO's callable demoted-plan
-   adapter with exactly `task(description="Prometheus …", subagent_type="plan",
-   ...)`. The `plan` target is the canonical callable identity of Prometheus in
-   this workflow, not a substitute or skipped stage. Never target
-   `subagent_type="prometheus"`: pinned OmO reserves that name for its primary
-   coordinator and rejects it from `task(...)`. Require an executable,
+3. Delegate the **Prometheus planning role** through OmO's callable,
+   collision-free adapter with exactly `task(description="Prometheus …",
+   subagent_type="prometheus-plan", ...)`. Never target
+   `subagent_type="plan"`: OpenCode reserves that literal identity and injects
+   its native read-only prompt. Never target `subagent_type="prometheus"`
+   either: pinned OmO reserves that name for its primary coordinator and rejects
+   it from `task(...)`. Require an executable,
    model-neutral plan: outcome, non-goals, invariants, exact files/interfaces,
    ordered tasks, checks, rollout, rollback, and discovery gates. Prometheus must
    write that plan to one task-specific `.omo/plans/*.md` artifact and return its

@@ -223,7 +223,7 @@ TEAM_TOOLS = (
 CORE_TOOLS = (
     "edit", "glob", "grep", "list", "task", "call_omo_agent",
     "skill", "skill_mcp", "todowrite", "todoread",
-    "webfetch", "websearch", "question", "doom_loop", "external_directory",
+    "webfetch", "websearch", "question", "external_directory",
     "interactive_bash", "background_output", "background_cancel", "look_at",
     "session_info", "session_list", "session_read", "session_search",
     "grep_app", "list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource",
@@ -238,6 +238,15 @@ for t in TEAM_TOOLS + CORE_TOOLS:
     if perm.get(t) != "allow":
         perm[t] = "allow"
         changes.append(f"permission.{t} -> allow")
+# Headless execution cannot resolve an interactive doom-loop approval.
+if perm.get("doom_loop") != "deny":
+    perm["doom_loop"] = "deny"
+    changes.append("permission.doom_loop -> deny")
+# Native OpenCode owns the step synthesis cue; OmO strips it from agent overrides.
+explore_native = oc.setdefault("agent", {}).setdefault("explore", {})
+if explore_native.get("steps") != 24:
+    explore_native["steps"] = 24
+    changes.append("agent.explore.steps -> 24")
 # Official OpenCode default: deny .env reads (https://opencode.ai/docs/permissions)
 READ_PERM = {"*": "allow", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow"}
 if perm.get("read") != READ_PERM:
@@ -554,6 +563,10 @@ if isinstance(cg2, dict):
 
 # Hephaestus needs teammate:allow to be a team member (OmO conditional)
 agents = omo.setdefault("agents", {})
+explore_perm = agents.setdefault("explore", {}).setdefault("permission", {})
+if explore_perm.get("codegraph*") != "allow":
+    explore_perm["codegraph*"] = "allow"
+    changes.append("agents.explore.permission.codegraph* -> allow")
 heph = agents.setdefault("hephaestus", {})
 if isinstance(heph, dict):
     hp = heph.setdefault("permission", {})

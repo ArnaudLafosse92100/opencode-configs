@@ -6,7 +6,27 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import vm from "node:vm";
-import { applyCanonicalAgentModels, assertPatched, patchDist } from "../scripts/patch-omo-runtime-fallback.mjs";
+import { applyCanonicalAgentModels, applyExploreStepBound, assertPatched, patchDist } from "../scripts/patch-omo-runtime-fallback.mjs";
+
+test("native Explore bound survives protected builtin assembly without other overrides", async () => {
+  const source = "async function assembleAgentConfig(params) { return params.builtinAgents; }";
+  const patched = applyExploreStepBound(source);
+  assert.equal(applyExploreStepBound(patched), patched);
+  const assemble = vm.runInNewContext(`(${patched})`);
+  for (const steps of [1, 24, 0, -1, 25, 2.5, "24", undefined]) {
+    const params = {
+      sources: { configAgent: { explore: { steps, model: "must-not-win", permission: { edit: "allow" } } } },
+      builtinAgents: { explore: { model: "preserved", permission: { edit: "deny" } }, oracle: { steps: 99 } },
+    };
+    const result = await assemble(params);
+    assert.equal(result.explore.steps, [1, 24].includes(steps) ? steps : undefined);
+    assert.equal(result.explore.model, "preserved");
+    assert.equal(result.explore.permission.edit, "deny");
+    assert.equal(result.oracle.steps, 99);
+  }
+  await assemble({ sources: { configAgent: {} }, builtinAgents: {} });
+  assert.throws(() => applyExploreStepBound("upstream changed"), /anchor/i);
+});
 
 const FIXTURE = `
 // packages/omo-opencode/src/config/schema/agent-overrides.ts
@@ -1369,6 +1389,29 @@ test("fresh relevant-region fixture is grounded in the checked clean OmO 4.19.4 
     assert.ok(FRESH_PATCH_FIXTURE.includes(anchor), `immutable fixture carries ${anchor}`);
     assert.ok(text.includes(anchor), `clean package carries ${anchor}`);
   }
+});
+
+test("demoted plan inherits Prometheus artifact authority and its markdown-only guard", () => {
+  const text = patchDist(cleanOmo4194Source()).text;
+  const demoteStart = text.indexOf("function buildPlanDemoteConfig(");
+  const demoteEnd = text.indexOf("// packages/omo-opencode/src/agents/prometheus/system-prompt.ts", demoteStart);
+  const demote = text.slice(demoteStart, demoteEnd);
+  assert.match(demote, /const prompt = planOverride\?\.prompt \?\? prometheusConfig\?\.prompt/);
+  assert.match(demote, /const permission = planOverride\?\.permission \?\? prometheusConfig\?\.permission/);
+  assert.match(demote, /mode: "subagent",\s+hidden: false/);
+  assert.match(demote, /typeof prompt === "string" \? \{ prompt \} : \{\}/);
+  assert.match(demote, /permission && typeof permission === "object" \? \{ permission \} : \{\}/);
+  assert.doesNotMatch(demote, /return \{ mode: "subagent", hidden: true, \.\.\.modelSettings \};/);
+
+  const matcherStart = text.indexOf("function isPrometheusAgent(");
+  const matcherEnd = text.indexOf("// packages/omo-opencode/src/hooks/prometheus-md-only/path-policy.ts", matcherStart);
+  const matcher = text.slice(matcherStart, matcherEnd);
+  assert.match(matcher, /normalized === "plan"/);
+  assert.match(matcher, /normalized === "prometheus-plan"/);
+  assert.match(matcher, /normalized\?\.includes\(PROMETHEUS_AGENT\)/);
+
+  assert.match(text, /\.\.\.planDemoteConfig \? \{ "prometheus-plan": planDemoteConfig \} : \{\}/);
+  assert.doesNotMatch(text, /\.\.\.planDemoteConfig \? \{ plan: planDemoteConfig \} : \{\}/);
 });
 
 test("clean OmO resolver chooses only the expected unpatched hash deterministically", () => {
