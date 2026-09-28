@@ -161,15 +161,21 @@ class ContentAwareFallbackTests(unittest.TestCase):
         self.assertEqual(codex["options"]["chunkTimeout"], 3_600_000)
         self.assertEqual(
             set(codex["models"]),
-            {"gpt-6-astra", "astra-opus", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
+            {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
         )
         self.assertEqual(codex["models"]["gpt-5.6-sol-review"]["id"], "openai/gpt-5.6-sol")
-        self.assertEqual(codex["models"]["astra-opus"]["id"], "combo/astra-opus")
         active_sources = "\n".join(
             (REPO / name).read_text(encoding="utf-8")
             for name in (".env.example", "lib/common.sh", "oh-my-openagent.json")
         )
         self.assertNotIn("LLM_GATEWAY_", active_sources)
+
+    def test_claude_code_plugin_is_pinned_and_catalog_comes_from_the_plugin(self) -> None:
+        opencode = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))
+        self.assertIn("@openchamber/opencode-claude@0.14.0", opencode["plugin"])
+        self.assertIn("claude-code", opencode["enabled_providers"])
+        # Declaring models here would override the plugin's context/attachment limits.
+        self.assertNotIn("models", opencode["provider"]["claude-code"])
 
     def test_normal_quick_and_unspecified_low_use_metered_runtime_pool(self) -> None:
         expected = {
@@ -207,7 +213,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         flash = "openrouter/deepseek/deepseek-v4-flash-0731"
         sol = "codex-subscription/gpt-5.6-sol"
         astra = "codex-subscription/gpt-6-astra"
-        astra_opus = "codex-subscription/astra-opus"
+        opus = "claude-code/opus"
         for section, names in (
             ("agents", ("librarian", "sisyphus-junior", "explore")),
             ("categories", ("quick", "unspecified-low")),
@@ -228,7 +234,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
             ("categories", ("ultrabrain", "unspecified-high", "arch-review")),
         ):
             for name in names:
-                self.assertEqual(normal[section][name], {"model": astra_opus, "fallback_models": [sol]}, name)
+                self.assertEqual(normal[section][name], {"model": astra, "fallback_models": [opus, sol]}, name)
         for removed in ("codex-plan", "codex-implement", "codex-review"):
             self.assertNotIn(removed, normal["categories"])
             self.assertNotIn(removed, self.config["categories"])
@@ -249,7 +255,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
                 with self.subTest(section=section, name=name):
                     if route["model"].startswith("codex-subscription/"):
                         self.assertTrue(all(
-                            fallback.startswith("codex-subscription/")
+                            fallback.startswith(("codex-subscription/", "claude-code/"))
                             for fallback in route["fallback_models"]
                         ))
                     self.assertFalse(route["model"].startswith("claude-subscription/"))

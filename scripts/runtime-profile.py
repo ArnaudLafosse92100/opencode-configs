@@ -538,14 +538,18 @@ class RuntimeProfiles:
                 "venice-api": f"venice/{model['model']}",
                 "deepseek-api": f"deepseek/{model['model']}",
                 "claude-subscription": None,
+                "claude-code-agent-sdk": f"claude-code/{model['model']}",
             }.get(model["transport"])
             if model["transport"] == "openrouter-pi" and not model["model"].startswith("openrouter/"):
                 raise SystemExit(f"invalid OpenRouter model identity: {reference}")
             if model["transport"] == "codex-subscription" and model["provider"] != "codex":
                 raise SystemExit(f"invalid Codex model provider: {reference}")
-            if model["transport"] == "claude-subscription" and model["provider"] != "claude":
+            if model["transport"] in {"claude-subscription", "claude-code-agent-sdk"} and model["provider"] != "claude":
                 raise SystemExit(f"invalid Claude model provider: {reference}")
-            if model["transport"] not in {"codex-subscription", "openrouter-pi", "venice-api", "deepseek-api", "claude-subscription"}:
+            if model["transport"] not in {
+                "codex-subscription", "openrouter-pi", "venice-api", "deepseek-api",
+                "claude-subscription", "claude-code-agent-sdk",
+            }:
                 raise SystemExit(f"unsupported model transport: {reference}")
             if runtime_model != expected_runtime:
                 raise SystemExit(f"runtime model identity mismatch: {reference}")
