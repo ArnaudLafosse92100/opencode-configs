@@ -20,6 +20,7 @@ Usage:
   oc profile xdg-path [normal|pentest]
   oc profile env [normal|pentest] [--shell]
   oc profile resolve <normal|pentest> <agents|categories> <name>
+  oc profile routes <normal|pentest>
   oc profile export-route <normal|pentest> <name>
   oc profile export-workflow-routes <normal|pentest> [--schema-version 1|3|4]
   oc profile export-policy-manifest <normal|pentest>
@@ -58,6 +59,11 @@ case "$MODE" in
     shift
     [[ $# -eq 3 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" resolve "$@"
+    ;;
+  routes)
+    shift
+    [[ $# -eq 1 ]] || usage
+    exec python3 "$PYTHON_TOOL" --repo "$REPO" routes "$@"
     ;;
   export-route)
     shift

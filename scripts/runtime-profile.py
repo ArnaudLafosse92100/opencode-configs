@@ -1189,6 +1189,25 @@ class RuntimeProfiles:
             "source": str(self.profile_path),
         }
 
+    def routes(self, profile: str) -> dict:
+        """Every resolved agent/category route of one profile, read-only."""
+        selected = self.selected(profile)
+        return {
+            "schema_version": 1,
+            "profile": profile,
+            **{
+                section: {
+                    name: {
+                        key: value
+                        for key, value in self.resolve(profile, section, name).items()
+                        if key not in ("profile", "section", "name", "source")
+                    }
+                    for name in sorted(selected.get(section) or {})
+                }
+                for section in VALID_SECTIONS
+            },
+        }
+
     def export_route(self, profile: str, name: str) -> dict:
         route = ((self.data.get("export_routes") or {}).get(profile) or {}).get(name)
         if not isinstance(route, dict):
@@ -1873,6 +1892,8 @@ def parser() -> argparse.ArgumentParser:
     resolve.add_argument("profile", choices=VALID_PROFILES)
     resolve.add_argument("section", choices=VALID_SECTIONS)
     resolve.add_argument("name")
+    routes = sub.add_parser("routes")
+    routes.add_argument("profile", choices=VALID_PROFILES)
     export_route = sub.add_parser("export-route")
     export_route.add_argument("profile", choices=VALID_PROFILES)
     export_route.add_argument("name")
@@ -1895,6 +1916,9 @@ def main() -> int:
         return 0
     if args.command == "export-policy-manifest":
         print(json.dumps(profiles.export_policy_manifest(args.profile), ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "routes":
+        print(json.dumps(profiles.routes(args.profile), ensure_ascii=False, sort_keys=True))
         return 0
     with profiles.locked():
         profiles.assert_native_migration_safe()
