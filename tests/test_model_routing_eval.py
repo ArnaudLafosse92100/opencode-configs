@@ -161,9 +161,10 @@ class ContentAwareFallbackTests(unittest.TestCase):
         self.assertEqual(codex["options"]["chunkTimeout"], 3_600_000)
         self.assertEqual(
             set(codex["models"]),
-            {"gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
+            {"gpt-6-astra", "astra-opus", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-sol-review"},
         )
         self.assertEqual(codex["models"]["gpt-5.6-sol-review"]["id"], "openai/gpt-5.6-sol")
+        self.assertEqual(codex["models"]["astra-opus"]["id"], "combo/astra-opus")
         active_sources = "\n".join(
             (REPO / name).read_text(encoding="utf-8")
             for name in (".env.example", "lib/common.sh", "oh-my-openagent.json")
@@ -206,6 +207,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         flash = "openrouter/deepseek/deepseek-v4-flash-0731"
         sol = "codex-subscription/gpt-5.6-sol"
         astra = "codex-subscription/gpt-6-astra"
+        astra_opus = "codex-subscription/astra-opus"
         for section, names in (
             ("agents", ("librarian", "sisyphus-junior", "explore")),
             ("categories", ("quick", "unspecified-low")),
@@ -226,7 +228,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
             ("categories", ("ultrabrain", "unspecified-high", "arch-review")),
         ):
             for name in names:
-                self.assertEqual(normal[section][name], {"model": astra, "fallback_models": [sol]}, name)
+                self.assertEqual(normal[section][name], {"model": astra_opus, "fallback_models": [sol]}, name)
         for removed in ("codex-plan", "codex-implement", "codex-review"):
             self.assertNotIn(removed, normal["categories"])
             self.assertNotIn(removed, self.config["categories"])
@@ -674,11 +676,11 @@ class WorkflowRouteTests(unittest.TestCase):
         )
         self.assertEqual(
             opencode["bindings"]["agents"]["metis"],
-            {"capability": "architecture", "effort": "medium"},
+            {"capability": "orchestration", "effort": "medium"},
         )
         self.assertEqual(
             opencode["bindings"]["agents"]["momus"],
-            {"capability": "architecture", "effort": "medium"},
+            {"capability": "orchestration", "effort": "medium"},
         )
         aliases = payload["surfaces"]["factory-archon"]["aliases"]
         for binding in aliases.values():

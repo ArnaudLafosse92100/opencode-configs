@@ -757,10 +757,10 @@ if omo:
         if not re.fullmatch(r"[0-9a-f]{64}", runtime_profiles.manifest_snapshot_id("normal")):
             raise ValueError("invalid policy manifest snapshot id")
         openconfig_agents = runtime_profiles.data["profiles"]["normal"]["bindings"]["agents"]
-        if openconfig_agents.get("metis") != {"capability": "architecture", "effort": "medium"}:
-            raise ValueError("metis must retain its OpenCode architecture role")
-        if openconfig_agents.get("momus") != {"capability": "architecture", "effort": "medium"}:
-            raise ValueError("momus must retain its OpenCode architecture role")
+        if openconfig_agents.get("metis") != {"capability": "orchestration", "effort": "medium"}:
+            raise ValueError("metis must retain its OpenCode orchestration role")
+        if openconfig_agents.get("momus") != {"capability": "orchestration", "effort": "medium"}:
+            raise ValueError("momus must retain its OpenCode orchestration role")
         ok("workflow_routes v4 derives all workflow capabilities from qualified model bindings")
         ok("policy manifest seals canonical OpenCode and Factory/Archon surface bindings")
     except Exception as exc:

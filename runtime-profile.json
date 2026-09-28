@@ -117,6 +117,34 @@
       ],
       "tool_use": true
     },
+    "astra-opus-subscription": {
+      "runtime_model": "codex-subscription/astra-opus",
+      "provider": "codex",
+      "model": "astra-opus",
+      "billing": "subscription",
+      "transport": "codex-subscription",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode"
+      ],
+      "tool_use": true
+    },
     "opus-subscription": {
       "runtime_model": null,
       "provider": "claude",
@@ -591,6 +619,22 @@
         "medium"
       ]
     },
+    "orchestration": {
+      "primary": "astra-opus-subscription",
+      "fallbacks": [
+        "sol-subscription"
+      ],
+      "required_privacy": "standard",
+      "required_modalities": [
+        "text"
+      ],
+      "allowed_billing": [
+        "subscription"
+      ],
+      "allow_metered_fallback": false,
+      "requires_tools": true,
+      "workflow_efforts": []
+    },
     "review": {
       "primary": "opus-subscription",
       "fallbacks": [],
@@ -857,11 +901,11 @@
       "bindings": {
         "agents": {
           "codex-router": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "sisyphus": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "hephaestus": {
@@ -869,11 +913,11 @@
             "effort": "medium"
           },
           "prometheus": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "plan": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "atlas": {
@@ -881,7 +925,7 @@
             "effort": "medium"
           },
           "oracle": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "librarian": {
@@ -897,11 +941,11 @@
             "effort": "medium"
           },
           "metis": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "momus": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "sisyphus-junior": {
@@ -943,7 +987,7 @@
             "effort": "medium"
           },
           "ultrabrain": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "deep": {
@@ -967,7 +1011,7 @@
             "effort": "medium"
           },
           "unspecified-high": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "writing": {
@@ -983,7 +1027,7 @@
             "effort": "medium"
           },
           "arch-review": {
-            "capability": "architecture",
+            "capability": "orchestration",
             "effort": "medium"
           },
           "content-aware-fast": {
