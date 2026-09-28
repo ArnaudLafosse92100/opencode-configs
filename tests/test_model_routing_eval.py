@@ -530,6 +530,29 @@ class ExportRouteTests(unittest.TestCase):
             json.dumps(payload, ensure_ascii=False, sort_keys=True),
         )
 
+    def test_routes_command_lists_every_resolved_route_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(
+            os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
+        ):
+            profiles = runtime_profile.RuntimeProfiles(REPO)
+            for profile in ("normal", "pentest"):
+                with self.subTest(profile=profile):
+                    result = subprocess.run(
+                        [str(REPO / "oc"), "profile", "routes", profile],
+                        cwd=REPO, check=True, capture_output=True, text=True,
+                    )
+                    payload = json.loads(result.stdout)
+                    selected = profiles.selected(profile)
+                    self.assertEqual(payload["schema_version"], 1)
+                    self.assertEqual(payload["profile"], profile)
+                    for section in ("agents", "categories"):
+                        self.assertEqual(sorted(payload[section]), sorted(selected[section]))
+                        for name, route in payload[section].items():
+                            resolved = profiles.resolve(profile, section, name)
+                            self.assertEqual(route["model"], resolved["model"], name)
+                            self.assertEqual(route["fallback_models"], resolved["fallback_models"], name)
+                    self.assertEqual(list(pathlib.Path(state).iterdir()), [])
+
     def test_export_policy_never_renders_into_omo(self) -> None:
         with tempfile.TemporaryDirectory() as state, mock.patch.dict(
             os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
