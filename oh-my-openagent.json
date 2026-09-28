@@ -31,7 +31,7 @@
       "color": "#00F0FF",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -47,7 +47,7 @@
       "color": "#FF5C00",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-6-astra"
       ]
@@ -59,7 +59,7 @@
       "color": "#B967FF",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -72,7 +72,7 @@
       "color": "#B967FF",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -84,7 +84,7 @@
       "color": "#39FF14",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-6-astra"
       ]
@@ -102,7 +102,7 @@
       "color": "#6C63FF",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -120,7 +120,7 @@
       "color": "#00FFD1",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/z-ai/glm-5.3",
         "openrouter/minimax/minimax-m3"
@@ -140,7 +140,7 @@
       "color": "#FFD400",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/z-ai/glm-5.3",
         "openrouter/minimax/minimax-m3"
@@ -162,7 +162,7 @@
         "openrouter/google/gemini-3.7-flash",
         "openrouter/minimax/minimax-m3"
       ],
-      "reasoning": "low"
+      "reasoning": "medium"
     },
     "metis": {
       "mode": "subagent",
@@ -182,7 +182,7 @@
       "color": "#FF8A3D",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "xhigh",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -194,7 +194,7 @@
       "color": "#7A8BFF",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/z-ai/glm-5.3",
         "openrouter/minimax/minimax-m3"
@@ -215,7 +215,7 @@
       "description": "Content-aware research — full technical depth without soft refusals (edit denied). Replaces disabled OmO security-* skills.",
       "maxTokens": 16384,
       "model": "venice/deepseek-v4-pro-0813",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro",
         "venice/deepseek-v4-1-flash"
@@ -236,7 +236,7 @@
       "description": "Flash attack-surface recon on Venice DeepSeek V4.1 Flash (edit denied). Venice only.",
       "maxTokens": 8192,
       "model": "venice/deepseek-v4-1-flash",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro-0813",
         "venice/deepseek-v4-pro"
@@ -257,7 +257,7 @@
       "description": "Uncensored Hermes 4 405B over pasted context (edit denied, no tools). Fallbacks are tool-capable.",
       "maxTokens": 16384,
       "model": "openrouter/nousresearch/hermes-4-405b",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol",
         "openrouter/deepseek/deepseek-v4-pro-0813"
@@ -270,7 +270,7 @@
         "codex-subscription/gpt-5.6-sol"
       ],
       "temperature": 0.2,
-      "reasoning": "low",
+      "reasoning": "medium",
       "maxTokens": 32768,
       "prompt_append": "file://~/.config/opencode/prompts/agents/codex-router.md",
       "permission": {
@@ -293,7 +293,7 @@
       "description": "Optional Sisyphus lead on native DeepSeek V4 Pro (not OpenRouter, not Venice)",
       "maxTokens": 8192,
       "model": "deepseek/deepseek-v4-pro",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "deepseek/deepseek-flash",
         "openrouter/qwen/qwen3.8-max-0902",
@@ -309,7 +309,7 @@
       "description": "Fast child of sisyphus-deepseek on native DeepSeek V4.1 Flash",
       "maxTokens": 8192,
       "model": "deepseek/deepseek-flash",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "deepseek/deepseek-v4-pro",
         "openrouter/qwen/qwen3.8-max-0902",
@@ -329,7 +329,7 @@
       "description": "Optional Sisyphus lead on Venice DeepSeek V4 Pro (coding/context; not default)",
       "maxTokens": 8192,
       "model": "venice/deepseek-v4-pro-0813",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro",
         "venice/deepseek-v4-1-flash"
@@ -344,7 +344,7 @@
       "description": "Fast child of sisyphus-venice-deepseek on Venice DeepSeek V4.1 Flash",
       "maxTokens": 8192,
       "model": "venice/deepseek-v4-1-flash",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro-0813",
         "venice/deepseek-v4-pro"
@@ -357,7 +357,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/visual-engineering.md",
       "maxTokens": 16384,
       "model": "openrouter/google/gemini-3.1-pro-preview",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/google/gemini-3.7-flash",
         "openrouter/minimax/minimax-m3"
@@ -367,7 +367,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "xhigh",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -376,7 +376,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/deep.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-6-astra"
       ]
@@ -386,7 +386,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/artistry.md",
       "maxTokens": 16384,
       "model": "openrouter/google/gemini-3.1-pro-preview",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/google/gemini-3.7-flash",
         "openrouter/minimax/minimax-m3"
@@ -396,7 +396,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/quick.md",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/z-ai/glm-5.3",
         "openrouter/minimax/minimax-m3"
@@ -406,7 +406,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-low.md",
       "maxTokens": 32768,
       "model": "openrouter/deepseek/deepseek-v4-flash-0731",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "openrouter/z-ai/glm-5.3",
         "openrouter/minimax/minimax-m3"
@@ -416,7 +416,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -435,7 +435,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/bug-hunt.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-6-astra"
       ]
@@ -445,7 +445,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/refactor-safe.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-5.6-sol",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-6-astra"
       ]
@@ -455,7 +455,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/arch-review.md",
       "maxTokens": 32768,
       "model": "codex-subscription/gpt-6-astra",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
       ]
@@ -465,7 +465,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-fast.md",
       "maxTokens": 8192,
       "model": "venice/deepseek-v4-1-flash",
-      "reasoning": "low",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro-0813",
         "venice/deepseek-v4-pro"
@@ -476,7 +476,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/categories/content-aware-deep.md",
       "maxTokens": 32768,
       "model": "venice/deepseek-v4-pro-0813",
-      "reasoning": "high",
+      "reasoning": "medium",
       "fallback_models": [
         "venice/deepseek-v4-pro",
         "venice/deepseek-v4-1-flash"
@@ -490,7 +490,7 @@
         "openrouter/deepseek/deepseek-v4-pro-0813",
         "openrouter/z-ai/glm-5.3"
       ],
-      "reasoning": "high",
+      "reasoning": "medium",
       "maxTokens": 24576,
       "prompt_append": "file://~/.config/opencode/prompts/categories/agentic-deep-kimi.md"
     }
