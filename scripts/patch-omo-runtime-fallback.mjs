@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MARKER = "OpenConfig runtime-fallback and canonical agent-model patch v35";
+const MARKER = "OpenConfig runtime-fallback and canonical agent-model patch v36";
 const LEGACY_MARKERS = [
   "OpenConfig runtime-fallback primary retry patch v1",
   "OpenConfig runtime-fallback primary retry patch v2",
@@ -37,6 +37,7 @@ const LEGACY_MARKERS = [
   "OpenConfig runtime-fallback and canonical agent-model patch v32",
   "OpenConfig runtime-fallback and canonical agent-model patch v33",
   "OpenConfig runtime-fallback and canonical agent-model patch v34",
+  "OpenConfig runtime-fallback and canonical agent-model patch v35",
 ];
 const EXPECTED_OMO_VERSION = "4.19.4";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +49,7 @@ Applies OpenConfig's governed runtime patch to the pinned OmO package cache.
 The patch adds same-primary retries before model fallback, makes the first
 subagent prompt watchdog configurable from OpenConfig-owned environment knobs,
 and makes canonical agents.*.models drive task(subagent_type) resolution.
-Accepts a fresh pinned dist or upgrades deployed markers v1-v3 and v7-v34; unknown
+Accepts a fresh pinned dist or upgrades deployed markers v1-v3 and v7-v35; unknown
 intermediate OpenConfig patch markers are refused fail-closed.`);
 }
 
@@ -1981,15 +1982,53 @@ function applyNativeIdleTurnPreservationV35(original) {
   return original;
 }
 
+// A spent Codex subscription (OpenCodex's local quota lock or the upstream
+// usage limit) cannot recover by retrying the same model: OpenCode would sleep
+// on a multi-day Retry-After. validate.sh restricts codex-subscription
+// primaries to subscription fallbacks, so falling back here never reaches a
+// metered API.
+function applyCodexSubscriptionExhaustionFallbackV36(original) {
+  const marker = "OpenConfig Codex subscription exhaustion fallback v36";
+  if (original.includes(marker)) return original;
+  let text = original;
+  text = replaceOnce(text, `function openConfigAllowPrimaryRetry(error, retrySignal, retryOnErrors) {
+  return openConfigCanRetryFallbackError(error, retryOnErrors);
+}
+function openConfigCanRetrySessionStatus(retrySignal, retryMessage, retryOnErrors) {
+  return openConfigCanRetryFallbackError({ message: retryMessage, status: retryMessage }, retryOnErrors);
+}`, `function openConfigIsCodexSubscriptionExhaustion(error) {
+  // ${marker}: a spent Codex plan falls back at once instead of retrying the primary.
+  let serialized = "";
+  try { serialized = typeof error === "string" ? error : JSON.stringify(error); } catch {}
+  return /codex main account is blocked by the \\d+% main-account quota policy|usage_limit_reached|you(?:'|\\u2019)?ve hit your usage limit|the usage limit has been reached/i.test(serialized ?? "");
+}
+function openConfigAllowPrimaryRetry(error, retrySignal, retryOnErrors) {
+  if (openConfigIsCodexSubscriptionExhaustion(error)) return false;
+  return openConfigCanRetryFallbackError(error, retryOnErrors);
+}
+function openConfigCanRetrySessionStatus(retrySignal, retryMessage, retryOnErrors) {
+  if (openConfigIsCodexSubscriptionExhaustion(retryMessage)) return true;
+  return openConfigCanRetryFallbackError({ message: retryMessage, status: retryMessage }, retryOnErrors);
+}`, "v36 Codex exhaustion classifier");
+  text = replaceOnce(text, `  const errorType = String(classifyErrorType(error) ?? "").toLowerCase();
+  const fatalType = new Set(["abort", "context_overflow", "missing_api_key", "invalid_api_key", "model_not_found", "quota_exceeded"]);`, `  if (openConfigIsCodexSubscriptionExhaustion(error)) return true;
+  const errorType = String(classifyErrorType(error) ?? "").toLowerCase();
+  const fatalType = new Set(["abort", "context_overflow", "missing_api_key", "invalid_api_key", "model_not_found", "quota_exceeded"]);`, "v36 Codex exhaustion is fallback-eligible");
+  text = replaceOnce(text, `      source: "session.status",
+      allowPrimaryRetry: true`, `      source: "session.status",
+      allowPrimaryRetry: !openConfigIsCodexSubscriptionExhaustion(retryMessage)`, "v36 session.status skips primary retry on Codex exhaustion");
+  return text;
+}
+
 function applyCurrentRuntimeFixes(original) {
-  return applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(applyConfiguredAgentContextResolutionV32(original))));
+  return applyCodexSubscriptionExhaustionFallbackV36(applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(applyConfiguredAgentContextResolutionV32(original)))));
 }
 
 function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
   const openConfigMarkers = [...new Set(text.match(/OpenConfig runtime-fallback[^\n*]*patch v\d+/g) ?? [])];
   const unsupportedMarkers = openConfigMarkers.filter(marker => marker !== MARKER && !LEGACY_MARKERS.includes(marker));
   if (unsupportedMarkers.length > 0) {
-    throw new Error(`Refusing unsupported OpenConfig OmO runtime patch marker(s): ${unsupportedMarkers.join(", ")}. Only fresh dist or deployed v1-v34 upgrades are supported.`);
+    throw new Error(`Refusing unsupported OpenConfig OmO runtime patch marker(s): ${unsupportedMarkers.join(", ")}. Only fresh dist or deployed v1-v35 upgrades are supported.`);
   }
 }
 
@@ -1997,18 +2036,23 @@ function assertNoUnsupportedOpenConfigRuntimePatchMarkers(text) {
 function patchFallbackDist(original) {
   assertNoUnsupportedOpenConfigRuntimePatchMarkers(original);
   if (original.includes(MARKER)) return { text: original, changed: false };
+  if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v35")) {
+    const text = `${applyCodexSubscriptionExhaustionFallbackV36(original)}\n/* ${MARKER} */\n`;
+    assertFallbackPatched(text);
+    return { text, changed: true };
+  }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v34")) {
-    const text = `${applyNativeIdleTurnPreservationV35(original)}\n/* ${MARKER} */\n`;
+    const text = `${applyCodexSubscriptionExhaustionFallbackV36(applyNativeIdleTurnPreservationV35(original))}\n/* ${MARKER} */\n`;
     assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v33")) {
-    const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(original))}\n/* ${MARKER} */\n`;
+    const text = `${applyCodexSubscriptionExhaustionFallbackV36(applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(original)))}\n/* ${MARKER} */\n`;
     assertFallbackPatched(text);
     return { text, changed: true };
   }
   if (original.includes("OpenConfig runtime-fallback and canonical agent-model patch v32")) {
-    const text = `${applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(original)))}\n/* ${MARKER} */\n`;
+    const text = `${applyCodexSubscriptionExhaustionFallbackV36(applyNativeIdleTurnPreservationV35(applyFallbackIdleTurnPreservationV34(applyFallbackBootstrapRaceFixV33(original))))}\n/* ${MARKER} */\n`;
     assertFallbackPatched(text);
     return { text, changed: true };
   }
@@ -2384,6 +2428,8 @@ function assertFallbackPatched(text) {
     "function openConfigFallbackTransitionLimit(config3)",
     "function openConfigPentestFallbackActive()",
     "OpenConfig strict fallback classifier v20",
+    "OpenConfig Codex subscription exhaustion fallback v36",
+    "function openConfigIsCodexSubscriptionExhaustion(error)",
     "OpenConfig Error envelope status safety v23",
     "OpenConfig per-model retry and dispatch bounds v25",
     "OpenConfig durable user turn state reset v26",
