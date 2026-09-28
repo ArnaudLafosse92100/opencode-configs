@@ -494,7 +494,7 @@ function retryabilityBundle(patched, profile = "pentest") {
     openConfigPentestFallbackActive: () => profile === "pentest",
     RETRYABLE_ERROR_PATTERNS: [/retrying/i, /endpoint unavailable/i],
   };
-  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.canRetry = openConfigCanRetryFallbackError; globalThis.canRetryStatus = openConfigCanRetrySessionStatus;`, context);
+  vm.runInNewContext(`${patched.slice(start, end)}; globalThis.canRetry = openConfigCanRetryFallbackError; globalThis.canRetryStatus = openConfigCanRetrySessionStatus; globalThis.allowPrimary = openConfigAllowPrimaryRetry;`, context);
   return context;
 }
 
@@ -806,7 +806,7 @@ function deployedV29StalePentestAliasFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
   text = replaceExactlyOnce(
     text,
-    "OpenConfig runtime-fallback and canonical agent-model patch v35",
+    "OpenConfig runtime-fallback and canonical agent-model patch v36",
     "OpenConfig runtime-fallback and canonical agent-model patch v29",
     "v29 marker",
   );
@@ -822,7 +822,7 @@ function deployedV30StaleExploreHelperFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
   text = replaceExactlyOnce(
     text,
-    "OpenConfig runtime-fallback and canonical agent-model patch v35",
+    "OpenConfig runtime-fallback and canonical agent-model patch v36",
     "OpenConfig runtime-fallback and canonical agent-model patch v30",
     "v30 marker",
   );
@@ -836,7 +836,7 @@ function deployedV30StaleExploreHelperFixture() {
 
 function deployedV31RestrictedAgentResolverFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
-  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v31", "v31 marker");
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v36", "OpenConfig runtime-fallback and canonical agent-model patch v31", "v31 marker");
   text = replaceExactlyOnce(text, `function openConfigConfiguredAgentName(agent, pluginConfig) {
   if (typeof agent !== "string" || !pluginConfig?.agents) return;
   const normalized = agent.trim().toLowerCase();
@@ -855,7 +855,7 @@ function deployedV31RestrictedAgentResolverFixture() {
 
 function deployedV32RacyFallbackBootstrapFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
-  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v32", "v32 marker");
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v36", "OpenConfig runtime-fallback and canonical agent-model patch v32", "v32 marker");
   text = replaceExactlyOnce(text, `function openConfigGetOrCreateFallbackState(sessionStates, sessionID, initialModel) {
   const existing = sessionStates.get(sessionID);
   if (existing) return existing;
@@ -871,13 +871,13 @@ function deployedV32RacyFallbackBootstrapFixture() {
 
 function deployedV33IdleCleanupFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
-  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v33", "v33 marker");
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v36", "OpenConfig runtime-fallback and canonical agent-model patch v33", "v33 marker");
   return replaceExactlyOnce(text, `    if (event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`, `    if (event.type === "session.idle" || event.type === "session.deleted") openConfigClearFallbackReplay(resolveSessionEventID(props));`, "v33 idle cleanup");
 }
 
 function deployedV34NativeIdleCleanupFixture() {
   let text = patchDist(cleanOmo4194Source()).text;
-  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v35", "OpenConfig runtime-fallback and canonical agent-model patch v34", "v34 marker");
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v36", "OpenConfig runtime-fallback and canonical agent-model patch v34", "v34 marker");
   const preserved = `  const handleSessionIdle2 = (props) => {
     const sessionID = resolveSessionEventID(props);
     if (!sessionID)
@@ -925,7 +925,7 @@ test("v31 upgrade adds configured-agent recovery for codex-router fallback", () 
   assert.throws(() => assertPatched(staleV31), /openConfigConfiguredAgentName/, "v31 hard-coded agent resolver fails closed");
   const upgraded = patchDist(staleV31);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assertPatched(upgraded.text);
   assert.equal(patchDist(upgraded.text).changed, false, "v35 resolver upgrade is idempotent");
 });
@@ -947,7 +947,7 @@ test("v32 upgrade removes the fallback-state bootstrap race", () => {
   assert.throws(() => assertPatched(staleV32), /openConfigGetOrCreateFallbackState/, "v32 racy bootstrap fails closed");
   const upgraded = patchDist(staleV32);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assertPatched(upgraded.text);
   assert.equal(patchDist(upgraded.text).changed, false, "v35 bootstrap upgrade is idempotent");
 });
@@ -969,7 +969,7 @@ test("v33 upgrade preserves fallback state across session.idle", () => {
   assert.throws(() => assertPatched(staleV33), /session\.deleted/, "v33 idle cleanup fails closed");
   const upgraded = patchDist(staleV33);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assertPatched(upgraded.text);
   assert.equal(patchDist(upgraded.text).changed, false, "v35 idle upgrade is idempotent");
 });
@@ -979,9 +979,48 @@ test("v34 upgrade removes the native idle cleanup path", () => {
   assert.throws(() => assertPatched(staleV34), /handleSessionIdle2/, "v34 native idle cleanup fails closed");
   const upgraded = patchDist(staleV34);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assertPatched(upgraded.text);
   assert.equal(patchDist(upgraded.text).changed, false, "v35 native idle upgrade is idempotent");
+});
+
+function deployedV35WithoutCodexExhaustionFixture() {
+  let text = patchDist(cleanOmo4194Source()).text;
+  text = replaceExactlyOnce(text, "OpenConfig runtime-fallback and canonical agent-model patch v36", "OpenConfig runtime-fallback and canonical agent-model patch v35", "v35 marker");
+  const helperStart = text.indexOf("function openConfigIsCodexSubscriptionExhaustion(error) {");
+  const helperEnd = text.indexOf("function openConfigAllowPrimaryRetry(", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, "v36 helper is present before stripping");
+  text = text.slice(0, helperStart) + text.slice(helperEnd);
+  text = replaceExactlyOnce(text, "  if (openConfigIsCodexSubscriptionExhaustion(error)) return false;\n", "", "v36 primary retry guard");
+  text = replaceExactlyOnce(text, "  if (openConfigIsCodexSubscriptionExhaustion(retryMessage)) return true;\n", "", "v36 session status guard");
+  text = replaceExactlyOnce(text, "  if (openConfigIsCodexSubscriptionExhaustion(error)) return true;\n", "", "v36 classifier guard");
+  return replaceExactlyOnce(text, "allowPrimaryRetry: !openConfigIsCodexSubscriptionExhaustion(retryMessage)", "allowPrimaryRetry: true", "v36 session.status primary retry");
+}
+
+test("v35 upgrade adds the Codex subscription exhaustion fallback", () => {
+  const staleV35 = deployedV35WithoutCodexExhaustionFixture();
+  assert.throws(() => assertPatched(staleV35), /Codex subscription exhaustion/, "v35 without the exhaustion fallback fails closed");
+  const upgraded = patchDist(staleV35);
+  assert.equal(upgraded.changed, true);
+  assert.match(upgraded.text, /patch v36/);
+  assertPatched(upgraded.text);
+  assert.equal(patchDist(upgraded.text).changed, false, "v36 exhaustion upgrade is idempotent");
+});
+
+test("a spent Codex subscription falls back at once while other quota errors stay terminal", () => {
+  const { canRetry, canRetryStatus, allowPrimary } = retryabilityBundle(patchDist(cleanOmo4194Source()).text, "normal");
+  const retryOn = [408, 429, 500, 502, 503, 504];
+  const opencodexLock = "Codex main account is blocked by the 98% main-account quota policy. Choose another account, wait for quota to reset, or disable codexMainAccountHardLock in Settings.";
+  for (const message of [opencodexLock, "usage_limit_reached", "You've hit your usage limit. Upgrade to Pro or try again later."]) {
+    assert.equal(canRetryStatus(undefined, message, retryOn), true, message);
+    assert.equal(allowPrimary({ message }, undefined, retryOn), false, `${message} skips primary retries`);
+    assert.equal(canRetry({ statusCode: 429, message }, retryOn), true, `${message} is fallback-eligible`);
+  }
+  for (const error of [
+    { name: "QuotaExceededError", message: "quota exceeded" },
+    { statusCode: 402, message: "insufficient_quota on the OpenRouter key" },
+  ]) assert.equal(canRetry(error, retryOn), false, JSON.stringify(error));
+  assert.equal(allowPrimary({ statusCode: 429, message: "rate limit, retryable" }, undefined, retryOn), true, "ordinary 429 keeps its primary retries");
 });
 
 test("direct explore rejects clear security and source-recovery work before dispatch", () => {
@@ -1014,7 +1053,7 @@ test("v29 upgrade migrates stale governed pentest aliases to throughput and reta
   assert.throws(() => assertPatched(staleV29), /stale pentest ZDR Floor alias/, "stale aliases inside the governed retry matrix fail closed");
   const upgraded = patchDist(staleV29);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assert.doesNotMatch(upgraded.text.slice(
     upgraded.text.indexOf("function configuredPrimaryRetryLimit(config3, state3) {"),
     upgraded.text.indexOf("function openConfigMaxRecoveryDispatches() {"),
@@ -1037,7 +1076,7 @@ test("v30 upgrade replaces the restricted explore helper with expanded semantics
   assert.throws(() => assertPatched(staleV30), /restricted explore helper missing required semantics/, "v30 helper semantics fail closed before migration");
   const upgraded = patchDist(staleV30);
   assert.equal(upgraded.changed, true);
-  assert.match(upgraded.text, /patch v35/);
+  assert.match(upgraded.text, /patch v36/);
   assert.equal(upgraded.text.split("function openConfigRejectRestrictedExploreTask(args)").length - 1, 1, "helper is replaced rather than duplicated");
   const reject = restrictedExploreBundle(upgraded.text);
   for (const prompt of [
