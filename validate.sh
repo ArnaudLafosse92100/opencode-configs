@@ -332,10 +332,14 @@ if oc:
         err(f"team_* tools not allow: {missing_team} — run: oc fix")
     else:
         ok(f"{len(TEAM_TOOLS)} team_* tools allowed")
-    for t in ("task", "edit", "external_directory", "doom_loop", "question", "call_omo_agent",
+    for t in ("task", "edit", "external_directory", "question", "call_omo_agent",
               "lsp", "grep_app", "webfetch", "websearch"):
         if perm.get(t) != "allow":
             err(f"permission.{t} must be allow (got {perm.get(t)!r})")
+    if perm.get("doom_loop") != "deny":
+        err("permission.doom_loop must be deny (bounded headless execution) — run: oc fix")
+    if ((oc.get("agent") or {}).get("explore") or {}).get("steps") != 24:
+        err("agent.explore.steps must be 24 (native OpenCode synthesis cue) — run: oc fix")
     read_perm = perm.get("read")
     if not (
         isinstance(read_perm, dict)
@@ -1612,6 +1616,9 @@ if omo:
     else:
         ok("agents.context-aware-hermes edit deny")
     # Official OmO tool boundaries: https://omo.vibetip.help/docs/agents
+    explore_perm = ((omo.get("agents") or {}).get("explore") or {}).get("permission") or {}
+    if explore_perm.get("codegraph*") != "allow":
+        err("agents.explore.permission.codegraph* must be allow (override inherited wildcard deny) — run: oc fix")
     for ro in ("oracle", "librarian", "explore", "multimodal-looker"):
         rp = ((omo.get("agents") or {}).get(ro) or {}).get("permission") or {}
         if rp.get("edit") != "deny" or rp.get("task") != "deny":

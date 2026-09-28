@@ -956,11 +956,19 @@ try:
     missing = [t for t in REQUIRED_TEAM if perms.get(t) != "allow"]
     if not missing: print("OK|%d team_* tools allowed" % len(REQUIRED_TEAM))
     else: print("BAD|team_* not allow: %s — run: oc fix" % ", ".join(missing))
-    for t in ("task", "call_omo_agent", "edit", "external_directory", "doom_loop"):
+    for t in ("task", "call_omo_agent", "edit", "external_directory"):
         if perms.get(t) != "allow":
             print("BAD|permission.%s must be allow (got %r) — run: oc fix" % (t, perms.get(t)))
         else:
             print("OK|%s = allow" % t)
+    if perms.get("doom_loop") != "deny":
+        print("BAD|permission.doom_loop must be deny — run: oc fix")
+    else:
+        print("OK|doom_loop = deny (bounded headless execution)")
+    if ((oc.get("agent") or {}).get("explore") or {}).get("steps") != 24:
+        print("BAD|agent.explore.steps must be 24 — run: oc fix")
+    if (((omo.get("agents") or {}).get("explore") or {}).get("permission") or {}).get("codegraph*") != "allow":
+        print("BAD|Explore must allow codegraph* — run: oc fix")
 except Exception as e:
     print("BAD|could not read opencode.json permissions (%s)" % e)
 # eligible agents present

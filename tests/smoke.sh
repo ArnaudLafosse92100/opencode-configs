@@ -531,5 +531,11 @@ else
   bad "vault.json leaked personal 1Password ids or vault.local.json is trackable"
 fi
 
+if python3 "$REPO/tests/test_explore_bounds.py"; then
+  ok "Explore permissions, repair idempotency, and all profile bounds"
+else
+  bad "Explore bounds regression"
+fi
+
 printf "\n${c_bold}Result:${c_0} %d passed · %d failed\n\n" "$pass" "$fail"
 [[ $fail -eq 0 ]]
