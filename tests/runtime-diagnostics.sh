@@ -620,7 +620,7 @@ SH
 cat >"$BRIDGE_FAKE/curl" <<'SH'
 #!/bin/sh
 case "$*" in
-  *"/agent"*) printf '[{"name":"codex-router","modelID":"astra-opus"}]\n';;
+  *"/agent"*) printf '[{"name":"codex-router","modelID":"gpt-6-astra"}]\n';;
   *"/healthz"*)
     [ "${FAKE_HEALTH_FAIL:-0}" = 1 ] && exit 1
     state="${FAKE_BRIDGE_STATE:?}"; count=0

@@ -117,34 +117,6 @@
       ],
       "tool_use": true
     },
-    "astra-opus-subscription": {
-      "runtime_model": "codex-subscription/astra-opus",
-      "provider": "codex",
-      "model": "astra-opus",
-      "billing": "subscription",
-      "transport": "codex-subscription",
-      "active": true,
-      "qualified": true,
-      "supported_efforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "privacy_classes": [
-        "standard"
-      ],
-      "modalities": [
-        "text",
-        "attachments",
-        "multimodal"
-      ],
-      "execution_surfaces": [
-        "opencode"
-      ],
-      "tool_use": true
-    },
     "opus-subscription": {
       "runtime_model": null,
       "provider": "claude",
@@ -170,6 +142,34 @@
       ],
       "execution_surfaces": [
         "factory-archon"
+      ],
+      "tool_use": true
+    },
+    "opus-claude-code": {
+      "runtime_model": "claude-code/opus",
+      "provider": "claude",
+      "model": "opus",
+      "billing": "subscription",
+      "transport": "claude-code-agent-sdk",
+      "active": true,
+      "qualified": true,
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "privacy_classes": [
+        "standard"
+      ],
+      "modalities": [
+        "text",
+        "attachments",
+        "multimodal"
+      ],
+      "execution_surfaces": [
+        "opencode"
       ],
       "tool_use": true
     },
@@ -620,8 +620,9 @@
       ]
     },
     "orchestration": {
-      "primary": "astra-opus-subscription",
+      "primary": "astra-subscription",
       "fallbacks": [
+        "opus-claude-code",
         "sol-subscription"
       ],
       "required_privacy": "standard",

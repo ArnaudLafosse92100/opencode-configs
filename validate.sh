@@ -218,6 +218,11 @@ if oc:
             continue
         for mid in (pcfg.get("models") or {}):
             defined_models.add(f"{pname}/{mid}")
+    # The pinned @openchamber/opencode-claude plugin injects the claude-code
+    # aliases at runtime; they are defined only when that plugin is loaded.
+    if any(isinstance(p, str) and p.startswith("@openchamber/opencode-claude@") for p in (oc.get("plugin") or [])) \
+            and "claude-code" in (oc.get("provider") or {}):
+        defined_models.update(f"claude-code/{alias}" for alias in ("opus", "sonnet", "fable", "haiku"))
     for mid, m in models.items():
         o = m.get("options", {})
         if "reasoning_effort" in o:
@@ -376,8 +381,8 @@ if oc:
             ok("core tools + bash allow-everything (catastrophic denies kept)")
     if not oc.get("enabled_providers"):
         warn("opencode.json: enabled_providers not set — all providers with credentials will load.")
-    elif oc.get("enabled_providers") != ["openrouter", "codex-subscription", "venice", "deepseek"]:
-        err("opencode.json: enabled_providers must be ['openrouter', 'codex-subscription', 'venice', 'deepseek']")
+    elif oc.get("enabled_providers") != ["openrouter", "codex-subscription", "venice", "deepseek", "claude-code"]:
+        err("opencode.json: enabled_providers must be ['openrouter', 'codex-subscription', 'venice', 'deepseek', 'claude-code']")
     else:
         ok("enabled_providers = openrouter + codex-subscription + venice + deepseek")
     vmodels = set(((((oc.get("provider") or {}).get("venice") or {}).get("models")) or {}))
@@ -785,12 +790,23 @@ if omo:
         refs.extend(x for x in (cfg.get("fallback_models") or []) if isinstance(x, str))
         return refs
     provider_configs = (oc or {}).get("provider") or {}
+    # @openchamber/opencode-claude injects the claude-code catalog at runtime;
+    # declaring these models in opencode.json would override its limits.
+    plugin_model_catalogs = {
+        "claude-code": {
+            alias: {"tool_call": True, "attachment": True}
+            for alias in ("opus", "sonnet", "fable", "haiku")
+        },
+    }
     def _model_config_for_ref(ref):
         if not isinstance(ref, str) or "/" not in ref:
             return None
         provider, model_id = ref.split("/", 1)
         pcfg = provider_configs.get(provider) or {}
-        return (pcfg.get("models") or {}).get(model_id)
+        declared = (pcfg.get("models") or {}).get(model_id)
+        if declared is None:
+            return (plugin_model_catalogs.get(provider) or {}).get(model_id)
+        return declared
     normal_profile = _normalize_profile(runtime_profiles.selected("normal") if runtime_profiles else {})
     pentest_profile = _normalize_profile(runtime_profiles.selected("pentest") if runtime_profiles else {})
     selected_profile = _normalize_profile(selected_profile)
@@ -801,8 +817,10 @@ if omo:
         for name, cfg in ((normal_profile or {}).get(section) or {}).items():
             primary = str((cfg or {}).get("model") or "")
             fallbacks = [str(x) for x in ((cfg or {}).get("fallback_models") or [])]
+            # Claude Code (Agent SDK plugin) draws from the Claude plan, so it is a
+            # subscription fallback, never a metered one.
             if primary.startswith("codex-subscription/") and any(
-                not fallback.startswith("codex-subscription/") for fallback in fallbacks
+                not fallback.startswith(("codex-subscription/", "claude-code/")) for fallback in fallbacks
             ):
                 err(
                     f"runtime-profile.json[normal.{section}.{name}]: subscription primary "
