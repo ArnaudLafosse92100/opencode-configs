@@ -173,14 +173,12 @@ COMPAT_STATE="$TMP/compat-state"
 COMPAT_NATIVE="$TMP/compat-native/omo.jsonc"
 compat_env=(OC_RUNTIME_STATE_DIR="$COMPAT_STATE" OC_RUNTIME_PROMPT_DIR="$TMP/compat-prompts" OC_NATIVE_OMO_PATH="$COMPAT_NATIVE")
 compat_normal="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env)"
-compat_private="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env normal-private)"
 compat_pentest="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env pentest)"
 compat_back="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" env normal)"
 if printf '%s' "$compat_normal" | grep -q 'compat/generations/normal-' \
-  && printf '%s' "$compat_private" | grep -q 'compat/generations/normal-private-' \
   && printf '%s' "$compat_pentest" | grep -q 'compat/generations/pentest-' \
   && printf '%s' "$compat_back" | grep -q 'compat/generations/normal-'; then
-  ok "compat profile resolver switches normal -> normal-private -> pentest -> normal"
+  ok "compat profile resolver switches normal -> pentest -> normal"
 else bad "compat profile resolver profile switch"; fi
 compat_current="$COMPAT_STATE/compat/current"
 runtime_normal="$(env "${compat_env[@]}" "$REPO/runtime-profile.sh" path normal)"
@@ -226,9 +224,9 @@ then
   ok "concurrent profile snapshot never mixes runtime and compat generations"
 else bad "profile snapshot concurrency coherence"; fi
 if [[ "$(grep -c 'runtime-profile.sh snapshot' "$REPO/doctor.sh")" -eq 1 ]] \
-  && grep -q '"normal-private"' "$REPO/doctor.sh" \
+  && grep -q '"pentest"' "$REPO/doctor.sh" \
   && ! grep -Eq 'runtime-profile\.sh (show|applied|identity)' "$REPO/doctor.sh"; then
-  ok "OpenConfig doctor consumes one atomic profile snapshot and accepts normal-private"
+  ok "OpenConfig doctor consumes one atomic profile snapshot and accepts pentest"
 else bad "OpenConfig doctor atomic snapshot consumer"; fi
 compat_config_dir="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["configDir"])' <<<"$compat_back")"
 repo_hash_before_raw="$(git -C "$REPO" hash-object opencode.json)"

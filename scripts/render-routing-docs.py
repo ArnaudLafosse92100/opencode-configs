@@ -58,8 +58,7 @@ def runtime_routing(repo: Path) -> str:
         [
             "",
             "Fallback order and reasoning remain machine-readable through "
-            "`oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. "
-            "`normal-private` composes normal routes with codex-subscription removed and OpenRouter ZDR constraints.",
+            "`oc profile resolve <normal|pentest> <agents|categories> <name>`.",
             ROUTING_END,
         ]
     )
@@ -127,7 +126,7 @@ def workflow_routing(repo: Path) -> str:
         "checks Factory/Archon surface support, transport identity, privacy, tools,",
         "modalities, workflow effort, lifecycle declarations, and catalog promotion gates",
         "before export. A gated route remains visible but cannot be silently promoted",
-        "or used by the OpenConfig runtime. `normal-private` and `pentest` export no",
+        "or used by the OpenConfig runtime. `pentest` exports no",
         "workflow routes. `--schema-version 3` emits the derived previous contract;",
         "`--schema-version 1` projects implementation and architecture to the legacy",
         "`standard`/`frontier` pair.",

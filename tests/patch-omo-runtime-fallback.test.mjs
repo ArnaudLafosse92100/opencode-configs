@@ -1159,7 +1159,6 @@ test("per-model rung retries and recovery dispatches stay isolated per root or d
   const patched = patchDist(cleanOmo4194Source()).text;
   const cases = [
     ["normal", "openrouter/deepseek/deepseek-v4-flash-0731", 2],
-    ["normal-private", "openrouter/z-ai/glm-5.3", 1],
     ["normal", "openrouter/google/gemini-3.7-flash", 1],
     ["normal", "openrouter/minimax/minimax-m3", 1],
     ["normal", "codex-subscription/gpt-5.6-sol", 1],

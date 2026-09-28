@@ -87,7 +87,7 @@ else
 fi
 profile_help="$({ "$REPO/oc" profile --help 2>&1 || true; })"
 if grep -qF '[--schema-version 1|3|4]' <<<"$profile_help" \
-  && grep -qF 'export-policy-manifest <normal|normal-private|pentest>' <<<"$profile_help"; then
+  && grep -qF 'export-policy-manifest <normal|pentest>' <<<"$profile_help"; then
   ok "oc profile help lists workflow schemas and canonical policy manifest"
 else
   bad "oc profile help has stale workflow export contracts"

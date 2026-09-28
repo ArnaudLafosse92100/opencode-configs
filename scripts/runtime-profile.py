@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 import uuid
 
 
-VALID_PROFILES = ("normal", "normal-private", "pentest")
+VALID_PROFILES = ("normal", "pentest")
 VALID_SECTIONS = ("agents", "categories")
 EXPORT_ROUTE_FIELDS = {
     "primary",
@@ -99,7 +99,7 @@ def render_pentest_prompt_overlay(text: str, profile: str, path: Path, policy: s
         before, remainder = text.split(PENTEST_PROMPT_OVERLAY_START, 1)
         _, after = remainder.split(PENTEST_PROMPT_OVERLAY_END, 1)
         text = before.rstrip() + "\n" + after.lstrip("\n")
-    if profile in ("normal", "normal-private"):
+    if profile == "normal":
         return text
     if profile != "pentest":
         raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
@@ -666,10 +666,6 @@ class RuntimeProfiles:
             selected = profiles[profile]
             if not isinstance(selected, dict):
                 raise SystemExit(f"invalid profile: {profile}")
-            if selected.get("compose") == "normal":
-                if profile != "normal-private" or selected.get("replacement_capability") not in self.capabilities:
-                    raise SystemExit(f"invalid composed profile: {profile}")
-                continue
             runtime_fallbacks = selected.get("runtime_fallbacks", {})
             if not isinstance(runtime_fallbacks, dict):
                 raise SystemExit(f"invalid runtime fallbacks: {profile}")
@@ -1022,31 +1018,6 @@ class RuntimeProfiles:
         if profile not in VALID_PROFILES:
             raise SystemExit(f"profile must be one of {', '.join(VALID_PROFILES)}")
         profile_policy = self.data["profiles"][profile]
-        if profile_policy.get("compose") == "normal":
-            base = copy.deepcopy(self.data["profiles"]["normal"])
-            replacement = profile_policy["replacement_capability"]
-            def compatible_with_private_composition(capability_name: str) -> bool:
-                capability = self.capabilities[capability_name]
-                return all(
-                    "zdr" in self.models[reference]["privacy_classes"]
-                    and str(self.models[reference]["runtime_model"]).startswith("openrouter/")
-                    for reference in (capability["primary"], *capability["fallbacks"])
-                )
-            for section in VALID_SECTIONS:
-                for binding in base["bindings"][section].values():
-                    if not compatible_with_private_composition(binding["capability"]):
-                        binding["capability"] = replacement
-            for key in ("small_model", "helper_model"):
-                if key in base and not compatible_with_private_composition(base[key]):
-                    base[key] = replacement
-            base["privacy"] = copy.deepcopy(profile_policy["privacy"])
-            base["admission"] = copy.deepcopy(profile_policy["admission"])
-            # Interactive fallbacks are a normal-surface policy. Private
-            # composition fails closed instead of inheriting subscription or
-            # non-ZDR candidates from that surface.
-            base["runtime_fallbacks"] = {}
-            profile_policy = base
-
         resolved = {
             "entry_agent": profile_policy["entry_agent"],
             "privacy": copy.deepcopy(profile_policy["privacy"]),
@@ -1097,29 +1068,16 @@ class RuntimeProfiles:
 
     def _effective_capability_names(self, profile: str) -> set[str]:
         policy = self.data["profiles"][profile]
-        source = self.data["profiles"]["normal"] if policy.get("compose") == "normal" else policy
         names = {
             binding["capability"]
             for section in VALID_SECTIONS
-            for binding in source["bindings"][section].values()
+            for binding in policy["bindings"][section].values()
         }
         names.update(
             capability for key in ("small_model", "helper_model")
-            if isinstance((capability := source.get(key)), str)
+            if isinstance((capability := policy.get(key)), str)
         )
-        if policy.get("compose") != "normal":
-            return names
-        replacement = policy["replacement_capability"]
-        return {
-            name if all(
-                "zdr" in self.models[reference]["privacy_classes"]
-                and str(self.models[reference]["runtime_model"]).startswith("openrouter/")
-                for reference in (
-                    self.capabilities[name]["primary"], *self.capabilities[name]["fallbacks"]
-                )
-            ) else replacement
-            for name in names
-        }
+        return names
 
     def pentest_policy_prose(self) -> str:
         capability_name = self.data["profiles"]["pentest"]["small_model"]
@@ -1216,7 +1174,7 @@ class RuntimeProfiles:
         route = (selected.get(section) or {}).get(name)
         if not isinstance(route, dict) or not isinstance(route.get("model"), str):
             raise SystemExit(f"route not found: {profile}.{section}.{name}")
-        profile_policy = self.data["profiles"]["normal" if profile == "normal-private" else profile]
+        profile_policy = self.data["profiles"][profile]
         binding = (((profile_policy.get("bindings") or {}).get(section) or {}).get(name) or {})
         reasoning = binding.get("effort")
         variant = "max" if reasoning == "xhigh" else reasoning
@@ -1544,22 +1502,6 @@ class RuntimeProfiles:
 
         opencode = load_json(self.repo / "opencode.json")
         omo = load_json(self.repo / "oh-my-openagent.json")
-        if profile == "normal-private":
-            # Privacy is rendered, not copied into a second route matrix.  Do
-            # not claim provider attestation: these are OpenRouter request
-            # constraints only, applied to every model that can be selected.
-            enabled = opencode.get("enabled_providers")
-            if isinstance(enabled, list):
-                opencode["enabled_providers"] = [
-                    name for name in enabled
-                    if name != "codex-subscription"
-                ]
-            for model in ((opencode.get("provider") or {}).get("openrouter") or {}).get("models", {}).values():
-                if not isinstance(model, dict):
-                    raise SystemExit("invalid OpenRouter model definition for normal-private")
-                provider = ((model.setdefault("options", {})).setdefault("provider", {}))
-                provider["data_collection"] = "deny"
-                provider["zdr"] = True
         small_model = (
             selected.get("small_model")
             or ((selected.get("categories") or {}).get("quick") or {}).get("model")

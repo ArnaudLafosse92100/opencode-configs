@@ -1703,7 +1703,7 @@ function applyPerModelRetryAndDispatchBoundsV25(original) {
   return openConfigRuntimeFallbackInteger("OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK", 0);
 }`, `function openConfigProfileName() {
   const profile = typeof process !== "undefined" ? process.env?.OPENCONFIG_RUNTIME_PROFILE : undefined;
-  return profile === "pentest" ? "pentest" : profile === "normal-private" ? "normal-private" : "normal";
+  return profile === "pentest" ? "pentest" : "normal";
 }
 
 function configuredPrimaryRetryLimit(config3, state3) {

@@ -14,15 +14,15 @@ Usage:
   oc profile applied
   oc profile identity
   oc profile snapshot
-  oc profile normal|normal-private|pentest
-  oc profile path [normal|normal-private|pentest]
-  oc profile compat-path [normal|normal-private|pentest]
-  oc profile xdg-path [normal|normal-private|pentest]
-  oc profile env [normal|normal-private|pentest] [--shell]
-  oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>
-  oc profile export-route <normal|normal-private|pentest> <name>
-  oc profile export-workflow-routes <normal|normal-private|pentest> [--schema-version 1|3|4]
-  oc profile export-policy-manifest <normal|normal-private|pentest>
+  oc profile normal|pentest
+  oc profile path [normal|pentest]
+  oc profile compat-path [normal|pentest]
+  oc profile xdg-path [normal|pentest]
+  oc profile env [normal|pentest] [--shell]
+  oc profile resolve <normal|pentest> <agents|categories> <name>
+  oc profile export-route <normal|pentest> <name>
+  oc profile export-workflow-routes <normal|pentest> [--schema-version 1|3|4]
+  oc profile export-policy-manifest <normal|pentest>
   oc profile ensure [--quiet]
   oc profile prepare-native-alias
 EOF
@@ -83,7 +83,7 @@ case "$MODE" in
     [[ $# -eq 1 ]] || usage
     exec python3 "$PYTHON_TOOL" --repo "$REPO" prepare-native-alias
     ;;
-  normal|normal-private|pentest)
+  normal|pentest)
     [[ $# -eq 1 ]] || usage
     ;;
   *)

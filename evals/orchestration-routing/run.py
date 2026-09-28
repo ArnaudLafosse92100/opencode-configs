@@ -99,7 +99,7 @@ def load_cases() -> dict:
     ).expanduser()
     active_path = state_root / "active-profile"
     active = active_path.read_text(encoding="utf-8").strip() if active_path.is_file() else profiles.get("default_profile", "normal")
-    if active not in ("normal", "normal-private", "pentest"):
+    if active not in ("normal", "pentest"):
         raise ValueError(f"invalid active profile state: {active!r}")
     spec = importlib.util.spec_from_file_location("openconfig_runtime_profile", REPO / "scripts/runtime-profile.py")
     if spec is None or spec.loader is None:
