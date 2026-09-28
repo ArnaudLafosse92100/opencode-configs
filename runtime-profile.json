@@ -794,7 +794,6 @@
         "admission": "primary-only"
       }
     },
-    "normal-private": {},
     "pentest": {}
   },
   "surface_bindings": {
@@ -1153,23 +1152,6 @@
           }
         }
       }
-    },
-    "normal-private": {
-      "compose": "normal",
-      "replacement_capability": "private-text",
-      "entry_agent": "codex-router",
-      "privacy": {
-        "classification": "private",
-        "enforcement": "zdr_required"
-      },
-      "admission": {
-        "unqualified_models": "deny",
-        "capability_mismatch": "deny",
-        "metered_fallback": "forbidden"
-      },
-      "exclude_providers": [
-        "codex-subscription"
-      ]
     }
   }
 }

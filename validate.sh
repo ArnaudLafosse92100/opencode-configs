@@ -724,8 +724,8 @@ if omo:
             default_profile = (json.load(open(runtime_profile_path)).get("default_profile") or "normal").strip()
         except Exception:
             default_profile = "invalid"
-    if default_profile not in ("normal", "normal-private", "pentest"):
-        err(f"runtime-profile.json default_profile must be normal, normal-private, or pentest (got {default_profile!r})")
+    if default_profile not in ("normal", "pentest"):
+        err(f"runtime-profile.json default_profile must be normal or pentest (got {default_profile!r})")
     else:
         ok(f"source defaults to runtime profile {default_profile!r}")
 
@@ -792,7 +792,6 @@ if omo:
         pcfg = provider_configs.get(provider) or {}
         return (pcfg.get("models") or {}).get(model_id)
     normal_profile = _normalize_profile(runtime_profiles.selected("normal") if runtime_profiles else {})
-    normal_private_profile = _normalize_profile(runtime_profiles.selected("normal-private") if runtime_profiles else {})
     pentest_profile = _normalize_profile(runtime_profiles.selected("pentest") if runtime_profiles else {})
     selected_profile = _normalize_profile(selected_profile)
     pentest_pro = "openrouter/deepseek/deepseek-v4-pro-0813"
@@ -851,7 +850,7 @@ if omo:
     ok("normal profile vision chains stay attachment-capable")
     # Tool-using routes must not fall back to a no-tools model. Hermes is allowed
     # only for content-aware-research, where edit/tools are intentionally denied.
-    capability_profiles = [("normal", normal_profile), ("normal-private", normal_private_profile), ("pentest", pentest_profile)]
+    capability_profiles = [("normal", normal_profile), ("pentest", pentest_profile)]
     for profile_name, profile in capability_profiles:
         for section in ("agents", "categories"):
             for name, cfg in ((profile or {}).get(section) or {}).items():

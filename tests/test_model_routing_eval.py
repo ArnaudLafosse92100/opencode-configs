@@ -85,7 +85,7 @@ class ContentAwareFallbackTests(unittest.TestCase):
         cls.profile_data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
         cls.profile = cls.profile_data["default_profile"]
         profiles = runtime_profile.RuntimeProfiles(REPO)
-        for profile in ("normal", "normal-private", "pentest"):
+        for profile in ("normal", "pentest"):
             cls.profile_data[profile] = profiles.selected(profile)
             for section in ("agents", "categories"):
                 for route in cls.profile_data[profile][section].values():
@@ -137,44 +137,6 @@ class ContentAwareFallbackTests(unittest.TestCase):
             profiles.policy_snapshot_id("pentest"),
             "4df616a0795cb73855594c7dc0a061b16f08030f50337e18f7ea6e4d9dcb2af5",
         )
-
-    def test_normal_private_routes_are_exclusively_openrouter(self) -> None:
-        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
-        private_primary = runtime_profile.RuntimeProfiles(REPO)._resolve_capability("private-text")["model"]
-        self.assertEqual(selected["small_model"], private_primary)
-        self.assertEqual(selected["helper_model"], private_primary)
-        for section in ("agents", "categories"):
-            for name, route in selected[section].items():
-                with self.subTest(section=section, name=name):
-                    chain = [route["model"], *route["fallback_models"]]
-                    self.assertTrue(all(model.startswith("openrouter/") for model in chain))
-
-    def test_normal_private_replaces_routes_without_an_openrouter_rung(self) -> None:
-        replacement = runtime_profile.RuntimeProfiles(REPO)._resolve_capability("private-text")
-        selected = runtime_profile.RuntimeProfiles(REPO).selected("normal-private")
-        expected = {
-            "agents": {
-                "content-aware-research",
-                "sisyphus-venice-deepseek",
-                "sisyphus-venice-deepseek-flash-junior",
-                "content-aware-fast",
-            },
-            "categories": {"content-aware-fast", "content-aware-deep"},
-        }
-        for section, names in expected.items():
-            for name in names:
-                with self.subTest(section=section, name=name):
-                    self.assertEqual(selected[section][name]["model"], replacement["model"])
-                    self.assertEqual(selected[section][name]["fallback_models"], replacement["fallback_models"])
-
-    def test_normal_private_rejects_an_invalid_replacement_route(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            repo = pathlib.Path(directory)
-            data = json.loads((REPO / "runtime-profile.json").read_text(encoding="utf-8"))
-            data["profiles"]["normal-private"]["replacement_capability"] = "missing"
-            (repo / "runtime-profile.json").write_text(json.dumps(data), encoding="utf-8")
-            with self.assertRaisesRegex(SystemExit, "invalid composed profile"):
-                runtime_profile.RuntimeProfiles(repo)
 
     def test_new_upstream_models_are_available(self) -> None:
         models = json.loads((REPO / "opencode.json").read_text(encoding="utf-8"))["provider"]["openrouter"]["models"]
@@ -517,7 +479,6 @@ class ExportRouteTests(unittest.TestCase):
             self.profile_data["export_routes"]["normal"]["security-strix-scan"],
             expected,
         )
-        self.assertEqual(self.profile_data["export_routes"]["normal-private"], {})
         self.assertEqual(self.profile_data["export_routes"]["pentest"], {})
         config = json.loads((REPO / "oh-my-openagent.json").read_text(encoding="utf-8"))
         self.assertNotIn("security-strix-scan", config["categories"])
@@ -526,7 +487,7 @@ class ExportRouteTests(unittest.TestCase):
             SystemExit, "route not found: normal\\.categories\\.security-strix-scan"
         ):
             profiles.resolve("normal", "categories", "security-strix-scan")
-        for profile in ("normal-private", "pentest"):
+        for profile in ("pentest",):
             with self.subTest(profile=profile), self.assertRaisesRegex(
                 SystemExit, f"exported route not found: {profile}\\.security-strix-scan"
             ):
@@ -574,7 +535,7 @@ class ExportRouteTests(unittest.TestCase):
             os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
         ):
             profiles = runtime_profile.RuntimeProfiles(REPO)
-            for profile in ("normal", "normal-private", "pentest"):
+            for profile in ("normal", "pentest"):
                 with self.subTest(profile=profile):
                     rendered = json.loads(
                         (profiles.render(profile, force=True) / "oh-my-openagent.json").read_text(
@@ -780,9 +741,9 @@ class WorkflowRouteTests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, message):
                     runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
 
-    def test_private_and_pentest_policy_manifests_fail_closed(self) -> None:
+    def test_pentest_policy_manifest_fails_closed(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)
-        for profile in ("normal-private", "pentest"):
+        for profile in ("pentest",):
             with self.subTest(profile=profile), self.assertRaisesRegex(SystemExit, "policy manifest unavailable"):
                 profiles.export_policy_manifest(profile)
 
@@ -1003,7 +964,7 @@ class WorkflowRouteTests(unittest.TestCase):
         self.assertEqual(resolved["reasoning"], "medium")
         self.assertEqual(resolved["variant"], "medium")
 
-    def test_runtime_policy_contract_is_model_neutral_and_private_snapshot_ignores_unexported_workflow(self) -> None:
+    def test_runtime_policy_contract_is_model_neutral_and_pentest_snapshot_ignores_unexported_workflow(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)
         contract = profiles.runtime_policy("normal")
         self.assertEqual(set(contract), {"schema_version", "profile", "entry_agent", "policy_snapshot_id", "privacy", "admission"})
@@ -1013,11 +974,9 @@ class WorkflowRouteTests(unittest.TestCase):
             self.assertNotIn(identifier, serialized)
         with tempfile.TemporaryDirectory() as directory:
             data = json.loads(json.dumps(self.profile_data))
-            private_before = profiles.policy_snapshot_id("normal-private")
             pentest_before = profiles.policy_snapshot_id("pentest")
             data["capabilities"]["exploration"]["primary"] = "sol-subscription"
             changed = runtime_profile.RuntimeProfiles(self._write_profile(directory, data))
-            self.assertEqual(changed.policy_snapshot_id("normal-private"), private_before)
             self.assertEqual(changed.policy_snapshot_id("pentest"), pentest_before)
 
     def test_policy_snapshot_hashes_only_effective_transitive_closure(self) -> None:
@@ -1051,9 +1010,9 @@ class WorkflowRouteTests(unittest.TestCase):
             wording_profiles = runtime_profile.RuntimeProfiles(self._write_profile(directory, wording_only))
             self.assertEqual(wording_profiles.policy_snapshot_id("normal"), before)
 
-    def test_private_and_pentest_workflow_exports_fail_closed(self) -> None:
+    def test_pentest_workflow_exports_fail_closed(self) -> None:
         profiles = runtime_profile.RuntimeProfiles(REPO)
-        for profile in ("normal-private", "pentest"):
+        for profile in ("pentest",):
             with self.subTest(profile=profile), self.assertRaisesRegex(SystemExit, "workflow routes unavailable"):
                 profiles.export_workflow_routes(profile)
 
@@ -1166,7 +1125,7 @@ class PentestPromptOverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as state, mock.patch.dict(
             os.environ, {**os.environ, "OC_RUNTIME_STATE_DIR": state}, clear=True
         ):
-            with self.assertRaisesRegex(SystemExit, "profile must be one of normal, normal-private, pentest"):
+            with self.assertRaisesRegex(SystemExit, "profile must be one of normal, pentest"):
                 runtime_profile.RuntimeProfiles(REPO).selected("unknown")
 
     def test_overlay_helper_is_idempotent(self) -> None:

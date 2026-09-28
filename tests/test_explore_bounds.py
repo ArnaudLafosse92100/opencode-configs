@@ -51,7 +51,7 @@ class ExploreBoundsTests(unittest.TestCase):
         spec.loader.exec_module(module)
         with tempfile.TemporaryDirectory() as state, patch.dict(os.environ, {"OC_RUNTIME_STATE_DIR": state}):
             profiles = module.RuntimeProfiles(REPO)
-            for name in ("normal", "normal-private", "pentest"):
+            for name in ("normal", "pentest"):
                 with self.subTest(profile=name):
                     runtime = profiles.render(name)
                     oc = json.loads((runtime / "opencode.json").read_text())

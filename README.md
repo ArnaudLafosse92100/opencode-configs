@@ -301,7 +301,7 @@ export-policy matrix. The table below is generated from its runtime routes and
 | `categories.visual-engineering` | `openrouter/google/gemini-3.1-pro-preview` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 | `categories.writing` | `openrouter/google/gemini-3.8-flash` | `openrouter/deepseek/deepseek-v4-flash-0731-zdr-throughput` |
 
-Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|normal-private|pentest> <agents|categories> <name>`. `normal-private` composes normal routes with codex-subscription removed and OpenRouter ZDR constraints.
+Fallback order and reasoning remain machine-readable through `oc profile resolve <normal|pentest> <agents|categories> <name>`.
 <!-- END GENERATED: runtime-routing -->
 
 ### Non-runtime route exports
@@ -314,7 +314,7 @@ The sole current export, `normal.security-strix-scan`, is restricted to
 synthetic data and `primary-only` admission. Its direct Strix/LiteLLM primary is
 `openrouter/deepseek/deepseek-v4-flash-0731`; the Pro entry remains source
 fallback metadata for outer-policy evaluation and is not admitted inside the
-Strix attempt. `normal-private` and `pentest` fail closed because OpenConfig's
+Strix attempt. `pentest` fails closed because OpenConfig's
 internal `-zdr-throughput` aliases cannot transfer their provider controls by
 model name alone. The export never appears in generated OmO configuration.
 
@@ -338,7 +338,7 @@ All 5 workflow routes have empty fallback lists, and producer validation
 checks Factory/Archon surface support, transport identity, privacy, tools,
 modalities, workflow effort, lifecycle declarations, and catalog promotion gates
 before export. A gated route remains visible but cannot be silently promoted
-or used by the OpenConfig runtime. `normal-private` and `pentest` export no
+or used by the OpenConfig runtime. `pentest` exports no
 workflow routes. `--schema-version 3` emits the derived previous contract;
 `--schema-version 1` projects implementation and architecture to the legacy
 `standard`/`frontier` pair.
@@ -381,7 +381,7 @@ the remaining entries are its fallback order, and supported per-entry settings
 are retained. Native agent registration consumes those arrays too, matching
 categories; `oc plugin --fix` fails closed if its pinned anchors drift.
 
-Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|normal-private|pentest` renders a complete machine-local generation under `~/.local/state/openconfig/{runtime,compat}/generations`; **`oc profile path` remains the stable runtime-overlay API** for integrations, while `oc profile compat-path` exposes the writable compatibility home and `oc profile env` returns the paired active config/XDG snapshot. `oc profile resolve <profile> <agents|categories> <name>` remains the stable runtime-route API; `oc profile export-route <profile> <name>` is the separate non-runtime policy API. Normal routes exploration to Flash, implementation to Sol, and architecture/review to Astra. Its OpenCode-only fallback pools are selected by billing class: Flash → GLM → MiniMax for metered exploration, Sol ↔ Astra for subscription work. The Factory/Archon workflow export remains a separate primary-only contract with empty fallback lists, including the qualified Opus review and adjudication lanes. Vision remains Gemini Pro → Gemini Flash → MiniMax, and the other specialized capability lanes remain explicit in the generated matrix. `normal-private` removes every non-OpenRouter provider, drops the normal interactive fallback pools, and maps routes with no OpenRouter rung to its Flash 0731 ZDR Throughput → Pro 0813 ZDR Throughput replacement. `pentest` remains stricter: every agent, category, small model, and helper is Flash 0731 ZDR Throughput, then the sole Pro 0813 ZDR Throughput fallback. The sequence is Flash initial + three Flash retries, exactly one Pro attempt, then terminal failure. There is deliberately no fake USD runtime hard-cap: exact observer costs are asynchronous, so only the existing evaluation campaign budgets are enforced synchronously.
+Runtime profiles can override this matrix without removing native OmO agents/categories. `runtime-profile.json` declares the immutable profiles and the tracked configs remain the `normal` source baseline. `oc profile normal|pentest` renders a complete machine-local generation under `~/.local/state/openconfig/{runtime,compat}/generations`; **`oc profile path` remains the stable runtime-overlay API** for integrations, while `oc profile compat-path` exposes the writable compatibility home and `oc profile env` returns the paired active config/XDG snapshot. `oc profile resolve <profile> <agents|categories> <name>` remains the stable runtime-route API; `oc profile export-route <profile> <name>` is the separate non-runtime policy API. Normal routes exploration to Flash, implementation to Sol, and architecture/review to Astra. Its OpenCode-only fallback pools are selected by billing class: Flash → GLM → MiniMax for metered exploration, Sol ↔ Astra for subscription work. The Factory/Archon workflow export remains a separate primary-only contract with empty fallback lists, including the qualified Opus review and adjudication lanes. Vision remains Gemini Pro → Gemini Flash → MiniMax, and the other specialized capability lanes remain explicit in the generated matrix. `pentest` remains stricter: every agent, category, small model, and helper is Flash 0731 ZDR Throughput, then the sole Pro 0813 ZDR Throughput fallback. The sequence is Flash initial + three Flash retries, exactly one Pro attempt, then terminal failure. There is deliberately no fake USD runtime hard-cap: exact observer costs are asynchronous, so only the existing evaluation campaign budgets are enforced synchronously.
 
 ### Bounded model-routing eval
 
@@ -626,7 +626,7 @@ a recoverable backup carrying the original mode and SHA-256. Until setup has
 done that, regular native OmO config remains journal-protected and a later
 `oc profile` reader rolls an interrupted switch back before reporting.
 
-`oc profile normal|normal-private|pentest` commits the desired profile immediately. When a
+`oc profile normal|pentest` commits the desired profile immediately. When a
 LaunchAgent is present it writes `applied-profile.json` only after a fresh
 launchd-owned bridge `/healthz` identity (schema, PID/listener, upstream and
 new instance ID), OpenCode health, and the expected `codex-router` model all verify.
