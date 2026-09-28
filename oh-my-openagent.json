@@ -30,7 +30,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/sisyphus.md",
       "color": "#00F0FF",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -58,7 +58,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -71,7 +71,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/prometheus.md",
       "color": "#B967FF",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -101,7 +101,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/oracle.md",
       "color": "#6C63FF",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -169,7 +169,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/metis.md",
       "color": "#9DFFFF",
       "maxTokens": 16384,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -181,7 +181,7 @@
       "prompt_append": "file://~/.config/opencode/prompts/agents/momus.md",
       "color": "#FF8A3D",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -264,7 +264,7 @@
       ]
     },
     "codex-router": {
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "mode": "primary",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -366,7 +366,7 @@
     "ultrabrain": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/ultrabrain.md",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -415,7 +415,7 @@
     "unspecified-high": {
       "prompt_append": "file://~/.config/opencode/prompts/categories/unspecified-high.md",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -454,7 +454,7 @@
       "description": "Coupling, cohesion, blast radius, security. Severity + fix per finding.",
       "prompt_append": "file://~/.config/opencode/prompts/categories/arch-review.md",
       "maxTokens": 32768,
-      "model": "codex-subscription/gpt-6-astra",
+      "model": "codex-subscription/astra-opus",
       "reasoning": "medium",
       "fallback_models": [
         "codex-subscription/gpt-5.6-sol"
@@ -529,7 +529,8 @@
       "venice/deepseek-v4-1-flash": 5,
       "deepseek/deepseek-v4-pro": 4,
       "deepseek/deepseek-flash": 6,
-      "codex-subscription/gpt-6-astra": 1
+      "codex-subscription/gpt-6-astra": 1,
+      "codex-subscription/astra-opus": 1
     },
     "maxDepth": 2,
     "staleTimeoutMs": 180000,

@@ -3,7 +3,7 @@
   "shell": "/bin/zsh",
   "logLevel": "WARN",
   "username": "user",
-  "model": "codex-subscription/gpt-6-astra",
+  "model": "codex-subscription/astra-opus",
   "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
   "default_agent": "sisyphus",
   "subagent_depth": 1,
@@ -917,6 +917,47 @@
           "status": "active",
           "limit": {
             "context": 1050000,
+            "output": 128000
+          },
+          "options": {
+            "reasoning": {
+              "effort": "high"
+            }
+          },
+          "variants": {
+            "low": {
+              "reasoning": {
+                "effort": "low"
+              }
+            },
+            "medium": {
+              "reasoning": {
+                "effort": "medium"
+              }
+            },
+            "high": {
+              "reasoning": {
+                "effort": "high"
+              }
+            },
+            "max": {
+              "reasoning": {
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        "astra-opus": {
+          "id": "combo/astra-opus",
+          "name": "Astra → Claude Opus 5.5 (subscription failover via OpenCodex)",
+          "family": "gpt",
+          "reasoning": true,
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "status": "active",
+          "limit": {
+            "context": 1000000,
             "output": 128000
           },
           "options": {
