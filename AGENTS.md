@@ -80,8 +80,8 @@ Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
 CodeGraph is the sole local code-navigation and impact-analysis engine. OmO
 owns its pinned provisioning, MCP bridge, daemon and privacy environment. Do
 not run CodeGraph's native agent installer or upgrader, and do not add a second
-project watcher. Use the managed graph for orientation, then verify material
-claims in current configuration and a fresh runtime request. The derived index
+project watcher. Code lookups follow the global CodeGraph rule; verify
+configuration claims in the current file and a fresh runtime request. The derived index
 is never proof of the active profile, provider, model, deployment or success.
 
 ## Terminal
