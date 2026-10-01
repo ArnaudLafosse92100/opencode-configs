@@ -143,3 +143,13 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 ## Sources
 
 Canonical link tables: `README.md` → **Sources & links**. Identity: `openconfig/opencode-configs` (`oc signature`). When docs disagree on runtime behavior, trust `oc validate` / `oc doctor` / pinned `versions.json`.
+
+## CI locale uniquement — aucun paiement GitHub (règle dure, 2026-10-01)
+
+Arnaud ne paie plus rien à GitHub. GitHub ne sert qu'à héberger le code et les PR ; GitHub Actions est volontairement bloqué (facturation coupée), donc chaque run finit en `startup_failure` : c'est attendu, ce n'est pas une panne.
+
+- Ne jamais proposer de débloquer la facturation GitHub, d'augmenter un budget ou une limite de dépense, ni d'attendre une CI GitHub.
+- Ne pas ajouter de workflow `.github/workflows` pour exécuter des vérifications ; les workflows existants sont inertes.
+- La porte de qualité est locale, sur le Mac : avant tout push ou merge, lancer les vérifications du dépôt (hooks de pré-push, scripts de test, lint, typecheck) et indiquer dans la PR ce qui a été exécuté et le résultat.
+- Les contrôles qui n'existaient qu'en CI (tests e2e, scans de secrets ou de vulnérabilités, SBOM) se lancent en local quand le changement les concerne ; sinon, les signaler explicitement comme non exécutés.
+- Un merge se décide sur ces preuves locales, jamais sur la présence ou l'absence de checks GitHub.
