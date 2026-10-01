@@ -1,5 +1,13 @@
 # Changelog
 
+- Remove CodeGraph from the stack: drop its version pin, setup step, doctor
+  section, telemetry env key, Explore permission grant and prompt/team/doc
+  guidance (local code now routes through read/grep/glob and LSP). Pinned OmO
+  4.19.4 ships CodeGraph as a default-on built-in, so `oh-my-openagent.json`
+  sets `codegraph.enabled/auto_init/auto_provision/daemon` to `false` and adds
+  `codegraph` to `disabled_mcps`; `oc validate` enforces this and `oc fix`
+  repairs it and strips a legacy `codegraph*` Explore grant.
+
 - Standardize every OpenCode runtime binding and Factory/Archon workflow alias
   on medium effort, preserving model selection, privacy boundaries, and fallback
   chains while using the same balanced default across normal, private, and

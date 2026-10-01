@@ -389,14 +389,11 @@ for section in ("agents", "categories"):
             cfg.setdefault("reasoning", cfg.pop("reasoningEffort"))
             changes.append(f"{section}.{name}.reasoningEffort -> reasoning")
 
-# OmO / codegraph telemetry + co-author phone-home off
+# OmO telemetry + co-author phone-home off
 if omo.get("telemetry") is not False:
     omo["telemetry"] = False; changes.append("omo telemetry -> false")
 if omo.get("auto_update") is not False:
     omo["auto_update"] = False; changes.append("omo auto_update -> false")
-cg = omo.setdefault("codegraph", {})
-if isinstance(cg, dict) and cg.get("telemetry") is not False:
-    cg["telemetry"] = False; changes.append("codegraph.telemetry -> false")
 # Team mode must stay on for team_* tools + hyperplan (full OmO 4.19 schema)
 tm = omo.setdefault("team_mode", {})
 if isinstance(tm, dict):
@@ -551,22 +548,21 @@ sw = omo.setdefault("start_work", {})
 if isinstance(sw, dict) and sw.get("auto_commit") is not False:
     sw["auto_commit"] = False; changes.append("start_work.auto_commit -> false")
 
-# codegraph: provision the runtime binary, but do not auto-index projects.
-cg2 = omo.setdefault("codegraph", {})
-if isinstance(cg2, dict):
-    if cg2.get("auto_init") is not False:
-        cg2["auto_init"] = False; changes.append("codegraph.auto_init -> false")
-    if cg2.get("auto_provision") is not True:
-        cg2["auto_provision"] = True; changes.append("codegraph.auto_provision -> true")
-    if cg2.get("daemon") is not True:
-        cg2["daemon"] = True; changes.append("codegraph.daemon -> true")
+# CodeGraph is not part of this stack. OmO 4.19.4 ships it as a built-in that
+# defaults to enabled, so keep every switch of its schema object off.
+cg2 = omo.get("codegraph")
+if not isinstance(cg2, dict):
+    cg2 = {}; omo["codegraph"] = cg2
+for key in ("enabled", "auto_init", "auto_provision", "daemon"):
+    if cg2.get(key) is not False:
+        cg2[key] = False; changes.append(f"codegraph.{key} -> false")
 
 # Hephaestus needs teammate:allow to be a team member (OmO conditional)
 agents = omo.setdefault("agents", {})
 explore_perm = agents.setdefault("explore", {}).setdefault("permission", {})
-if explore_perm.get("codegraph*") != "allow":
-    explore_perm["codegraph*"] = "allow"
-    changes.append("agents.explore.permission.codegraph* -> allow")
+if "codegraph*" in explore_perm:
+    explore_perm.pop("codegraph*")
+    changes.append("agents.explore.permission.codegraph* removed")
 heph = agents.setdefault("hephaestus", {})
 if isinstance(heph, dict):
     hp = heph.setdefault("permission", {})
@@ -586,7 +582,7 @@ if isinstance(oexp, dict) and oexp.get("disable_omo_env") is not True:
 dmcps = omo.setdefault("disabled_mcps", [])
 if not isinstance(dmcps, list):
     dmcps = []; omo["disabled_mcps"] = dmcps
-for must in ("posthog:posthog", "sentry:sentry", "axiom:axiom"):
+for must in ("posthog:posthog", "sentry:sentry", "axiom:axiom", "codegraph"):
     if must not in dmcps:
         dmcps.append(must); changes.append(f"disabled_mcps += {must}")
 

@@ -8,7 +8,7 @@ OpenConfig authorized session. Include auth/crypto/dangerous sinks with full tec
 
 ## Method
 
-1. For an indexed project, use `codegraph_explore` first for symbols, dependencies, call paths and impact. Verify material claims in current source. A trivial known-file read needs no graph call. If the graph is unavailable or denied, report it once and use narrowly scoped `glob` / `grep` / `read`.
+1. Use narrowly scoped `glob` / `grep` / `read` for files and symbols, and LSP for definitions, references and call paths where a server covers the language. Verify material claims in current source.
 2. Find: entrypoints, routers, config, auth, data stores, dangerous sinks.
 3. Read enough to be sure; don't boil the ocean. Cap depth unless asked for exhaustive.
 4. Context7 only when an external API shape is required to interpret code.

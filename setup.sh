@@ -265,51 +265,6 @@ if $need_install && ! $CHECK_ONLY; then
 fi
 echo ""
 
-# ─── 5b. CodeGraph (OmO code intelligence) ────────────────────────
-echo "Step 5b: CodeGraph"
-CG_BIN="${HOME}/.omo/codegraph/bin/codegraph"
-CG_WANT="$(oc_version_get codegraph.pin 2>/dev/null || true)"
-if [[ -x "$CG_BIN" ]]; then
-  CG_HAVE="$($CG_BIN --version 2>/dev/null | head -1 | tr -d '\r')"
-  if [[ -n "$CG_WANT" && "$CG_HAVE" != "$CG_WANT" ]]; then
-    opt "codegraph $CG_HAVE != OmO pin $CG_WANT (next OmO session auto-provisions it)"
-  else
-    ok "codegraph $CG_HAVE"
-  fi
-elif [[ -x "${HOME}/.omo/codegraph/bin/codegraph" ]]; then
-  ok "codegraph present"
-else
-  opt "codegraph binary missing at ~/.omo/codegraph/bin/codegraph"
-  if ! $CHECK_ONLY; then
-    # OmO auto_provision on first session; try CLI install if available via bunx
-    info "Will auto-provision on first OpenCode/OmO session (codegraph.auto_provision=true)"
-  fi
-fi
-# Ensure config does not point at a non-default broken install_dir
-python3 - "$REPO" <<'PY' 2>/dev/null || true
-import json, os, sys
-repo=sys.argv[1]
-p=os.path.join(repo,"oh-my-openagent.json")
-omo=json.load(open(p))
-cg=omo.get("codegraph") or {}
-bad=cg.get("install_dir")
-if bad and ("/.cache/opencode/codegraph" in str(bad) or str(bad).startswith("~/.cache")):
-    print(f"  ⚠ codegraph.install_dir={bad!r} is wrong — OmO default is ~/.omo/codegraph")
-elif cg.get("enabled") is False:
-    print("  ⚠ codegraph.enabled is false")
-elif cg.get("auto_init") is not False:
-    print("  ⚠ codegraph.auto_init must be false (managed projects are initialized explicitly)")
-elif cg.get("auto_provision") is not True:
-    print("  ⚠ codegraph.auto_provision must be true")
-elif cg.get("telemetry") is not False:
-    print("  ⚠ codegraph.telemetry must be false")
-elif cg.get("daemon") is not True:
-    print("  ⚠ codegraph.daemon must be true")
-else:
-    print("  ✓ codegraph config OK (explicit project init, managed daemon, telemetry off)")
-PY
-echo ""
-
 # ─── 6. Formatters ────────────────────────────────────────────────
 echo "Step 6: Formatters"
 need_install=false

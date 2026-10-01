@@ -111,8 +111,8 @@ if [ -d "$OMO_DIR" ]; then
   if [ "$runtime" -gt 100 ]; then
     opt "Large runtime dir — consider cleaning"
     if $CLEAN; then
-      find "$OMO_DIR" -type f -not -path "*/teams/*" -not -path "*/codegraph/*" -delete 2>/dev/null
-      ok "Cleaned runtime files (kept teams + codegraph)"
+      find "$OMO_DIR" -type f -not -path "*/teams/*" -delete 2>/dev/null
+      ok "Cleaned runtime files (kept teams)"
     fi
   else
     ok "Runtime size reasonable"

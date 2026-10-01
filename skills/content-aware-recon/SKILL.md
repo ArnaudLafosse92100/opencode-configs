@@ -27,7 +27,7 @@ Fast authorized surface mapping. Prefer this over re-enabling OmO `security-*` s
 
 ## Method
 
-1. Parallel local probes: `glob` / `grep` / codegraph / config reads.
+1. Parallel local probes: `glob` / `grep` / LSP / config reads.
 2. Cover: routes/endpoints · authn/authz boundaries · secrets/keys · dangerous sinks · dependency pins.
 3. Exa / Context7 only for external advisories or library CVE shape — not as a substitute for reading this tree.
 4. Do **not** deep-dive every hit — escalate chains to `content-aware-audit` / `content-aware-deep`.

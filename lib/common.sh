@@ -231,7 +231,6 @@ OC_ENV_ALLOWLIST=(
   OMO_SEND_ANONYMOUS_TELEMETRY
   OMO_CODEX_DISABLE_POSTHOG
   OMO_CODEX_SEND_ANONYMOUS_TELEMETRY
-  CODEGRAPH_TELEMETRY
   OTEL_SDK_DISABLED
   OPENCONFIG_OMO_SAME_MODEL_RETRIES_BEFORE_FALLBACK
   OPENCONFIG_OMO_FIRST_PROMPT_TIMEOUT_SECONDS
@@ -522,7 +521,7 @@ PY
 }
 
 # Telemetry off — always set before launching OpenCode / OmO CLI.
-# Kills PostHog (OmO), codegraph phone-home, OpenCode OTel exporters, and
+# Kills PostHog (OmO), OpenCode OTel exporters, and
 # Codex-edition OmO telemetry. Also hardens headless boot.
 oc_telemetry_off() {
   export DO_NOT_TRACK=1
@@ -530,7 +529,6 @@ oc_telemetry_off() {
   export OMO_SEND_ANONYMOUS_TELEMETRY=0
   export OMO_CODEX_DISABLE_POSTHOG=1
   export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
-  export CODEGRAPH_TELEMETRY=0
   # Ensure OpenCode experimental OTel / third-party OTLP stay dark
   unset OPENCODE_ENABLE_TELEMETRY 2>/dev/null || true
   unset OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_TRACES_ENDPOINT \
@@ -1354,7 +1352,6 @@ oc_scrub_env_to_allowlist() {
   oc_set_env_key_if_unset "$tmp" OMO_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
   oc_set_env_key_if_unset "$tmp" OMO_CODEX_DISABLE_POSTHOG 1 >/dev/null
   oc_set_env_key_if_unset "$tmp" OMO_CODEX_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
-  oc_set_env_key_if_unset "$tmp" CODEGRAPH_TELEMETRY 0 >/dev/null
   oc_set_env_key_if_unset "$tmp" OTEL_SDK_DISABLED true >/dev/null
   mv -f "$tmp" "$dest"
   chmod 600 "$dest"
@@ -1380,7 +1377,6 @@ oc_import_allowlisted_dotenv() {
   oc_set_env_key_if_unset "$dest" OMO_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
   oc_set_env_key_if_unset "$dest" OMO_CODEX_DISABLE_POSTHOG 1 >/dev/null
   oc_set_env_key_if_unset "$dest" OMO_CODEX_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
-  oc_set_env_key_if_unset "$dest" CODEGRAPH_TELEMETRY 0 >/dev/null
   oc_set_env_key_if_unset "$dest" OTEL_SDK_DISABLED true >/dev/null
   chmod 600 "$dest" 2>/dev/null || true
   if [[ ${#imported[@]} -gt 0 ]]; then
@@ -1688,7 +1684,6 @@ oc_secrets_sync() {
       oc_set_env_key_if_unset "$dest" OMO_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
       oc_set_env_key_if_unset "$dest" OMO_CODEX_DISABLE_POSTHOG 1 >/dev/null
       oc_set_env_key_if_unset "$dest" OMO_CODEX_SEND_ANONYMOUS_TELEMETRY 0 >/dev/null
-      oc_set_env_key_if_unset "$dest" CODEGRAPH_TELEMETRY 0 >/dev/null
       oc_set_env_key_if_unset "$dest" OTEL_SDK_DISABLED true >/dev/null
       chmod 600 "$dest" 2>/dev/null || true
       printf '%s|%s\n' "$backend" "$imported"
