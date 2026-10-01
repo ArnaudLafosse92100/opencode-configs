@@ -25,7 +25,7 @@ OpenCode + OmO are powerful and easy to misconfigure. **OpenConfig** (`oc`) is t
 | Docs truth | [Context7](https://context7.com) MCP | Versioned library docs via `resolve-library-id` → `query-docs` — stop inventing APIs |
 | Web | [Exa](https://exa.ai) via OmO `websearch` | Ideal-page queries; `category:company\|people\|news…`; then webfetch |
 | GitHub code | OmO `grep_app` | Real call-site examples across public repos |
-| Code intel | OmO codegraph + OpenCode LSP | Graph at `~/.omo/codegraph`; LSP locked to TS/Python/Go only |
+| Code intel | OpenCode LSP | LSP locked to TS/Python/Go only |
 | Design | Open Design / Claude Design patterns | `artistry` locks direction; `visual-engineering` ships (shadcn-aware) |
 | Identity | `signature.json` + `oc signature` | Markers + content fingerprint — proves this tree is OpenConfig, not a random clone |
 
@@ -69,20 +69,11 @@ Re-running install / setup / heal / fix on a healthy box must **not** clobber `.
 ## How to work
 
 - Parallel tool batches. Prefer `read`/`grep`/`glob` over bash for files. Hashline edits. Smallest diff. Cite `path:line`. Real output only.
-- **Tool matrix:** local code → read/grep/codegraph · library APIs → **Context7** · GitHub patterns → **grep_app** · current web → **Exa websearch** → webfetch. Never invent APIs.
+- **Tool matrix:** local code → read/grep/LSP · library APIs → **Context7** · GitHub patterns → **grep_app** · current web → **Exa websearch** → webfetch. Never invent APIs.
 - Visual → `artistry` / `visual-engineering`. GLM/DeepSeek for tool loops; escalate when stuck. Long multi-iteration plans → `/start-work` → Atlas (`/goal` disabled — see `prompts/goal.md`).
 - No speculative fallbacks / `as any` / `@ts-ignore`. Plain markdown. Stop when done.
 
 Full detail: `prompts/core.md` + `prompts/agents|categories|profiles/`.
-
-## CodeGraph
-
-CodeGraph is the sole local code-navigation and impact-analysis engine. OmO
-owns its pinned provisioning, MCP bridge, daemon and privacy environment. Do
-not run CodeGraph's native agent installer or upgrader, and do not add a second
-project watcher. Code lookups follow the global CodeGraph rule; verify
-configuration claims in the current file and a fresh runtime request. The derived index
-is never proof of the active profile, provider, model, deployment or success.
 
 ## Terminal
 
@@ -98,9 +89,9 @@ is never proof of the active profile, provider, model, deployment or success.
 ## Permissions
 
 - Allow-everything on this trusted local box (no interactive prompts for normal tools).
-- Repeated identical tool loops are denied (`doom_loop: deny`) so headless runs cannot wait on loop approval. Explore keeps CodeGraph access and a native 24-step synthesis cue; this cue is not a hard execution limit. Return a partial map when its progress budget is exhausted; the Codex bridge separately stops repeated read-only calls.
+- Repeated identical tool loops are denied (`doom_loop: deny`) so headless runs cannot wait on loop approval. Explore keeps a native 24-step synthesis cue; this cue is not a hard execution limit. Return a partial map when its progress budget is exhausted; the Codex bridge separately stops repeated read-only calls.
 - Hard-deny catastrophic bash: `rm -rf /`, `rm -rf ~`, `mkfs`, `sudo`, `git push --force`, `gh repo delete`.
-- External directories, team tools, LSP, MCP allowed: Context7 · Exa websearch · grep_app · codegraph · lsp (OmO builtins + `opencode.json` Context7).
+- External directories, team tools, LSP, MCP allowed: Context7 · Exa websearch · grep_app · lsp (OmO builtins + `opencode.json` Context7).
 - Keys in `.env` (never commit): `OPENROUTER_API_KEY`, `EXA_API_KEY`, `CONTEXT7_API_KEY`.
 
 ## Commands
@@ -137,7 +128,8 @@ Do not scaffold into the config repo. Prefer `oc new`; use `--here` / `--dir` on
 - Do not commit `.env`, `vault.local.json`, or secrets.
 - Do not delete failing tests to make them pass.
 - Do not use `as any`, `@ts-ignore`, or `@ts-expect-error`.
-- Do not re-enable OmO/OpenCode/CodeGraph telemetry (`telemetry`, PostHog, `share`, OTel exporters) — `oc_telemetry_off` + `oc fix` keep them dark.
+- Do not re-enable OmO/OpenCode telemetry (`telemetry`, PostHog, `share`, OTel exporters) — `oc_telemetry_off` + `oc fix` keep them dark.
+- Do not re-enable OmO's built-in CodeGraph: pinned OmO 4.19.4 defaults it on, so `codegraph.enabled/auto_init/auto_provision/daemon` stay `false` and `disabled_mcps` lists `codegraph` (`oc validate` enforces, `oc fix` repairs).
 - Do not skip `oc signature` after editing identity files (`oc`, `lib/common.sh`, `versions.json`, …) — run `oc signature --refresh`.
 
 ## Sources

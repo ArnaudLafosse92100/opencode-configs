@@ -127,7 +127,7 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 
 | Need | Tool | Notes |
 | --- | --- | --- |
-| Local code | `read` · `grep` · `glob` · codegraph · LSP | Always first |
+| Local code | `read` · `grep` · `glob` · LSP | Always first |
 | Library / framework APIs | **Context7** MCP | `resolve-library-id` → `query-docs` |
 | GitHub call sites | **grep_app** (OmO) | Public-repo patterns |
 | Current web | **websearch** (Exa) | Ideal-page queries; then webfetch |
@@ -140,13 +140,12 @@ oc versions --fix         # set ~/.opencode @opencode-ai/plugin to match OpenCod
 | --- | --- |
 | Context7 MCP | Enabled (`CONTEXT7_API_KEY`) |
 | Exa websearch | Enabled (`EXA_API_KEY`) |
-| codegraph | Enabled · telemetry off · `~/.omo/codegraph` |
 | LSP | TypeScript · Python · Go only |
 | Formatters | Prettier + Ruff |
 | Skills | `content-aware-recon` · `content-aware-audit` under `skills/` (fenced) |
 | OmO `security-*` skills | Disabled (hang headless `oc run`) — use local content-aware skills |
 | Extra MCPs | Disabled (PostHog, Sentry, Playwright MCP, …) |
-| Telemetry | Off (OpenCode share/OTel · OmO PostHog · codegraph · `DO_NOT_TRACK`) |
+| Telemetry | Off (OpenCode share/OTel · OmO PostHog · `DO_NOT_TRACK`) |
 
 Disabled on purpose (noisy / footguns): `interactive_bash`, monitor tools, `session_list` / `session_search`.
 

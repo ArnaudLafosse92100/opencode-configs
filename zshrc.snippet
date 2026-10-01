@@ -60,12 +60,12 @@ _oc_resolve_start_dir() {
   if [[ "$real_dir" == "$projects_home" ]]; then
     need_workspace=1
   fi
-  # Empty / sidecar-only dirs (only .omo/.codegraph/.claude/.git/…) are not
-  # real projects — launching there feels broken/slow (CodeGraph on nothing).
+  # Empty / sidecar-only dirs (only .omo/.claude/.git/…) are not real
+  # projects — launching there feels broken/slow.
   if (( !need_workspace )) && [[ -d "$real_dir" ]]; then
     local _oc_real_count
     _oc_real_count="$(find "$real_dir" -mindepth 1 -maxdepth 1 \
-      ! -name '.omo' ! -name '.codegraph' ! -name '.claude' ! -name '.opencode' \
+      ! -name '.omo' ! -name '.claude' ! -name '.opencode' \
       ! -name '.git' ! -name '.DS_Store' ! -name '.gitignore' \
       ! -name '.metadata_never_index' ! -name 'README.md' \
       2>/dev/null | wc -l | tr -d ' ')"
@@ -94,7 +94,6 @@ opencode() {
   export OMO_SEND_ANONYMOUS_TELEMETRY=0
   export OMO_CODEX_DISABLE_POSTHOG=1
   export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
-  export CODEGRAPH_TELEMETRY=0
   export OTEL_SDK_DISABLED=true
   unset OPENCODE_ENABLE_TELEMETRY OTEL_EXPORTER_OTLP_ENDPOINT \
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS \
@@ -107,7 +106,7 @@ opencode() {
       _oc_key="${_oc_line%%=*}"
       # Keep in sync with OC_ENV_ALLOWLIST in lib/common.sh (no OPENAI_API_KEY).
       case "$_oc_key" in
-        OPENROUTER_API_KEY|VENICE_API_KEY|DEEPSEEK_API_KEY|EXA_API_KEY|CONTEXT7_API_KEY|OPENROUTER_MGMT_KEY|OC_PROJECTS_DIR|OC_DEFAULT_WORKSPACE|DO_NOT_TRACK|CODEGRAPH_TELEMETRY|OTEL_SDK_DISABLED|OMO_*) ;;
+        OPENROUTER_API_KEY|VENICE_API_KEY|DEEPSEEK_API_KEY|EXA_API_KEY|CONTEXT7_API_KEY|OPENROUTER_MGMT_KEY|OC_PROJECTS_DIR|OC_DEFAULT_WORKSPACE|DO_NOT_TRACK|OTEL_SDK_DISABLED|OMO_*) ;;
         *) continue ;;
       esac
       _oc_val="${_oc_line#*=}"
@@ -119,7 +118,7 @@ opencode() {
   # Re-assert kill switches after .env load (env file must not re-enable telemetry)
   export DO_NOT_TRACK=1 OMO_DISABLE_POSTHOG=1 OMO_SEND_ANONYMOUS_TELEMETRY=0
   export OMO_CODEX_DISABLE_POSTHOG=1 OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
-  export CODEGRAPH_TELEMETRY=0 OTEL_SDK_DISABLED=true
+  export OTEL_SDK_DISABLED=true
   # Capture the producer before eval. `eval "$(...)"` masks an `oc` failure
   # and would let inherited stale paths reach OpenCode.
   unset OPENCODE_CONFIG_DIR XDG_CONFIG_HOME OPENCONFIG_RUNTIME_PROFILE

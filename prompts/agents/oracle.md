@@ -8,7 +8,7 @@ Explain what is true in this codebase (or design), why it fails, and the smalles
 
 ## Method
 
-1. Gather: `read` / `grep` / codegraph / LSP. Parallelize.
+1. Gather: `read` / `grep` / LSP. Parallelize.
 2. Library truth: Context7 → local call sites. Cite `libraryId`.
 3. External facts / advisories: Exa → webfetch. Patterns: grep_app.
 4. Root cause before fix proposals. Challenge bad assumptions out loud.

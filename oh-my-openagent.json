@@ -134,7 +134,6 @@
       "mode": "subagent",
       "temperature": 0.1,
       "permission": {
-        "codegraph*": "allow",
         "edit": "deny",
         "webfetch": "allow",
         "question": "allow",
@@ -607,11 +606,10 @@
     "include_co_authored_by": false
   },
   "codegraph": {
-    "enabled": true,
+    "enabled": false,
     "auto_init": false,
-    "auto_provision": true,
-    "telemetry": false,
-    "daemon": true
+    "auto_provision": false,
+    "daemon": false
   },
   "model_capabilities": {
     "enabled": true,
@@ -703,7 +701,8 @@
     "stripe:stripe",
     "supabase:supabase",
     "clerk:clerk",
-    "axiom:axiom"
+    "axiom:axiom",
+    "codegraph"
   ],
   "skills": {
     "sources": [

@@ -18,7 +18,9 @@ class ExploreBoundsTests(unittest.TestCase):
         self.assertEqual(oc["permission"]["doom_loop"], "deny")
         self.assertEqual(oc["agent"]["explore"]["steps"], 24)
         permission = omo["agents"]["explore"]["permission"]
-        self.assertEqual(permission["codegraph*"], "allow")
+        self.assertNotIn("codegraph*", permission)
+        self.assertEqual(omo["codegraph"], {"enabled": False, "auto_init": False, "auto_provision": False, "daemon": False})
+        self.assertIn("codegraph", omo["disabled_mcps"])
         self.assertEqual(permission["edit"], "deny")
         self.assertEqual(permission["task"], "deny")
 
@@ -32,12 +34,12 @@ class ExploreBoundsTests(unittest.TestCase):
             'heph = agents.setdefault', 1)[0]
         permission = 'explore_perm = agents.setdefault' + permission
         oc = {"permission": {"doom_loop": "allow"}, "agent": {"explore": {"description": "keep"}}}
-        agents = {"explore": {"permission": {"edit": "deny", "task": "deny"}, "model": "keep"}}
+        agents = {"explore": {"permission": {"edit": "deny", "task": "deny", "codegraph*": "allow"}, "model": "keep"}}
         state = {"oc": oc, "perm": oc["permission"], "agents": agents, "changes": []}
         exec(core + permission, state)
         self.assertEqual(oc["permission"]["doom_loop"], "deny")
         self.assertEqual(oc["agent"]["explore"], {"steps": 24, "description": "keep"})
-        self.assertEqual(agents["explore"]["permission"], {"edit": "deny", "task": "deny", "codegraph*": "allow"})
+        self.assertEqual(agents["explore"]["permission"], {"edit": "deny", "task": "deny"})
         self.assertEqual(agents["explore"]["model"], "keep")
         before = copy.deepcopy((oc, agents))
         state["changes"] = []
@@ -58,7 +60,8 @@ class ExploreBoundsTests(unittest.TestCase):
                     omo = json.loads((runtime / "oh-my-openagent.json").read_text())
                     self.assertEqual(oc["permission"]["doom_loop"], "deny")
                     self.assertEqual(oc["agent"]["explore"]["steps"], 24)
-                    self.assertEqual(omo["agents"]["explore"]["permission"]["codegraph*"], "allow")
+                    self.assertNotIn("codegraph*", omo["agents"]["explore"]["permission"])
+                    self.assertIs(omo["codegraph"]["enabled"], False)
                     selected = profiles.selected(name)
                     for section in ("agents", "categories"):
                         for agent, route in selected[section].items():

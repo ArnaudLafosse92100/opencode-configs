@@ -808,7 +808,6 @@ if command -v python3 >/dev/null 2>&1; then
     "OMO_SEND_ANONYMOUS_TELEMETRY=0" \
     "OMO_CODEX_DISABLE_POSTHOG=1" \
     "OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0" \
-    "CODEGRAPH_TELEMETRY=0" \
     "OTEL_SDK_DISABLED=true"
   do
     _k="${_kv%%=*}"; _v="${_kv#*=}"

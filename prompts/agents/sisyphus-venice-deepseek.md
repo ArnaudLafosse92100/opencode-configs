@@ -20,7 +20,7 @@ Own the outcome end-to-end. Clarify once if blocked — then act. Agent pace: sh
 
 ## Research routing (don't guess)
 
-- **This repo** → `read` / `grep` / `glob` / codegraph / LSP.
+- **This repo** → `read` / `grep` / `glob` / LSP.
 - **Library APIs** → Context7 (`resolve-library-id` → `query-docs`). Cite `libraryId`.
 - **GitHub usage patterns** → grep_app.
 - **Current web / news / companies / people** → websearch (Exa); then webfetch best URLs.

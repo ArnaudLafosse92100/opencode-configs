@@ -329,31 +329,6 @@ for k,cmd in enabled:
 # _lsp_miss already counted via opt(); do not double-add
 unset _lsp_miss
 
-# ─── CodeGraph ───────────────────────────────────────────────────────
-sec "CodeGraph (OmO)"
-CG_BIN="$HOME/.omo/codegraph/bin/codegraph"
-if [[ -x "$CG_BIN" ]]; then
-  ok "binary: $CG_BIN ($($CG_BIN --version 2>/dev/null | head -1 | tr -d '\r'))"
-else
-  opt "binary missing — first OmO session should auto_provision to ~/.omo/codegraph"
-  tip "or run: oc setup   # provisions codegraph + teams + LSP"
-fi
-cg_line="$(python3 -c "
-import json
-cg=json.load(open('$REPO/oh-my-openagent.json')).get('codegraph') or {}
-id=cg.get('install_dir')
-if cg.get('enabled') is False:
-    print('BAD enabled=false')
-elif id and 'cache/opencode/codegraph' in str(id):
-    print('BAD install_dir='+str(id))
-else:
-    print('enabled=%s auto_init=%s auto_provision=%s telemetry=%s' % (
-        cg.get('enabled', True), cg.get('auto_init', True),
-        cg.get('auto_provision', True), cg.get('telemetry')))
-" 2>/dev/null)"
-if [[ "$cg_line" == BAD* ]]; then bad "codegraph config: $cg_line"
-else ok "config: $cg_line"; fi
-
 # ─── Formatters ──────────────────────────────────────────────────────
 sec "Formatters"
 while read -r name cmd; do
@@ -967,8 +942,6 @@ try:
         print("OK|doom_loop = deny (bounded headless execution)")
     if ((oc.get("agent") or {}).get("explore") or {}).get("steps") != 24:
         print("BAD|agent.explore.steps must be 24 — run: oc fix")
-    if (((omo.get("agents") or {}).get("explore") or {}).get("permission") or {}).get("codegraph*") != "allow":
-        print("BAD|Explore must allow codegraph* — run: oc fix")
 except Exception as e:
     print("BAD|could not read opencode.json permissions (%s)" % e)
 # eligible agents present
@@ -1571,8 +1544,6 @@ checks.append(("OK" if (oc.get("experimental") or {}).get("openTelemetry") is Fa
 checks.append(("OK" if (oc.get("server") or {}).get("mdns") is False else "BAD",
                "server.mdns=%s" % (oc.get("server") or {}).get("mdns")))
 checks.append(("OK" if omo.get("telemetry") is False else "BAD", "omo.telemetry=%s" % omo.get("telemetry")))
-checks.append(("OK" if (omo.get("codegraph") or {}).get("telemetry") is False else "BAD",
-               "codegraph.telemetry=%s" % (omo.get("codegraph") or {}).get("telemetry")))
 checks.append(("OK" if (omo.get("git_master") or {}).get("include_co_authored_by") is False else "BAD",
                "co_authored_by=%s" % (omo.get("git_master") or {}).get("include_co_authored_by")))
 checks.append(("OK" if (omo.get("experimental") or {}).get("disable_omo_env") is True else "BAD",
@@ -1598,7 +1569,7 @@ else
 fi
 # Live env kill switches (from .env / process)
 _tel_env_ok=1
-for _kv in DO_NOT_TRACK=1 OMO_DISABLE_POSTHOG=1 OMO_SEND_ANONYMOUS_TELEMETRY=0 CODEGRAPH_TELEMETRY=0; do
+for _kv in DO_NOT_TRACK=1 OMO_DISABLE_POSTHOG=1 OMO_SEND_ANONYMOUS_TELEMETRY=0; do
   _k="${_kv%%=*}"; _want="${_kv#*=}"
   _got="$(oc_get_env_key "$REPO/.env" "$_k" 2>/dev/null || true)"
   if [[ "$_got" != "$_want" && -n "$_got" ]]; then

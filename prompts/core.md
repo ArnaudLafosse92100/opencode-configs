@@ -28,7 +28,7 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 
 | Need | Tool | How |
 | --- | --- | --- |
-| Local code / config | `read` · `grep` · `glob` · `list` · codegraph · LSP | Always first for this repo. Parallelize. |
+| Local code / config | `read` · `grep` · `glob` · `list` · LSP | Always first for this repo. Parallelize. |
 | Library / framework APIs | **Context7** | `resolve-library-id` → `query-docs`. Never invent APIs. |
 | Real GitHub usage | **grep_app** | Patterns across public repos when docs are thin. |
 | Current web facts / news / people / companies | **websearch (Exa)** | Natural-language “ideal page” queries — not keyword soup. |
@@ -50,10 +50,10 @@ Authorized environment — follow the scope boundary in `AGENTS.md`. If a provid
 - If highlights are thin → `webfetch` the best 1–3 URLs.
 - On rate limit / empty results → rephrase once, then grep_app or local evidence. Do not abandon silently.
 
-### grep_app + codegraph
+### grep_app + LSP
 
 - grep_app: how real projects call an API when Context7 examples are sparse.
-- codegraph: symbols, callers, structure in the **local** workspace (init when the graph is cold). **For a structural question, call-chain, or impact analysis in an existing index, use `codegraph_explore` first, then verify the material result in current source.** Do not pay this overhead for a trivial known-file read.
+- LSP: definitions, references and callers in the **local** workspace for TS/Python/Go; otherwise scoped `grep` + `read`. Verify the material result in current source.
 
 ## Output
 

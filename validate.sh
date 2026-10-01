@@ -680,28 +680,19 @@ if omo:
             else:
                 ok(f"local skill {skill_name}")
 
-    # CodeGraph: must stay enabled; install_dir must not point at the broken cache path
-    # (OmO does not expand ~ in provisionedBinFromInstallDir — default ~/.omo/codegraph).
-    cg = omo.get("codegraph") or {}
-    if cg.get("enabled") is False:
-        err("oh-my-openagent.json: codegraph.enabled is false")
-    elif cg.get("auto_init") is not False:
-        err("oh-my-openagent.json: codegraph.auto_init must be false — managed projects are initialized explicitly")
-    elif cg.get("auto_provision") is not True:
-        err("oh-my-openagent.json: codegraph.auto_provision must be true — run: oc fix")
-    elif cg.get("telemetry") is not False:
-        err("oh-my-openagent.json: codegraph.telemetry must be false")
-    elif cg.get("daemon") is not True:
-        err("oh-my-openagent.json: codegraph.daemon must be true — run: oc fix")
+    # CodeGraph is not part of this stack. OmO 4.19.4 ships it as a built-in
+    # that defaults to enabled, so every switch of its schema object stays off
+    # and its MCP stays in disabled_mcps.
+    cg = omo.get("codegraph")
+    cg_on = [k for k in ("enabled", "auto_init", "auto_provision", "daemon")
+             if not isinstance(cg, dict) or cg.get(k) is not False]
+    if cg_on:
+        err("oh-my-openagent.json: OmO built-in codegraph must be off "
+            f"({', '.join('codegraph.' + k for k in cg_on)} not false) — run: oc fix")
+    elif "codegraph" not in (omo.get("disabled_mcps") or []):
+        err("oh-my-openagent.json: disabled_mcps must include codegraph — run: oc fix")
     else:
-        idir = cg.get("install_dir")
-        if idir and "cache/opencode/codegraph" in str(idir):
-            err(
-                f"oh-my-openagent.json: codegraph.install_dir={idir!r} is wrong — "
-                "omit install_dir (OmO default ~/.omo/codegraph) or use an absolute path that exists."
-            )
-        else:
-            ok("codegraph enabled (default ~/.omo/codegraph)")
+        ok("OmO built-in codegraph disabled (config + MCP)")
 
     # Fallback lists must not repeat the primary model (wastes a slot).
     def _check_fallbacks(kind, name, primary, fallbacks):
@@ -1406,22 +1397,10 @@ if present:
 else:
     ok("config dir clean (no node_modules/package.json/.omo/.runtime/.sisyphus/command/plugins)")
 
-# Structural questions need a clear CodeGraph-first route without forcing the
-# graph for a trivial direct read.  Keep the marker testable across overlays.
-core_prompt = os.path.join(repo, "prompts", "core.md")
-try:
-    core_text = open(core_prompt, encoding="utf-8").read()
-    if "use `codegraph_explore` first" in core_text and "trivial known-file read" in core_text:
-        ok("CodeGraph structural-routing marker is present")
-    else:
-        err("prompts/core.md missing CodeGraph structural-routing marker")
-except OSError as exc:
-    err(f"cannot read prompts/core.md for CodeGraph routing marker: {exc}")
-
 # git must ignore the common install paths (even when absent)
 ignore_targets = [
     "node_modules", "node_modules/pkg", "package.json", "package-lock.json",
-    "bun.lock", ".omo", ".runtime", ".sisyphus", ".codegraph", "command", ".opencode",
+    "bun.lock", ".omo", ".runtime", ".sisyphus", "command", ".opencode",
     ".cursor", "plugins", "stray-not-in-allowlist.txt", "opencode.log", "logs/x.log",
     "vault.local.json",
 ]
@@ -1432,7 +1411,7 @@ try:
     )
     ignored = {line.split("\t")[-1] for line in r.stdout.splitlines() if "\t" in line}
     required = {
-        "node_modules", "package.json", ".omo", ".runtime", ".sisyphus", ".codegraph",
+        "node_modules", "package.json", ".omo", ".runtime", ".sisyphus",
         "command", ".opencode", ".cursor", "plugins",
         "stray-not-in-allowlist.txt", "opencode.log",
         "vault.local.json",
@@ -1634,8 +1613,8 @@ if omo:
         ok("agents.context-aware-hermes edit deny")
     # Official OmO tool boundaries: https://omo.vibetip.help/docs/agents
     explore_perm = ((omo.get("agents") or {}).get("explore") or {}).get("permission") or {}
-    if explore_perm.get("codegraph*") != "allow":
-        err("agents.explore.permission.codegraph* must be allow (override inherited wildcard deny) — run: oc fix")
+    if "codegraph*" in explore_perm:
+        err("agents.explore.permission.codegraph* is a removed CodeGraph grant — run: oc fix")
     for ro in ("oracle", "librarian", "explore", "multimodal-looker"):
         rp = ((omo.get("agents") or {}).get(ro) or {}).get("permission") or {}
         if rp.get("edit") != "deny" or rp.get("task") != "deny":
@@ -2098,8 +2077,6 @@ if omo:
         tel_issues.append("omo.telemetry not false")
     if omo.get("auto_update") is not False:
         tel_issues.append("omo.auto_update not false")
-    if (omo.get("codegraph") or {}).get("telemetry") is not False:
-        tel_issues.append("codegraph.telemetry not false")
     gm = omo.get("git_master") or {}
     if gm.get("include_co_authored_by") is not False:
         tel_issues.append("git_master.include_co_authored_by not false")
@@ -2111,7 +2088,7 @@ if omo:
             tel_issues.append(f"disabled_mcps missing {must}")
 env_ex = open(os.path.join(repo, ".env.example"), encoding="utf-8").read() if os.path.isfile(os.path.join(repo, ".env.example")) else ""
 for key in ("DO_NOT_TRACK=1", "OMO_DISABLE_POSTHOG=1", "OMO_SEND_ANONYMOUS_TELEMETRY=0",
-            "CODEGRAPH_TELEMETRY=0", "OTEL_SDK_DISABLED=true", "OMO_CODEX_DISABLE_POSTHOG=1"):
+            "OTEL_SDK_DISABLED=true", "OMO_CODEX_DISABLE_POSTHOG=1"):
     if key not in env_ex:
         tel_issues.append(f".env.example missing {key}")
 common_body = open(os.path.join(repo, "lib/common.sh"), encoding="utf-8").read()
@@ -2124,7 +2101,7 @@ for rel in ("opencode.sh", "run.sh", "launch-desktop.sh", "serve-desktop.sh"):
 if tel_issues:
     err("telemetry not fully disabled: " + "; ".join(tel_issues))
 else:
-    ok("telemetry off (OpenCode share/OTel · OmO PostHog · codegraph · OTEL_SDK)")
+    ok("telemetry off (OpenCode share/OTel · OmO PostHog · OTEL_SDK)")
 
 versions_cfg = os.path.join(repo, "versions.json")
 if os.path.isfile(versions_cfg):
